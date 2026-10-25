@@ -9,7 +9,8 @@ export type Order =
   | "dam"
   | "barricade"
   | "hold"
-  | "rest";
+  | "rest"
+  | "defend";
 export interface Point {
   x: number;
   y: number;
@@ -32,6 +33,7 @@ export interface Unit extends Point {
   heading: Point;
   royal?: boolean;
   reserve?: number;
+  defending?: number;
 }
 export interface House extends Point {
   id: number;
@@ -621,6 +623,7 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
   const rally = target ?? { x: us[0].x, y: us[0].y };
   for (const u of us) {
     u.order = order;
+    delete u.defending;
     u.target = order === "auto" || order === "hold" ? undefined : rally;
   }
 }
@@ -772,10 +775,42 @@ function updateRest(s: State, u: Unit) {
     u.target = { x: chosen.x, y: chosen.y };
   }
 }
+function updateDefence(s: State, u: Unit) {
+  if (u.team !== 0 || u.royal || !["auto", "rest", "defend"].includes(u.order))
+    return;
+  const houses = s.houses.filter((h) => h.team === u.team);
+  const threats = s.units
+    .filter(
+      (v) =>
+        v.team !== u.team &&
+        v.hp > 0 &&
+        distance(u, v) <= 10 &&
+        (distance(v, s.kingdoms[u.team].castle) <= 5 ||
+          houses.some((h) => distance(v, h) <= 5)),
+    )
+    .sort((a, b) => distance(u, a) - distance(u, b));
+  const current = threats.find((v) => v.id === u.defending);
+  const candidates = current
+    ? [current, ...threats.filter((v) => v.id !== current.id)]
+    : threats;
+  const target = candidates.find(
+    (v) => distance(u, v) > 0 && nextStep(s, u, v, u.team),
+  );
+  if (target) {
+    u.order = "defend";
+    u.defending = target.id;
+    u.target = { x: target.x, y: target.y };
+  } else if (u.order === "defend") {
+    u.order = "auto";
+    delete u.target;
+    delete u.defending;
+  }
+}
 function act(s: State, u: Unit) {
   const k = s.kingdoms[u.team];
   if (!k.alive || u.hp <= 0) return;
   if (u.order === "hold" || (u.royal && u.order === "auto")) return;
+  updateDefence(s, u);
   updateRest(s, u);
   let target = u.target;
   if (u.order === "rest" && target && distance(u, target) === 0) return;
@@ -991,6 +1026,7 @@ export function step(s: State, dt = 0.2) {
     }
   }
   for (const u of s.units) {
+    if (u.hp <= 0 || !s.kingdoms[u.team].alive) continue;
     u.age += dt;
     if (u.royal) {
       if (!sheltered(s, u) && !resting(s, u))
@@ -1088,6 +1124,7 @@ export function loadGame(data: string): State | undefined {
       "barricade",
       "hold",
       "rest",
+      "defend",
     ];
     if (
       s.version !== 2 ||
@@ -1163,6 +1200,7 @@ export function loadGame(data: string): State | undefined {
           num(u.age) &&
           typeof u.wait === "number" &&
           Number.isFinite(u.wait) &&
+          (u.defending === undefined || int(u.defending)) &&
           (!u.royal ||
             (typeof u.reserve === "number" && Number.isFinite(u.reserve))) &&
           orders.includes(u.order) &&

@@ -1,4 +1,5 @@
 import "./style.css";
+import { rectangleSelection, clickSelection } from "./selection";
 import {
   createGame,
   step,
@@ -147,7 +148,7 @@ function newGame() {
 }
 function help() {
   showModal(
-    `<span class="eyebrow">Le livre des couronnes</span><h2>Le monde n’attend pas vos ordres.</h2><p>Chacun des quatre royaumes commence avec <strong>un château de neuf cases et un roi. Le premier chapitre donne cinq maisons au joueur et deux à chaque adversaire ; les suivants, quatre à chaque camp</strong>. Chaque camp reçoit 5 000 pièces. Les graphismes sont identiques ; seule la couleur change.</p><p>Les maisons produisent chacune des habitants de <strong>100 PV</strong>. Ils errent, défrichent les arbres et rochers pour récupérer des ressources et fondent rapidement de nouvelles maisons dès qu’une case libre respecte l’espacement. Se déplacer, travailler et combattre use leurs vies. Sur le sol, les habitants perdent aussi 0,12 PV par seconde. L’ordre Tenir la position permet de rester immobile sur une maison alliée et d’arrêter cette usure. Le roi peut aussi s’abriter sur une maison, ou rester dans son château. Couper un arbre coûte 2 pièces, dégager un rocher 3 pièces et engager un combat 1 pièce. Sans or, l’action attend. Fonder une maison transforme l’habitant en bâtiment.</p><p><strong>Rencontres :</strong> deux alliés fusionnent en additionnant leurs PV. Entre ennemis, le plus fort survit et perd 70 % des PV du vaincu. À égalité, les deux disparaissent. Le roi commence à 100 PV. Sa force gagne 25 % des PV de ses autres unités. Les alliés qui le rejoignent fusionnent avec lui. Dans les neuf cases de son château, sa puissance défensive est multipliée par quatre. Dehors, il perd 5 % de ses PV par seconde (minimum 4 PV/s). Le retour au château arrête cette perte, sans effacer les dégâts. Sélectionnez le roi comme une unité pour le déplacer ; il peut raser les maisons adverses. Un royaume disparaît si son roi meurt, ou s’il n’a plus aucune maison ni unité ordinaire, même si son roi vit encore. Le château s’effondre alors. Les adversaires peuvent s’éliminer entre eux.</p><div class="sprite-sheet"><canvas id="sprites-preview" width="300" height="192" aria-label="Sprites quatre directions et trois gabarits"></canvas></div><p><strong>Trois gabarits :</strong> habitant sous 1 000 PV, guerrier de 1 000 à 10 000 PV inclus, colosse au-delà. Chaque gabarit existe de face, de dos, à gauche et à droite, dans les quatre couleurs.</p><ul><li><strong>Sélection :</strong> clic ou rectangle sur les unités vertes. Maj ajoute à la sélection. Le roi est exclu des rectangles et de la touche A : il se sélectionne seul par un clic direct. Voir le roi recentre seulement la carte.</li><li><strong>Déplacer :</strong> choisissez une destination. Une case de château adverse vise son roi. À destination, l’unité tient sa position.</li><li><strong>Fusionner :</strong> les unités sélectionnées convergent sur un point de rassemblement.</li><li><strong>Maison :</strong> 100 or. Aucune maison voisine, même en diagonale. La case doit être dégagée.</li><li><strong>Pont :</strong> 1 000 or au premier chantier, 500 pour reconstruire au même endroit, plus 4 bois par case. Le pont a 1 000 PV et peut être détruit ; les unités qui s’y trouvent tombent à l’eau. Cliquez sur une rivière : l’unité rejoint la berge et construit un passage complet (6 cases maximum).</li><li><strong>Barricade :</strong> 750 or + 12 bois, 1 500 PV. Elle bloque une case de terre. Les unités la contournent ; un ordre Déplacer sur la barricade ennemie permet de l’attaquer.</li><li><strong>Barrage :</strong> 32 or + 12 pierres + 4 bois par case. Il bloque le passage et rapporte 0,2 or par seconde et par case. Il ne modifie pas le niveau d’eau.</li><li><strong>Impôts :</strong> de 0 à 30 %. Plus le taux est élevé, plus l’or rentre et plus les naissances ralentissent. L’automatisme ajuste le taux selon l’or et la population.</li><li><strong>Tenir :</strong> arrête les déplacements. Sur une maison alliée, l’unité ne perd plus de vies avec le temps.</li><li><strong>Autonomie :</strong> annule les ordres et rend leurs choix aux habitants. Quand aucun travail accessible ne reste, ou quand l’or manque, les habitants attendent sur les maisons sans usure et sans fusion forcée. Ils repartent si un passage ou du travail s’ouvre. Pour votre camp, seules les maisons et les coupes d’arbres sont spontanées. Les habitants évitent les rochers et les ennemis. Toute autre action nécessite un ordre ; les adversaires gardent leur autonomie. L’épargne chantier réserve 1 000 pièces contre les fondations automatiques.</li></ul><p>Molette pour zoomer ; clic droit glissé ou Alt + glisser pour déplacer la carte. Sur écran tactile : glisser sélectionne, le bouton ↔ active le déplacement de carte. <kbd>Espace</kbd> pause, <kbd>Échap</kbd> annule un ordre, <kbd>F</kbd> fusion. La partie s’arrête quand cet onglet est masqué. Sauvegarde locale automatique et export disponible au menu. Limite : 150 unités par royaume.</p><div class="close-row"><span></span><button class="primary" id="close-help">J’ai compris</button></div>`,
+    `<span class="eyebrow">Le livre des couronnes</span><h2>Le monde n’attend pas vos ordres.</h2><p>Chacun des quatre royaumes commence avec <strong>un château de neuf cases et un roi. Le premier chapitre donne cinq maisons au joueur et deux à chaque adversaire ; les suivants, quatre à chaque camp</strong>. Chaque camp reçoit 5 000 pièces. Les graphismes sont identiques ; seule la couleur change.</p><p>Les maisons produisent chacune des habitants de <strong>100 PV</strong>. Ils errent, défrichent les arbres et rochers pour récupérer des ressources et fondent rapidement de nouvelles maisons dès qu’une case libre respecte l’espacement. Se déplacer, travailler et combattre use leurs vies. Sur le sol, les habitants perdent aussi 0,12 PV par seconde. L’ordre Tenir la position permet de rester immobile sur une maison alliée et d’arrêter cette usure. Le roi peut aussi s’abriter sur une maison, ou rester dans son château. Couper un arbre coûte 2 pièces, dégager un rocher 3 pièces et engager un combat 1 pièce. Sans or, l’action attend. Fonder une maison transforme l’habitant en bâtiment.</p><p><strong>Rencontres :</strong> deux alliés fusionnent en additionnant leurs PV. Entre ennemis, le plus fort survit et perd 70 % des PV du vaincu. À égalité, les deux disparaissent. Le roi commence à 100 PV. Sa force gagne 25 % des PV de ses autres unités. Les alliés qui le rejoignent fusionnent avec lui. Dans les neuf cases de son château, sa puissance défensive est multipliée par quatre. Dehors, il perd 5 % de ses PV par seconde (minimum 4 PV/s). Le retour au château arrête cette perte, sans effacer les dégâts. Sélectionnez le roi comme une unité pour le déplacer ; il peut raser les maisons adverses. Un royaume disparaît si son roi meurt, ou s’il n’a plus aucune maison ni unité ordinaire, même si son roi vit encore. Le château s’effondre alors. Les adversaires peuvent s’éliminer entre eux.</p><div class="sprite-sheet"><canvas id="sprites-preview" width="300" height="192" aria-label="Sprites quatre directions et trois gabarits"></canvas></div><p><strong>Trois gabarits :</strong> habitant sous 1 000 PV, guerrier de 1 000 à 10 000 PV inclus, colosse au-delà. Chaque gabarit existe de face, de dos, à gauche et à droite, dans les quatre couleurs.</p><ul><li><strong>Sélection :</strong> clic ou rectangle sur les unités vertes. Maj ajoute à la sélection. Le roi est exclu des rectangles et de la touche A : il se sélectionne seul par un clic direct. Voir le roi recentre seulement la carte.</li><li><strong>Déplacer :</strong> choisissez une destination. Une case de château adverse vise son roi. À destination, l’unité tient sa position.</li><li><strong>Fusionner :</strong> les unités sélectionnées convergent sur un point de rassemblement.</li><li><strong>Maison :</strong> 100 or. Aucune maison voisine, même en diagonale. La case doit être dégagée.</li><li><strong>Pont :</strong> 1 000 or au premier chantier, 500 pour reconstruire au même endroit, plus 4 bois par case. Le pont a 1 000 PV et peut être détruit ; les unités qui s’y trouvent tombent à l’eau. Cliquez sur une rivière : l’unité rejoint la berge et construit un passage complet (6 cases maximum).</li><li><strong>Barricade :</strong> 750 or + 12 bois, 1 500 PV. Elle bloque une case de terre. Les unités la contournent ; un ordre Déplacer sur la barricade ennemie permet de l’attaquer.</li><li><strong>Barrage :</strong> 32 or + 12 pierres + 4 bois par case. Il bloque le passage et rapporte 0,2 or par seconde et par case. Il ne modifie pas le niveau d’eau.</li><li><strong>Impôts :</strong> de 0 à 30 %. Plus le taux est élevé, plus l’or rentre et plus les naissances ralentissent. L’automatisme ajuste le taux selon l’or et la population.</li><li><strong>Tenir :</strong> arrête les déplacements. Sur une maison alliée, l’unité ne perd plus de vies avec le temps.</li><li><strong>Autonomie :</strong> annule les ordres et rend leurs choix aux habitants. Quand aucun travail accessible ne reste, ou quand l’or manque, les habitants attendent sur les maisons sans usure et sans fusion forcée. Ils repartent si un passage ou du travail s’ouvre. Pour votre camp, seules les maisons et les coupes d’arbres sont spontanées, avec une défense locale si un ennemi menace les maisons ou le château. Un ordre manuel reste prioritaire et le roi ne sort jamais seul. Les habitants évitent les rochers et les ennemis hors de leur territoire. Toute autre action nécessite un ordre ; les adversaires gardent leur autonomie. L’épargne chantier réserve 1 000 pièces contre les fondations automatiques.</li></ul><p>Molette pour zoomer ; clic droit glissé ou Alt + glisser pour déplacer la carte. Sur écran tactile : glisser sélectionne, le bouton ↔ active le déplacement de carte. <kbd>Espace</kbd> pause, <kbd>Échap</kbd> annule un ordre, <kbd>F</kbd> fusion. La partie s’arrête quand cet onglet est masqué. Sauvegarde locale automatique et export disponible au menu. Limite : 150 unités par royaume.</p><div class="close-row"><span></span><button class="primary" id="close-help">J’ai compris</button></div>`,
   );
   $("close-help").onclick = closeModal;
   const c = $<HTMLCanvasElement>("sprites-preview").getContext("2d")!;
@@ -296,7 +297,12 @@ function updateUI() {
     ? `${Math.ceil(us.reduce((n, u) => n + u.hp, 0)).toLocaleString("fr-FR")} PV au total · ${us.length === 1 ? (us[0].royal ? "Roi · " : "") + ["Habitant", "Guerrier", "Colosse"][tier(us[0].hp)] : "Choisissez un ordre puis une destination."}`
     : "Sélectionnez vos habitants verts sur la carte, par clic ou par rectangle.";
   document.querySelectorAll<HTMLButtonElement>("[data-order]").forEach((b) => {
-    b.disabled = !us.length;
+    b.disabled =
+      !us.length ||
+      (us.every((u) => u.royal) &&
+        ["house", "bridge", "dam", "barricade"].includes(
+          b.dataset.order ?? "",
+        ));
     b.classList.toggle("active", b.dataset.order === targetOrder);
   });
   $("events").innerHTML = state.events
@@ -325,6 +331,7 @@ function updateUI() {
         auto: "",
         hold: "",
         rest: "",
+        defend: "",
       }[targetOrder] + " · Échap pour annuler"
     : "";
 }
@@ -546,22 +553,17 @@ canvas.onpointerup = (e) => {
   if (!pointer) return;
   const p = local(e);
   if (!pointer.pan) {
-    if (targetOrder) issue(renderer.point(p.x, p.y));
+    if (targetOrder && !drag) issue(renderer.point(p.x, p.y));
     else {
-      if (!pointer.shift) selection.clear();
       if (drag) {
-        for (const id of selection)
-          if (state.units.find((u) => u.id === id)?.royal) selection.delete(id);
-        for (const u of state.units.filter((u) => u.team === 0 && !u.royal)) {
-          const v = renderer.screen(u.x, u.y);
-          if (
-            v.x >= drag.x &&
-            v.x <= drag.x + drag.w &&
-            v.y >= drag.y &&
-            v.y <= drag.y + drag.h
-          )
-            selection.add(u.id);
-        }
+        targetOrder = undefined;
+        selection = rectangleSelection(
+          state.units,
+          selection,
+          drag,
+          (u) => renderer.screen(u.x, u.y),
+          pointer.shift,
+        );
       } else {
         const nearest = state.units
           .filter((u) => u.team === 0)
@@ -573,14 +575,14 @@ canvas.onpointerup = (e) => {
             ),
           }))
           .sort((a, b) => a.d - b.d)[0];
-        if (nearest && nearest.d < Math.max(10, CELL * renderer.zoom)) {
-          if (nearest.u.royal) selection.clear();
-          else
-            for (const id of selection)
-              if (state.units.find((u) => u.id === id)?.royal)
-                selection.delete(id);
-          selection.add(nearest.u.id);
-        }
+        selection = clickSelection(
+          state.units,
+          selection,
+          nearest && nearest.d < Math.max(10, CELL * renderer.zoom)
+            ? nearest.u
+            : undefined,
+          pointer.shift,
+        );
       }
       updateUI();
     }

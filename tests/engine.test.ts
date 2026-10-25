@@ -479,3 +479,39 @@ test("house founding time is saved for gradual coloured turf", () => {
   assert.equal(s.houses.at(-1)!.founded, 42);
   assert.equal(loadGame(saveGame(s))!.houses.at(-1)!.founded, 42);
 });
+test("inhabitants defend nearby houses automatically but explicit commands remain prioritary", () => {
+  const s = createGame();
+  tile(s, 20, 23)!.terrain = "grass";
+  assert.ok(addHouse(s, 0, 20, 23));
+  const defender = unit(0, 500, 20, 22),
+    invader = unit(1, 100, 21, 22);
+  tile(s, 20, 22)!.terrain = "grass";
+  tile(s, 21, 22)!.terrain = "grass";
+  invader.wait = 999;
+  s.units.push(defender, invader);
+  step(s);
+  assert.equal(invader.hp, 0);
+  assert.ok(defender.hp > 0);
+  assert.equal(defender.order, "defend");
+  assert.ok(loadGame(saveGame(s)));
+  command(s, [defender.id], "move", { x: 20, y: 25 });
+  assert.equal(defender.defending, undefined);
+  defender.wait = 0;
+  step(s);
+  assert.notEqual(defender.order, "defend");
+  assert.ok(loadGame(saveGame(s)));
+});
+test("a manual hold order suppresses automatic pursuit of an invader", () => {
+  const s = createGame();
+  tile(s, 20, 23)!.terrain = "grass";
+  addHouse(s, 0, 20, 23);
+  const defender = unit(0, 500, 20, 22),
+    invader = unit(1, 100, 21, 22);
+  defender.order = "hold";
+  invader.wait = 999;
+  s.units.push(defender, invader);
+  step(s);
+  assert.equal(defender.order, "hold");
+  assert.ok(invader.hp > 99);
+  assert.equal(defender.x, 20);
+});
