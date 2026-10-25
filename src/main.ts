@@ -49,8 +49,8 @@ let state = createGame(),
 const saved = read(KEY);
 lastStored = saved ? loadGame(saved) : undefined;
 const app = $("app");
-app.innerHTML = `<header><div class="brand"><span class="crown">♛</span><div><h1>Les Quatre Couronnes</h1><p class="eyebrow">Des royaumes qui prennent vie</p></div></div><div class="top-resources"><div class="resource"><i>◈</i><div><b id="gold">5 000</b><small>Or</small></div></div><div class="resource"><i>♠</i><div><b id="wood">32</b><small>Bois</small></div></div><div class="resource"><i>⬟</i><div><b id="stone">18</b><small>Pierre</small></div></div><div class="resource"><i>⚑</i><div><b id="population">100</b><small>PV totaux</small></div></div></div><div class="header-actions"><button id="help" title="Règles et commandes">?</button><button id="save" title="Sauvegarder">↓<span class="wide-label"> Sauver</span></button><button id="menu" title="Écran titre">☰</button></div><button class="mobile-tab" id="sidebar-toggle">Conseil</button></header>
-<main class="layout"><section class="battlefield" aria-label="Carte du jeu"><canvas id="map" tabindex="0" aria-label="Carte. Cliquez une unité verte ou tracez un rectangle pour sélectionner. Les ordres sont dans le conseil à droite."></canvas><div class="map-head"><span class="eyebrow" id="chapter">Chapitre I · Forêt & montagne</span><h2 id="level-name">La vallée des premiers jours</h2><p id="map-sub">80 × 80 · Quatre royaumes · Aucune frontière</p></div><span class="time" id="time">☀ 00:00</span><div class="map-help">Clic : sélectionner · Glisser : sélection multiple<br>Molette : zoom · Clic droit glissé : déplacer la carte</div><div class="map-controls"><button id="pause" title="Pause (Espace)">Ⅱ</button><button id="speed" title="Vitesse de simulation">×1</button><button id="zoom-out" title="Dézoomer">−</button><button id="zoom-in" title="Zoomer">+</button><button id="fit" title="Voir toute la carte">⊡</button></div><div id="selection-menu" class="selection-menu hidden" aria-label="Ordres de la sélection"><button data-order="move">⚑ Déplacer</button><button data-order="merge">✦ Fusionner</button><button data-order="house">⌂ Maison</button><button data-order="bridge">≋ Pont</button><button data-order="dam">▤ Barrage</button><button data-order="barricade">╳ Barricade</button><button data-order="auto">↝ Autonomie</button><button data-order="hold">⏸ Tenir</button></div><div id="target-banner" class="status-banner hidden"></div><div id="paused-label" class="paused-label hidden">Le temps est suspendu</div></section>
+app.innerHTML = `<header><button id="brand-title" class="brand" aria-label="Revenir à l’écran titre"><span class="crown">♛</span><div><h1>Les Quatre Couronnes</h1><p class="eyebrow">Des royaumes qui prennent vie</p></div></button><div class="top-resources"><div class="resource"><i>◈</i><div><b id="gold">5 000</b><small>Or</small></div></div><div class="resource"><i>♠</i><div><b id="wood">32</b><small>Bois</small></div></div><div class="resource"><i>⬟</i><div><b id="stone">18</b><small>Pierre</small></div></div><div class="resource"><i>⚑</i><div><b id="population">100</b><small>PV totaux</small></div></div></div><div class="header-actions"><button id="help" title="Règles et commandes">?</button><button id="save" title="Sauvegarder">↓<span class="wide-label"> Sauver</span></button><button id="menu" title="Écran titre">☰</button></div><button class="mobile-tab" id="sidebar-toggle">Conseil</button></header>
+<main class="layout"><section class="battlefield" aria-label="Carte du jeu"><canvas id="map" tabindex="0" aria-label="Carte. Cliquez une unité verte ou tracez un rectangle pour sélectionner. Les ordres sont dans le conseil à droite."></canvas><div class="map-head"><span class="eyebrow" id="chapter">Chapitre I · Forêt & montagne</span><h2 id="level-name">La vallée des premiers jours</h2><p id="map-sub">80 × 80 · Quatre royaumes · Aucune frontière</p></div><span class="time" id="time">☀ 00:00</span><div class="map-help">Clic : sélectionner · Glisser : sélection multiple<br>Molette : zoom · Clic droit glissé : déplacer la carte</div><div class="map-controls"><button id="pause" title="Pause (Espace)">Ⅱ</button><button id="speed" title="Vitesse : ×1, ×2, ×4, ×8, ×16">×1</button><button id="zoom-out" title="Dézoomer">−</button><button id="zoom-in" title="Zoomer">+</button><button id="fit" title="Voir toute la carte">⊡</button></div><div id="selection-menu" class="selection-menu hidden" aria-label="Ordres de la sélection"><button data-order="move">⚑ Déplacer</button><button data-order="merge">✦ Fusionner</button><button data-order="house">⌂ Maison</button><button data-order="bridge">≋ Pont</button><button data-order="dam">▤ Barrage</button><button data-order="barricade">╳ Barricade</button><button data-order="auto">↝ Autonomie</button><button data-order="hold">⏸ Tenir</button></div><div id="target-banner" class="status-banner hidden"></div><div id="paused-label" class="paused-label hidden">Ⅱ Partie en pause</div></section>
 <aside class="sidebar" id="sidebar"><span class="eyebrow">Votre royaume</span><h2>La couronne Émeraude</h2><p class="subtitle">Laissez vivre. Choisissez quand agir.</p><div class="section"><div class="label-row"><h3>Les quatre couronnes</h3><span class="badge" id="alive">4 en lice</span></div><div id="kingdoms"></div></div><div class="section"><div class="label-row"><h3>Votre roi</h3><span class="badge" id="king-hp">100 PV</span></div><p class="selection-info" id="king-info">À l’abri du château</p><div class="orders"><button id="select-king">♛ Voir le roi</button><button id="return-king">⌂ Rentrer</button></div></div><div class="section"><div class="label-row"><h3>Impôts du royaume</h3><span class="tax-number" id="tax-value">12<span>%</span></span></div><input id="tax" type="range" min="0" max="30" value="12" aria-label="Taux des impôts de 0 à 30 pour cent"><div class="range-labels"><span>0 % · Plus de naissances</span><span>30 % · Plus d’or</span></div><label class="check"><input id="auto-tax" type="checkbox" checked> Ajustement automatique</label><label class="check"><input id="save-gold" type="checkbox"> Épargner 1 000 pièces pour un chantier</label><p class="tax-hint" id="tax-hint"></p></div><div class="section"><div class="label-row"><h3>Vos ordres</h3><span class="badge" id="selection-count">0 unité</span></div><p class="selection-info" id="selection-info">Sélectionnez vos habitants verts sur la carte, par clic ou par rectangle.</p><div class="orders"><button data-order="move">⚑ Déplacer</button><button data-order="merge">✦ Fusionner</button><button data-order="house">⌂ Maison</button><button data-order="bridge">≋ Pont</button><button data-order="dam">▤ Barrage</button><button data-order="barricade">╳ Barricade</button><button data-order="auto">↝ Autonomie</button><button data-order="hold">⏸ Tenir</button></div><div id="inspect" class="inspect"></div></div><div class="section"><div class="label-row"><h3>Échos de la vallée</h3><span style="color:var(--gold)">✧</span></div><div id="events"></div></div><p class="save-status" id="save-status">Sauvegarde automatique toutes les 10 s</p></aside></main>
 <div class="overlay" id="title"><div class="title-panel"><p class="eyebrow">Un jeu de stratégie vivant</p><div class="crest">♛</div><h1>Les Quatre<br>Couronnes</h1><div class="title-colors">${COLORS.map((c) => `<span style="background:${c}"></span>`).join("")}</div><p class="intro">Dans la vallée, chaque habitant suit son chemin.<br>Les royaumes grandissent, se croisent et s’affrontent.<br>Votre couronne. Leur histoire.</p><div class="title-buttons"><button class="primary" id="new-game">New game</button><button id="load-game" ${lastStored ? "" : "disabled"}>Load game</button></div><p class="load-note" id="load-note"></p><div class="title-detail"><span>4 royaumes</span><span>80 × 80 cases</span><span>Un monde autonome</span></div><button class="small" id="title-help">Découvrir les règles</button><p class="title-foot">Observez la vie. Prenez le commandement.</p></div></div>
 <div class="overlay hidden" id="modal"><div class="dialog" id="dialog" role="dialog" aria-modal="true" aria-label="Conseil des couronnes"></div></div><div class="toast hidden" id="toast" role="status"></div>`;
@@ -90,7 +90,7 @@ function updateLoad() {
   lastStored = raw ? loadGame(raw) : undefined;
   $<HTMLButtonElement>("load-game").disabled = !lastStored;
   $("load-note").textContent = lastStored
-    ? `Sauvegarde · Chapitre ${lastStored.level + 1} · ${clock(lastStored.time)} · ${lastStored.units.filter((u) => u.team === 0).length} habitants`
+    ? `Sauvegarde · Chapitre ${lastStored.level + 1} · ${clock(lastStored.time)} · ${lastStored.units.filter((u) => u.team === 0).length} unité${lastStored.units.filter((u) => u.team === 0).length > 1 ? "s" : ""}`
     : "Votre aventure sera sauvegardée dans ce navigateur.";
 }
 function persist(manual = false) {
@@ -113,6 +113,7 @@ function start(s: State, loading = false) {
   inGame = true;
   paused = loading;
   ended = false;
+  speed = 1;
   selection.clear();
   targetOrder = undefined;
   accumulator = 0;
@@ -414,6 +415,27 @@ $("return-king").onclick = () => {
     updateUI();
   }
 };
+$("brand-title").onclick = () => {
+  if (!inGame) return;
+  const wasPaused = paused;
+  paused = true;
+  showModal(
+    `<span class="eyebrow">Quitter la vallée</span><h2>Revenir à l’écran titre ?</h2><p>Votre partie sera sauvegardée dans ce navigateur. Vous pourrez la reprendre avec Load game.</p><div class="close-row"><button id="cancel-title">Rester dans la vallée</button><button id="confirm-title" class="primary">Sauvegarder et revenir</button></div>`,
+  );
+  updateUI();
+  $("cancel-title").onclick = () => {
+    closeModal();
+    paused = wasPaused;
+    updateUI();
+  };
+  $("confirm-title").onclick = () => {
+    persist();
+    inGame = false;
+    closeModal();
+    $("title").classList.remove("hidden");
+    updateLoad();
+  };
+};
 $("new-game").onclick = newGame;
 $("load-game").onclick = () => {
   const raw = read(KEY),
@@ -431,7 +453,8 @@ $("pause").onclick = () => {
   updateUI();
 };
 $("speed").onclick = () => {
-  speed = speed === 1 ? 2 : speed === 2 ? 4 : 1;
+  speed =
+    ({ 1: 2, 2: 4, 4: 8, 8: 16, 16: 1 } as Record<number, number>)[speed] ?? 1;
   updateUI();
 };
 $("zoom-in").onclick = () => renderer.zoomAt(1.3);

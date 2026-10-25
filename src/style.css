@@ -781,3 +781,35 @@ kbd {
     min-width: 85px;
   }
 }
+
+html,
+body,
+#app {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.brand {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  border-radius: 0;
+}
+.brand:hover {
+  background: transparent;
+  border: 0;
+}
+.paused-label {
+  top: 115px;
+  left: 21px;
+  transform: none;
+  font-size: 18px;
+  padding: 8px 14px;
+}
+@media (max-width: 650px) {
+  .paused-label {
+    top: 100px;
+    left: 12px;
+    font-size: 15px;
+  }
+}

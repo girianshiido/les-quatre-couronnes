@@ -74,22 +74,66 @@ export class Renderer {
           px = x * CELL,
           py = y * CELL;
         const grass = [
-          "#59774a",
-          "#5e7c4f",
-          "#628052",
-          "#587547",
-          "#668354",
-          "#5b794b",
-          "#607d4e",
-          "#648150",
-        ];
+          [
+            "#59774a",
+            "#5e7c4f",
+            "#628052",
+            "#587547",
+            "#668354",
+            "#5b794b",
+            "#607d4e",
+            "#648150",
+          ],
+          [
+            "#b79b68",
+            "#bfa572",
+            "#c5ab77",
+            "#c3a570",
+            "#c7ae7a",
+            "#b69a67",
+            "#baa16e",
+            "#c8ae7d",
+          ],
+          [
+            "#bfcecf",
+            "#c6d4d4",
+            "#cbd9d8",
+            "#b9cacc",
+            "#ccdad8",
+            "#c0d0d2",
+            "#c6d5d7",
+            "#cfdddc",
+          ],
+          [
+            "#455d50",
+            "#4b6556",
+            "#506958",
+            "#435e50",
+            "#526d5c",
+            "#496457",
+            "#4d6758",
+            "#536d5e",
+          ],
+          [
+            "#625877",
+            "#685e80",
+            "#6e6385",
+            "#605776",
+            "#73688a",
+            "#655b7b",
+            "#6b6181",
+            "#746a8c",
+          ],
+        ][s.level];
         c.fillStyle =
           t.terrain === "water" || t.terrain === "dam"
-            ? "#407d86"
+            ? ["#407d86", "#4a9796", "#61889f", "#355e68", "#626eab"][s.level]
             : grass[t.variant];
         c.fillRect(px, py, CELL, CELL);
         if (t.terrain === "water") {
-          c.fillStyle = "#53939a";
+          c.fillStyle = ["#53939a", "#6bb5ab", "#8caebb", "#4c7b83", "#919acb"][
+            s.level
+          ];
           c.fillRect(px + 2, py + 5 + (t.variant % 3), 7, 1);
           c.fillStyle = "#366d77";
           c.fillRect(px + 8, py + 12, 6, 1);
@@ -98,7 +142,65 @@ export class Renderer {
           c.fillRect(px + 3, py + 3, 1, 2);
           c.fillRect(px + 11, py + 12, 2, 1);
         }
-        if (t.terrain === "tree") {
+        if (t.terrain === "tree" && s.level === 1) {
+          c.fillStyle = "#4e693d";
+          if (t.variant % 2) {
+            c.fillRect(px + 6, py + 1, 4, 14);
+            c.fillRect(px + 2, py + 5, 3, 6);
+            c.fillRect(px + 3, py + 9, 4, 2);
+            c.fillRect(px + 11, py + 3, 3, 5);
+            c.fillRect(px + 8, py + 6, 4, 2);
+            c.fillStyle = "#7f9455";
+            c.fillRect(px + 7, py + 2, 1, 11);
+          } else {
+            c.fillStyle = "#896b42";
+            c.fillRect(px + 7, py + 4, 2, 11);
+            c.fillRect(px + 8, py + 1, 2, 6);
+            c.fillStyle = "#4f7648";
+            for (const [dx, dy] of [
+              [-7, 2],
+              [6, 3],
+              [-5, -3],
+              [5, -3],
+            ]) {
+              c.beginPath();
+              c.moveTo(px + 8, py + 1);
+              c.lineTo(px + 8 + dx, py + 1 + dy);
+              c.lineTo(px + 8 + dx, py + 4 + dy);
+              c.fill();
+            }
+          }
+        } else if (t.terrain === "tree" && s.level === 3) {
+          c.fillStyle = "#665d3f";
+          c.fillRect(px + 7, py + 4, 3, 11);
+          c.fillStyle = "#254e43";
+          c.beginPath();
+          c.ellipse(px + 8, py + 4, 7, 6, 0, 0, Math.PI * 2);
+          c.fill();
+          c.fillStyle = "#4d7860";
+          c.fillRect(px + 3, py + 1, 6, 3);
+          c.fillStyle = "#506b4a";
+          c.fillRect(px + 2, py + 6, 1, 6);
+          c.fillRect(px + 12, py + 6, 1, 5);
+        } else if (t.terrain === "tree" && s.level === 4) {
+          c.fillStyle = "#37314988";
+          c.fillRect(px + 3, py + 10, 12, 6);
+          c.fillStyle = "#8fc9c9";
+          c.beginPath();
+          c.moveTo(px + 8, py - 3);
+          c.lineTo(px + 13, py + 5);
+          c.lineTo(px + 9, py + 14);
+          c.lineTo(px + 3, py + 5);
+          c.fill();
+          c.fillStyle = "#d6ece0";
+          c.beginPath();
+          c.moveTo(px + 8, py - 3);
+          c.lineTo(px + 9, py + 14);
+          c.lineTo(px + 3, py + 5);
+          c.fill();
+          c.fillStyle = "#8f91c5";
+          c.fillRect(px + 1, py + 8, 3, 6);
+        } else if (t.terrain === "tree") {
           c.fillStyle = "#294b354f";
           c.fillRect(px + 3, py + 8, 12, 8);
           c.fillStyle = "#644c37";
@@ -117,11 +219,22 @@ export class Renderer {
           c.fill();
           c.fillStyle = "#658252";
           c.fillRect(px + 6, py + 2, 2, 3);
+          if (s.level === 2) {
+            c.fillStyle = "#eff4ec";
+            c.beginPath();
+            c.moveTo(px + 8, py - 2);
+            c.lineTo(px + 13, py + 6);
+            c.lineTo(px + 4, py + 6);
+            c.fill();
+            c.fillRect(px + 1, py + 10, 13, 2);
+          }
         }
         if (t.terrain === "rock") {
           c.fillStyle = "#31423f55";
           c.fillRect(px + 2, py + 10, 13, 5);
-          c.fillStyle = "#6f7973";
+          c.fillStyle = ["#6f7973", "#997947", "#7e96a2", "#657466", "#9791b1"][
+            s.level
+          ];
           c.beginPath();
           c.moveTo(px + 2, py + 12);
           c.lineTo(px + 3, py + 5);
@@ -129,7 +242,9 @@ export class Renderer {
           c.lineTo(px + 13, py + 5);
           c.lineTo(px + 15, py + 12);
           c.fill();
-          c.fillStyle = "#a1a69a";
+          c.fillStyle = ["#a1a69a", "#d6b782", "#e0e9e8", "#8f9b7d", "#c5bde0"][
+            s.level
+          ];
           c.beginPath();
           c.moveTo(px + 3, py + 5);
           c.lineTo(px + 8, py + 1);
@@ -159,10 +274,10 @@ export class Renderer {
           c.fillRect(px, py + 1, 2, 14);
         }
       }
-    this.cached = `${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}`;
+    this.cached = `${s.level}-${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}`;
   }
   paintInfluence(s: State) {
-    const key = `${s.seed}-${Math.floor(s.time * 2)}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}-${s.stats.cleared}`;
+    const key = `${s.level}-${s.seed}-${Math.floor(s.time * 2)}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}-${s.stats.cleared}`;
     if (key === this.influenceKey) return;
     this.influenceKey = key;
     this.influence.width = s.size * CELL;
@@ -362,7 +477,7 @@ export class Renderer {
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.fillStyle = "#14282a";
     c.fillRect(0, 0, this.width, this.height);
-    const key = `${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}`;
+    const key = `${s.level}-${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}`;
     if (this.cached !== key) this.paintTerrain(s);
     c.save();
     c.translate(this.ox, this.oy);

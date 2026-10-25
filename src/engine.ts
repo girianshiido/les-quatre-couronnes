@@ -89,10 +89,10 @@ export const TEAM_NAMES = ["Émeraude", "Azur", "Ambre", "Carmin"];
 export const COLORS = ["#73cc97", "#70baff", "#edc86b", "#ef8580"];
 export const LEVELS = [
   { name: "La vallée des premiers jours", biome: "Forêt & montagne", size: 80 },
-  { name: "Les deux rivières", biome: "Forêt de bouleaux", size: 80 },
-  { name: "Les cols de granit", biome: "Hautes terres", size: 88 },
-  { name: "Le bassin des brumes", biome: "Lacs & sapinières", size: 88 },
-  { name: "Le dernier confluent", biome: "Massif des quatre rois", size: 96 },
+  { name: "Les oasis du soleil", biome: "Désert & palmeraies", size: 80 },
+  { name: "Les couronnes du givre", biome: "Terres enneigées", size: 88 },
+  { name: "Le bassin des brumes", biome: "Marais & cyprès", size: 88 },
+  { name: "La vallée de cristal", biome: "Forêt cristalline", size: 96 },
 ];
 export function random(s: State) {
   s.rng = (Math.imul(1664525, s.rng) + 1013904223) >>> 0;
@@ -145,13 +145,18 @@ export function createGame(level = 0, seed = 14243): State {
           Math.cos(ay * 0.26) +
           Math.sin((ax + ay) * 0.22)) /
         3;
-      const density = 0.29 + forest * 0.24 + level * 0.02;
+      const density =
+        [0.29, 0.16, 0.23, 0.4, 0.28][level] +
+        forest * [0.24, 0.1, 0.2, 0.16, 0.24][level];
       const riverX = size / 2 - 1 + Math.round(Math.sin(y * 0.16) * 2),
         riverY = size / 2 - 1 + Math.round(Math.sin(x * 0.16) * 2);
       const river =
         level === 0
           ? x === riverX || y === riverY
-          : Math.abs(x - riverX) < 1.3 || Math.abs(y - riverY) < 1.3;
+          : Math.abs(x - riverX) < 1.3 ||
+            Math.abs(y - riverY) < 1.3 ||
+            (level === 3 &&
+              (x - size * 0.32) ** 2 + (y - size * 0.62) ** 2 < 20);
       const mountains =
         ((ax < 5 || ay < 5) && hash < 0.64) ||
         (Math.sin(ax * 0.32 - ay * 0.14) + Math.cos(ay * 0.29) > 1.25 &&

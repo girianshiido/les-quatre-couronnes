@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "test": "node --import tsx --test tests/*.test.ts",
     "sprites": "node --import tsx scripts/sprite-atlas.ts",
-    "simulate": "node --import tsx scripts/simulate.ts"
+    "simulate": "node --import tsx scripts/simulate.ts",
+    "biomes": "node --import tsx scripts/biome-preview.ts"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^1.0.13",

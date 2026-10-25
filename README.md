@@ -2,11 +2,11 @@
 
 Un jeu de stratégie autonome en **TypeScript**, Canvas et Vite. Quatre couleurs, les mêmes habitants, des royaumes qui grandissent seuls. Vous incarnez la couronne Émeraude face à trois adversaires, qui peuvent aussi se détruire entre eux.
 
-**Jouer : https://girianshiido.github.io/les-quatre-couronnes/**
+**Jouer en local :** `pnpm dev`. Le dossier `docs/` est prêt pour une activation de GitHub Pages lors de la publication publique.
 
 ## Une vallée vivante
 
-La première carte contient 80 × 80 petites cases, sans quadrillage visible : terre, sapins, rochers, montagnes et rivières. Chaque camp commence avec **5 000 pièces**, un château de **3 × 3 cases**, un roi de **100 PV** et des maisons espacées. Le premier chapitre donne **cinq maisons au joueur et deux à chacun de ses adversaires**, avec des bras de rivière d’une case de large. À partir du deuxième chapitre, chaque camp reçoit quatre maisons. Cinq chapitres proposent des cartes de 80 à 96 cases de côté et une production adverse progressivement accélérée.
+La première carte contient 80 × 80 petites cases, sans quadrillage visible : terre, sapins, rochers, montagnes et rivières. Chaque camp commence avec **5 000 pièces**, un château de **3 × 3 cases**, un roi de **100 PV** et des maisons espacées. Le premier chapitre donne **cinq maisons au joueur et deux à chacun de ses adversaires**, avec des bras de rivière d’une case de large. À partir du deuxième chapitre, chaque camp reçoit quatre maisons. Cinq chapitres proposent des cartes de 80 à 96 cases de côté et une production adverse progressivement accélérée. Les thèmes se succèdent : forêt et montagne, désert avec palmiers et cactus, terres enneigées, marais à cyprès, puis forêt de cristal. Les chapitres se débloquent uniquement après la victoire du précédent.
 
 Chaque maison produit régulièrement une unité de 100 PV. Les habitants choisissent seuls leurs déplacements. Une terre libre et suffisamment éloignée des autres maisons les encourage à fonder rapidement une nouvelle maison. Pour le joueur, les seules initiatives sont la construction de maisons et la coupe des arbres. Déblayer les rochers, attaquer, capturer des maisons et construire les autres éléments exige un ordre. L’errance, les fusions au contact et la défense restent les règles de la simulation. Les adversaires prennent leurs propres initiatives. On peut observer toute la partie ou intervenir.
 
@@ -41,7 +41,8 @@ Un royaume disparaît lorsque son roi meurt **ou lorsqu’il n’a plus aucune m
 - L’option **Épargner pour un chantier** réserve 1 000 pièces contre les fondations automatiques, afin de pouvoir financer une infrastructure. Les ponts et barricades désactivent cette épargne après leur construction.
 - **Tenir** immobilise les unités. **Autonomie** leur rend leurs choix.
 - Molette ou boutons +/− pour zoomer ; clic droit glissé ou Alt + glisser pour déplacer la carte. Sur écran tactile, le bouton ↔ active le déplacement de la carte.
-- Espace : pause ; F : fusion ; A : sélectionner tout ; Échap : annuler. Vitesses ×1, ×2 et ×4.
+- Espace : pause ; F : fusion ; A : sélectionner tout ; Échap : annuler. Vitesses ×1, ×2, ×4, ×8 et ×16. Une nouvelle partie démarre à ×1.
+- Un clic sur le titre en haut à gauche demande confirmation, sauvegarde la partie et revient à l’écran titre. Le texte de l’interface ne se sélectionne pas pendant les gestes.
 - Écran titre **New game / Load game**. Sauvegarde locale automatique toutes les 10 secondes, bouton manuel, export et import JSON au menu. La reprise se fait en pause. Le hasard, les ordres, les ressources, les rois et les ruines sont conservés.
 - La partie ne progresse pas lorsque son onglet est masqué. Aucune progression hors ligne n’est calculée. Le stockage dépend du navigateur et de l’adresse utilisée ; l’export permet de transférer une sauvegarde.
 
@@ -55,12 +56,17 @@ pnpm dev
 pnpm test
 pnpm build
 pnpm sprites
+pnpm biomes
 pnpm simulate
 ```
 
 `src/engine.ts` contient la simulation déterministe, `src/render.ts` les sprites et la carte, `src/main.ts` l’interface et la sauvegarde. `pnpm build` vérifie les types et produit `docs/`, prêt pour GitHub Pages. Les sprites sont dessinés par le code du jeu ; les deux planches PNG sont des exports de référence régénérables, sans asset emprunté.
 
 La limite est de 150 unités simultanées par camp, roi compris. Cette première version est destinée à être équilibrée par les parties réelles : vitesse d’expansion, coûts, usure et protection royale sont centralisés dans le moteur.
+
+## Les cinq thèmes
+
+![Les cinq vallées du jeu](public/biomes.png)
 
 ## Planches des sprites
 
