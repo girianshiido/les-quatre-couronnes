@@ -11,6 +11,10 @@ import {
 } from "../src/engine.ts";
 function scenario(team = 3) {
   const s = createGame();
+  // This isolated scenario replaces the tutorial geography and its bridges.
+  s.structures = [];
+  s.bridgeSites = [];
+  s.stats.bridges = 0;
   s.time = 100;
   for (const t of s.tiles) {
     t.terrain = "water";

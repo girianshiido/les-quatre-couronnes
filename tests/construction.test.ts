@@ -173,7 +173,9 @@ test("malformed funding progress is rejected and legacy structures still load", 
     { paid: 1, total: 0 },
   ]) {
     const bad = JSON.parse(saveGame(s));
-    bad.structures[0].construction = construction;
+    bad.structures.find(
+      (b: { id: number }) => b.id === structureAt(s, p)!.id,
+    )!.construction = construction;
     assert.equal(loadGame(JSON.stringify(bad)), undefined);
   }
   s.kingdoms[0].gold = 700;

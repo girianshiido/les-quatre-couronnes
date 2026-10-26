@@ -16,6 +16,10 @@ import {
 } from "../src/engine.ts";
 function setup(homes = 5) {
   const s = createGame();
+  // This isolated scenario replaces the tutorial geography and its bridges.
+  s.structures = [];
+  s.bridgeSites = [];
+  s.stats.bridges = 0;
   for (const t of s.tiles) t.terrain = "grass";
   if (homes > 5) {
     assert.ok(addHouse(s, 0, 20, 30, false));

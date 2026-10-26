@@ -276,6 +276,12 @@ export function createGame(level = 0, seed = 14243): State {
           (x - size * 0.7) ** 2 + (y - size * 0.61) ** 2 < 25;
       if (biome === 3 && stage !== 4)
         river = river || (x - size * 0.29) ** 2 + (y - size * 0.63) ** 2 < 20;
+      // The introductory valley gives the northwest kingdom a larger basin.
+      // Its rivers still meander and stay one cell wide.
+      if (level === 0)
+        river =
+          x === tutorialRiverX(size, y, phase) ||
+          y === tutorialRiverY(size, x, phase);
       const ridge =
         Math.sin(ax * 0.23 - ay * 0.14 + phase) +
         Math.cos(ay * 0.2 + phase * 0.5);
@@ -302,6 +308,16 @@ export function createGame(level = 0, seed = 14243): State {
     { x: size - 1 - m, y: size - 1 - m },
     { x: m, y: size - 1 - m },
   ];
+  if (level === 0) {
+    for (let y = 4; y < size - 4; y++)
+      for (let x = 4; x < size - 4; x++)
+        if (
+          x < tutorialRiverX(size, y, phase) &&
+          y < tutorialRiverY(size, x, phase) &&
+          tile(s, x, y)!.terrain === "rock"
+        )
+          tile(s, x, y)!.terrain = "tree";
+  }
   for (let team = 0; team < 4; team++) {
     const jitter = () =>
       level === 0 && team === 0 ? 0 : Math.floor(random(s) * 7) - 3;
@@ -323,7 +339,7 @@ export function createGame(level = 0, seed = 14243): State {
       kills: 0,
     });
     const radius =
-      level === 0 ? (team === 0 ? 8 : 6) : 5 + Math.floor(random(s) * 3);
+      level === 0 ? (team === 0 ? 9 : 6) : 5 + Math.floor(random(s) * 3);
     for (let dy = -radius; dy <= radius; dy++)
       for (let dx = -radius; dx <= radius; dx++)
         if (dx * dx + dy * dy <= radius * radius)
@@ -372,9 +388,73 @@ export function createGame(level = 0, seed = 14243): State {
       heading: { x: 0, y: 1 },
     });
   }
+  if (level === 0) connectTutorialOpponents(s, phase);
   seedCaves(s);
   log(s, "Quatre couronnes. Une seule vallée. L’histoire commence.");
   return s;
+}
+function tutorialRiverX(size: number, y: number, phase: number) {
+  return Math.floor(size * 0.56 + Math.sin(y * 0.11 + phase) * 1.5);
+}
+function tutorialRiverY(size: number, x: number, phase: number) {
+  return Math.floor(size * 0.56 + Math.sin(x * 0.1 - phase) * 1.5);
+}
+function connectTutorialOpponents(s: State, phase: number) {
+  const blue = s.kingdoms[1].castle,
+    yellow = s.kingdoms[2].castle,
+    red = s.kingdoms[3].castle;
+  const rightX = Math.round((blue.x + yellow.x) / 2),
+    bottomY = Math.round((yellow.y + red.y) / 2);
+  const right = { x: rightX, y: tutorialRiverY(s.size, rightX, phase) },
+    bottom = { x: tutorialRiverX(s.size, bottomY, phase), y: bottomY };
+  const path = (from: Point, to: Point, horizontalFirst: boolean) => {
+    let { x, y } = from;
+    const clear = () => {
+      const t = tile(s, x, y)!;
+      if (t.terrain !== "water") t.terrain = "grass";
+    };
+    const across = () => {
+      while (x !== to.x) {
+        x += Math.sign(to.x - x);
+        clear();
+      }
+    };
+    const along = () => {
+      while (y !== to.y) {
+        y += Math.sign(to.y - y);
+        clear();
+      }
+    };
+    if (horizontalFirst) {
+      across();
+      along();
+    } else {
+      along();
+      across();
+    }
+  };
+  path(blue, { x: right.x, y: right.y - 1 }, true);
+  path(yellow, { x: right.x, y: right.y + 1 }, true);
+  path(red, { x: bottom.x - 1, y: bottom.y }, false);
+  path(yellow, { x: bottom.x + 1, y: bottom.y }, false);
+  for (const [p, team] of [
+    [right, 1],
+    [bottom, 3],
+  ] as const) {
+    const t = tile(s, p.x, p.y)!;
+    t.terrain = "bridge";
+    t.owner = team;
+    s.structures.push({
+      id: s.nextId++,
+      kind: "bridge",
+      team,
+      hp: 1000,
+      maxHp: 1000,
+      cells: [{ ...p }],
+    });
+    s.bridgeSites.push([{ ...p }]);
+    s.stats.bridges++;
+  }
 }
 export function territoryAt(s: State, p: Point) {
   if (tile(s, p.x, p.y)?.terrain !== "grass") return;
@@ -2205,6 +2285,7 @@ function act(s: State, u: Unit) {
     // Only opponents initiate infrastructure work without a direct order.
     if (
       u.team !== 0 &&
+      (s.level !== 0 || !landConnected(s, u.team)) &&
       s.time > 65 - Math.min(20, s.level) &&
       random(s) < 0.12
     ) {

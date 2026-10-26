@@ -18,6 +18,10 @@ import {
 
 function corridor() {
   const s = createGame();
+  // This isolated scenario replaces the tutorial geography and its bridges.
+  s.structures = [];
+  s.bridgeSites = [];
+  s.stats.bridges = 0;
   setPriorities(s, ["house", "raid", "clear"]);
   for (const t of s.tiles) t.terrain = "water";
   for (let x = 10; x <= 26; x++) tile(s, x, 20)!.terrain = "grass";

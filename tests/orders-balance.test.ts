@@ -170,6 +170,9 @@ test("ramparts absorb repeated assaults and a modest merged unit cannot instantl
 });
 test("shared formation paths preserve normal shortest steps and survive save/load", () => {
   const s = createGame();
+  s.structures = [];
+  s.bridgeSites = [];
+  s.stats.bridges = 0;
   for (const t of s.tiles) t.terrain = "grass";
   const u = unit(100, 5, 5);
   u.order = "move";

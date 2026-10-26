@@ -138,6 +138,9 @@ test("impôts 30 slow each house compared to zero and produce more gold", () => 
 });
 test("a bridge builds exactly one water cell; a wider river needs another explicit segment", () => {
   const s = createGame();
+  s.structures = [];
+  s.bridgeSites = [];
+  s.stats.bridges = 0;
   for (let y = 0; y < s.size; y++)
     for (let x = 0; x < s.size; x++) {
       const t = tile(s, x, y)!;
@@ -358,6 +361,9 @@ test("a king can move, arrive, hold and retain orders in a save", () => {
 });
 test("a 1000 HP bridge costs 1000, takes battle damage, and rebuilds for 500 at the saved site", () => {
   const s = createGame();
+  s.structures = [];
+  s.bridgeSites = [];
+  s.stats.bridges = 0;
   for (let y = 0; y < s.size; y++)
     for (let x = 0; x < s.size; x++) {
       const t = tile(s, x, y)!;
@@ -571,14 +577,17 @@ test("legacy multi-cell bridges load as independent single-cell segments without
     tile(s, x, 20)!.terrain = x === 30 || x === 31 ? "water" : "grass";
   const u = unit(0, 100, 29, 20);
   assert.ok(buildCrossing(s, u, { x: 30, y: 20 }));
-  const b = s.structures[0];
+  const originalBridges = s.structures.length - 1;
+  const b = structureAt(s, { x: 30, y: 20 })!;
   b.cells.push({ x: 31, y: 20 });
   tile(s, 31, 20)!.terrain = "bridge";
   tile(s, 31, 20)!.owner = 0;
-  s.bridgeSites[0].push({ x: 31, y: 20 });
+  s.bridgeSites
+    .find((site) => site.some((p) => p.x === 30 && p.y === 20))!
+    .push({ x: 31, y: 20 });
   const loaded = loadGame(saveGame(s))!;
   assert.ok(loaded);
-  assert.equal(loaded.structures.length, 2);
+  assert.equal(loaded.structures.length, originalBridges + 2);
   assert.ok(loaded.structures.every((b) => b.cells.length === 1));
   assert.equal(loaded.kingdoms[0].gold, s.kingdoms[0].gold);
 });

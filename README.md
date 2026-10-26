@@ -8,7 +8,7 @@ Jeu de stratégie autonome en TypeScript et Canvas : quatre royaumes identiques,
 
 **25 niveaux en cinq séries** : forêt et montagne, désert, neige, marais, forêt de cristal. Chaque victoire débloque le niveau suivant. Les cartes sont asymétriques : départs plus ouverts ou confinés, rivières, plateaux, îlots, gorges et clairières. Certaines cartes proposent des grottes facultatives.
 
-Les nouvelles cartes vont de **64 × 64 à 80 × 80**, sans quadrillage visible. Tous les camps commencent avec **5 000 or**, un château de neuf cases et un roi de 100 PV. Le premier niveau donne **cinq maisons au joueur et deux à chaque adversaire**, avec des cours d’eau d’une case de large. Ensuite le joueur en reçoit quatre ; les adversaires quatre à six selon la série. Les règles et les impôts s’appliquent de façon identique aux quatre camps.
+Les nouvelles cartes vont de **64 × 64 à 80 × 80**, sans quadrillage visible. Tous les camps commencent avec **5 000 or**, un château de neuf cases et un roi de 100 PV. Le premier niveau donne **cinq maisons au joueur et deux à chaque adversaire**, avec des cours d’eau d’une case de large. Son bassin est plus vaste et isolé, tandis que deux ponts déjà achevés relient les trois adversaires entre eux. Ensuite le joueur en reçoit quatre ; les adversaires quatre à six selon la série. Les règles et les impôts s’appliquent de façon identique aux quatre camps.
 
 ![Les cinq séries de vallées](public/biomes.png)
 
@@ -64,7 +64,7 @@ Ils commencent dans des zones fermées par l’eau ou une barricade. **Ouvrir un
 
 Molette ou +/− : zoom ; clic droit ou Alt + glisser : déplacer la carte. Le bouton ↔ permet le déplacement tactile. A sélectionne les habitants sans le roi. Vitesses **×1, ×2, ×4, ×8, ×16** ; une nouvelle partie démarre à ×1.
 
-Un clic sur le titre en haut à gauche demande confirmation, sauvegarde et revient à **New game / Load game**. Le texte ne se sélectionne pas pendant les gestes. Sauvegarde automatique toutes les 10 secondes, bouton manuel, export/import JSON au menu. La reprise se fait en pause. Les anciennes sauvegardes conservent leur carte complète et migrent vers la nouvelle campagne.
+Un clic sur le titre en haut à gauche demande confirmation, sauvegarde et revient à **New game / Load game**. Le texte ne se sélectionne pas pendant les gestes. Une sauvegarde automatique distincte est conservée pour chaque partie. Le bouton Sauver crée des copies nommées indépendantes ; Load game ouvre une bibliothèque avec recherche, chargement, renommage et suppression. Le jeu n’impose aucune limite de nombre (dans la capacité de stockage du navigateur). Export/import JSON au menu. La reprise se fait en pause. Les anciennes sauvegardes conservent leur carte complète et migrent vers la nouvelle campagne.
 
 Le jeu ne progresse pas lorsque son onglet est masqué. Le stockage dépend du navigateur et de l’adresse utilisée ; l’export permet de transférer une sauvegarde. Limites : 150 unités simultanées par camp, roi compris, et 100 monstres.
 
@@ -82,11 +82,11 @@ pnpm biomes
 pnpm simulate
 ```
 
-`src/engine.ts` : simulation déterministe et économie ; `src/monsters.ts` : grottes et monstres ; `src/orders.ts` et `src/selection.ts` : commandes ; `src/render.ts` : carte et sprites ; `src/main.ts` : interface et sauvegarde. Le build vérifie les types et produit `docs/` pour GitHub Pages. Les trajets des grandes formations sont partagés et les éléments hors champ ne sont pas dessinés. Voir `VALIDATION.md` pour les essais et leurs limites.
+`src/engine.ts` : simulation déterministe et économie ; `src/monsters.ts` : grottes et monstres ; `src/orders.ts` et `src/selection.ts` : commandes ; `src/render.ts` : carte et copies des atlas PNG ; `src/atlas.ts` : repères et chargement des images ; `src/saves.ts` : bibliothèque IndexedDB ; `src/main.ts` : interface et sauvegarde. Le build vérifie les types et produit `docs/` pour GitHub Pages. Les trajets des grandes formations sont partagés et les éléments hors champ ne sont pas dessinés. Voir `VALIDATION.md` pour les essais et leurs limites.
 
-![Habitants, guerriers et colosses](public/sprites-atlas.png)
+Les fichiers `public/art/actors.png`, `world.png` et `buildings.png` sont générés à l’avance par `pnpm sprites`, puis copiés dans le build et le cache hors connexion. 216 images d’habitants, rois et monstres couvrent quatre directions, deux poses et trois gabarits. Les quatre camps partagent les mêmes silhouettes, recolorées. Les cinq biomes possèdent leurs terrains et variantes. Le rendu copie ces images et conserve le cache de terrain. Maisons, grottes et chantiers tiennent dans une seule case, ombres comprises ; le château conserve ses neuf cases. Un rendu de secours reste disponible si les fichiers ne peuvent pas charger.
 
-![Rois dans les quatre directions et couleurs](public/kings-atlas.png)
+![Atlas des habitants, rois et monstres](public/art/actors.png)
 
 ### Expansion et ordres de groupe
 
@@ -112,7 +112,7 @@ Une mise à jour disponible ouvre maintenant une confirmation en cours de partie
 
 ### Recommencer et capturer un royaume
 
-Le bouton **↶ Recommencer le niveau** est accessible en cours de partie dans l’en-tête, ainsi que depuis le menu. La confirmation remet la même carte à zéro avec les conditions initiales, sans attendre une défaite. La doctrine et les niveaux débloqués sont conservés ; la sauvegarde de la partie en cours est remplacée.
+Le bouton **↶ Recommencer le niveau** est accessible en cours de partie dans l’en-tête, ainsi que depuis le menu. La confirmation remet la même carte à zéro avec les conditions initiales, sans attendre une défaite. La doctrine et les niveaux débloqués sont conservés ; une nouvelle sauvegarde automatique est créée et la précédente est conservée.
 
 Quand une unité élimine un roi adverse, **toutes les maisons de ce roi passent immédiatement au vainqueur**. Leur production, leur position et leur cycle de naissance sont conservés ; les maisons et leur gazon prennent la nouvelle couleur. Cela fonctionne entre les quatre royaumes, y compris lorsqu’un roi meurt dans un assaut raté. Le château vaincu s’effondre et les unités du camp éliminé disparaissent. Les monstres, les morts naturelles et les combats sans survivant ne donnent pas de royaume bénéficiaire.
 
@@ -147,3 +147,11 @@ Les chiffres au-dessus des habitants, rois et monstres sont masqués par défaut
 Un pont ou une barricade peut être commandé sans disposer de 1 000 ou 750 or. L’ouvrier rejoint une berge ou une case voisine et verse l’or disponible, puis les rentrées suivantes. Le chantier conserve sa progression et les dépenses si l’ouvrier meurt ou change d’ordre ; un autre habitant du même royaume peut le terminer en payant seulement le reste. À 0 % d’impôts et sans réserve, le chantier attend. L’usure et l’entretien habituels continuent ; une maison protège de l’usure normale.
 
 Les échafaudages montrent les chantiers et leur progression. Le pont reste une case d’eau infranchissable jusqu’à son achèvement ; la barricade ne bloque le passage qu’une fois achevée. Les chantiers peuvent être détruits et les dégâts reçus ne sont pas effacés par l’achèvement. Un chantier de pont abandonné avant son premier achèvement ne crée pas de réduction : la reconstruction à 500 or reste réservée aux ponts déjà achevés puis détruits. Sauvegarde, reprise et export conservent les paiements.
+
+## Une première vallée favorable au vert
+
+La génération du niveau 1 réserve au vert un bassin du nord-ouest plus vaste, un espace de départ un peu plus dégagé et des forêts défrichables plutôt que des obstacles rocheux intérieurs. Les montagnes restent présentes en bordure. Les trois autres royaumes disposent de deux ponts d’une case, déjà achevés, et de chemins dégagés entre leurs châteaux ; aucune de ces liaisons n’ouvre le territoire vert. Tous commencent toujours avec 5 000 or et un roi de 100 PV, avec cinq maisons pour le vert contre deux par adversaire.
+
+Sur cette première carte, une IA qui dispose encore d’un ennemi accessible par les liaisons existantes ne commence pas un nouveau pont. Le vert peut ouvrir lui-même un passage lorsqu’il est prêt ; le dernier adversaire peut ensuite chercher à le rejoindre. Les autres niveaux conservent leur génération et leur comportement antérieurs. Les sauvegardes chargées gardent leur géographie : une nouvelle partie ou un redémarrage de la première carte applique le nouveau tracé.
+
+Le **clic droit simple** annule la sélection et les actions en préparation. Il libère la pause de planification, en conservant une éventuelle pause manuelle. Le clic droit glissé continue de déplacer la carte.

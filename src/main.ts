@@ -1,4 +1,6 @@
+import { loadAtlases } from "./atlas";
 import "./style.css";
+import { SaveLibrary, newSaveId, type SaveEntry } from "./saves";
 import {
   DOCTRINES,
   type DoctrineId,
@@ -44,7 +46,29 @@ import { Renderer, CELL, tier } from "./render";
 const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const KEY = "quatre-couronnes-save-v2",
-  PROGRESS = "quatre-couronnes-campaign-v1";
+  PROGRESS = "quatre-couronnes-campaign-v1",
+  CHECKPOINT = "quatre-couronnes-checkpoint-v3";
+const saves = new SaveLibrary();
+let activeAutosaveId: string | undefined,
+  savedEntries: SaveEntry[] = [],
+  modalRevision = 0,
+  modalCancel: (() => void) | undefined;
+const storageReady = (async () => {
+  const legacy = read(KEY);
+  if (await saves.migrateLegacy(legacy)) {
+    try {
+      if (localStorage.getItem(KEY) === legacy) localStorage.removeItem(KEY);
+    } catch {}
+  }
+  const checkpoint = read(CHECKPOINT);
+  if (await saves.restoreCheckpoint(checkpoint)) {
+    try {
+      if (localStorage.getItem(CHECKPOINT) === checkpoint)
+        localStorage.removeItem(CHECKPOINT);
+    } catch {}
+  }
+})();
+void storageReady.catch(() => {});
 function read(key: string) {
   try {
     return localStorage.getItem(key);
@@ -66,17 +90,24 @@ let state = createGame(),
   uiTime = 0,
   last = 0,
   accumulator = 0,
-  ended = false,
-  lastStored: State | undefined;
-const saved = read(KEY);
-lastStored = saved ? loadGame(saved) : undefined;
+  ended = false;
 const app = $("app");
 app.innerHTML = `<header><button id="brand-title" class="brand" aria-label="Revenir à l’écran titre"><span class="crown">♛</span><div><h1>Les Quatre Couronnes</h1><p class="eyebrow">Des royaumes qui prennent vie</p></div></button><div class="top-resources"><div class="resource"><i>◈</i><div><b id="gold">5 000</b><small>Or</small></div></div><div class="resource"><i>⚑</i><div><b id="population">100</b><small>PV totaux</small></div></div></div><div class="header-actions"><button data-pwa class="pwa-button" title="Installer le jeu" aria-label="Installer le jeu">⇩</button><button id="help" title="Règles et commandes">?</button><button id="save" title="Sauvegarder">↓<span class="wide-label"> Sauver</span></button><button id="restart-level" title="Recommencer le niveau" aria-label="Recommencer le niveau">↶</button><button id="menu" title="Écran titre">☰</button></div><button class="mobile-tab" id="sidebar-toggle">Conseil</button></header>
-<main class="layout"><section class="battlefield" aria-label="Carte du jeu"><canvas id="map" tabindex="0" aria-label="Carte. Cliquez une unité verte ou tracez un rectangle pour sélectionner. Les ordres sont dans le conseil à droite."></canvas><div class="map-head"><span class="eyebrow" id="chapter">Chapitre I · Forêt & montagne</span><h2 id="level-name">La vallée des premiers jours</h2><p id="map-sub">64 × 64 · Quatre royaumes · Aucune frontière</p></div><span class="time" id="time">☀ 00:00</span><div class="map-help">Clic : sélectionner · Glisser : sélection multiple<br>Molette : zoom · Clic droit glissé : déplacer la carte</div><div class="map-controls"><button id="pause" title="Pause (Espace)">Ⅱ</button><button id="speed" title="Vitesse : ×1, ×2, ×4, ×8, ×16">×1</button><button id="zoom-out" title="Dézoomer">−</button><button id="zoom-in" title="Zoomer">+</button><button id="fit" title="Voir toute la carte">⊡</button></div><div id="selection-menu" class="selection-menu hidden" aria-label="Actions pour la destination"></div><div id="target-banner" class="status-banner hidden"></div><div id="paused-label" class="paused-label hidden">Ⅱ Partie en pause</div></section>
+<main class="layout"><section class="battlefield" aria-label="Carte du jeu"><canvas id="map" tabindex="0" aria-label="Carte. Cliquez une unité verte ou tracez un rectangle pour sélectionner. Les ordres sont dans le conseil à droite."></canvas><div class="map-head"><span class="eyebrow" id="chapter">Chapitre I · Forêt & montagne</span><h2 id="level-name">La vallée des premiers jours</h2><p id="map-sub">64 × 64 · Quatre royaumes · Aucune frontière</p></div><span class="time" id="time">☀ 00:00</span><div class="map-help">Clic : sélectionner · Glisser : sélection multiple<br>Molette : zoom · Clic droit : annuler · Clic droit glissé : déplacer la carte</div><div class="map-controls"><button id="pause" title="Pause (Espace)">Ⅱ</button><button id="speed" title="Vitesse : ×1, ×2, ×4, ×8, ×16">×1</button><button id="zoom-out" title="Dézoomer">−</button><button id="zoom-in" title="Zoomer">+</button><button id="fit" title="Voir toute la carte">⊡</button></div><div id="selection-menu" class="selection-menu hidden" aria-label="Actions pour la destination"></div><div id="target-banner" class="status-banner hidden"></div><div id="paused-label" class="paused-label hidden">Ⅱ Partie en pause</div></section>
 <aside class="sidebar" id="sidebar"><span class="eyebrow">Votre royaume</span><h2>La couronne Émeraude</h2><p class="subtitle">Laissez vivre. Choisissez quand agir.</p><div class="section"><div class="label-row"><h3>Les quatre couronnes</h3><span class="badge" id="alive">4 en lice</span></div><div id="kingdoms"></div></div><div class="section"><div class="label-row"><h3>Votre roi</h3><span class="badge" id="king-hp">100 PV</span></div><p class="selection-info" id="king-info">À l’abri du château</p><button id="select-king" class="small">♛ Voir le roi</button></div><div class="section"><div class="label-row"><h3>Impôts du royaume</h3><span class="tax-number" id="tax-value">12<span>%</span></span></div><input id="tax" type="range" min="0" max="30" value="12" aria-label="Taux des impôts de 0 à 30 pour cent"><div class="range-labels"><span>0 % · Plus de naissances</span><span>30 % · Plus d’or</span></div><label class="check"><input id="auto-tax" type="checkbox" checked> Ajustement automatique</label><label class="check"><input id="save-gold" type="checkbox"> Épargner 1 000 pièces pour un chantier</label><p class="tax-hint" id="tax-hint"></p></div><div class="section"><div class="label-row"><h3>Vos ordres</h3><span class="badge" id="selection-count">0 unité</span></div><p class="selection-info" id="selection-info">Sélectionnez vos habitants verts, puis cliquez une destination. Le jeu attend votre ordre.</p><p id="command-help" class="selection-info">Sélectionnez, puis cliquez une destination.</p><button id="cancel-selection" class="small hidden">Annuler la sélection</button><div id="inspect" class="inspect"></div></div><div class="section"><h3>Doctrine du royaume</h3><label class="sr-only" for="doctrine-profile">Doctrine du royaume</label><select id="doctrine-profile" class="doctrine-profile"></select><p id="doctrine-description" class="tax-hint"></p><ol id="doctrine" class="doctrine"></ol><p class="tax-hint">Sans travail : abri sur une maison. Les unités affaiblies cherchent un abri. Ponts et barricades restent sur ordre.</p></div><div class="section"><div class="label-row"><h3>Échos de la vallée</h3><span style="color:var(--gold)">✧</span></div><p id="monster-status" class="tax-hint hidden"></p><div id="events"></div></div><p class="save-status" id="save-status">Sauvegarde automatique toutes les 10 s</p></aside></main>
-<div class="overlay" id="title"><div class="title-panel"><p class="eyebrow">Un jeu de stratégie vivant</p><div class="crest">♛</div><h1>Les Quatre<br>Couronnes</h1><div class="title-colors">${COLORS.map((c) => `<span style="background:${c}"></span>`).join("")}</div><p class="intro">Dans la vallée, chaque habitant suit son chemin.<br>Les royaumes grandissent, se croisent et s’affrontent.<br>Votre couronne. Leur histoire.</p><div class="title-buttons"><button class="primary" id="new-game">New game</button><button id="load-game" ${lastStored ? "" : "disabled"}>Load game</button></div><p class="load-note" id="load-note"></p><div class="title-detail"><span>4 royaumes</span><span>64 × 64 cases</span><span>25 vallées</span></div><div class="title-utilities"><button data-pwa class="pwa-button small">Installer le jeu</button><button class="small" id="title-help">Découvrir les règles</button></div><p class="title-foot">Observez la vie. Prenez le commandement.</p></div></div>
+<div class="overlay" id="title"><div class="title-panel"><p class="eyebrow">Un jeu de stratégie vivant</p><div class="crest">♛</div><h1>Les Quatre<br>Couronnes</h1><div class="title-colors">${COLORS.map((c) => `<span style="background:${c}"></span>`).join("")}</div><p class="intro">Dans la vallée, chaque habitant suit son chemin.<br>Les royaumes grandissent, se croisent et s’affrontent.<br>Votre couronne. Leur histoire.</p><div class="title-buttons"><button class="primary" id="new-game">New game</button><button id="load-game" disabled>Load game</button></div><p class="load-note" id="load-note"></p><div class="title-detail"><span>4 royaumes</span><span>64 × 64 cases</span><span>25 vallées</span></div><div class="title-utilities"><button data-pwa class="pwa-button small">Installer le jeu</button><button class="small" id="title-help">Découvrir les règles</button></div><p class="title-foot">Observez la vie. Prenez le commandement.</p></div></div>
 <div class="overlay hidden" id="modal"><div class="dialog" id="dialog" role="dialog" aria-modal="true" aria-label="Conseil des couronnes"></div></div><div class="toast hidden" id="toast" role="status"></div>`;
 const renderer = new Renderer($<HTMLCanvasElement>("map"));
+void loadAtlases()
+  .then((atlases) => {
+    renderer.atlases = atlases;
+    renderer.cached = "";
+  })
+  .catch(() =>
+    toast(
+      "Les nouvelles illustrations n’ont pas pu être chargées. Réessayez après une mise à jour.",
+    ),
+  );
 const HP_DISPLAY_KEY = "quatre-couronnes-show-unit-hp";
 renderer.showUnitHP = read(HP_DISPLAY_KEY) === "yes";
 const canvas = renderer.canvas;
@@ -102,37 +133,239 @@ function toast(text: string) {
 }
 let toastTimer = 0;
 function showModal(html: string) {
+  modalRevision++;
+  modalCancel = undefined;
   $("dialog").innerHTML = html;
   $("modal").classList.remove("hidden");
   $("dialog").querySelector<HTMLButtonElement>("button")?.focus();
+  return modalRevision;
 }
 function closeModal() {
+  modalRevision++;
+  modalCancel = undefined;
   $("modal").classList.add("hidden");
 }
-function updateLoad() {
-  const raw = read(KEY);
-  lastStored = raw ? loadGame(raw) : undefined;
-  $<HTMLButtonElement>("load-game").disabled = !lastStored;
-  $("load-note").textContent = lastStored
-    ? `Sauvegarde · Chapitre ${lastStored.level + 1} · ${clock(lastStored.time)} · ${lastStored.units.filter((u) => u.team === 0).length} unité${lastStored.units.filter((u) => u.team === 0).length > 1 ? "s" : ""}`
-    : "Votre aventure sera sauvegardée dans ce navigateur.";
-}
-function persist(manual = false) {
-  if (!inGame) return false;
+async function updateLoad() {
   try {
-    localStorage.setItem(KEY, saveGame(state));
+    await storageReady;
+    savedEntries = await saves.list();
+    $<HTMLButtonElement>("load-game").disabled = savedEntries.length === 0;
+    $("load-note").textContent = savedEntries.length
+      ? `${savedEntries.length} sauvegarde${savedEntries.length > 1 ? "s" : ""} disponible${savedEntries.length > 1 ? "s" : ""} · Choisissez votre partie`
+      : "Vos sauvegardes seront conservées dans ce navigateur.";
+  } catch {
+    $("load-note").textContent =
+      "Le stockage est indisponible. Vous pouvez toujours exporter vos parties depuis le menu.";
+  }
+}
+async function persist(notify = false) {
+  if (!inGame || !activeAutosaveId) return false;
+  const operation = saves.automatic(activeAutosaveId, state);
+  try {
+    await operation;
     $("save-status").textContent =
       `Sauvegardé à ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
-    if (manual) toast("La vallée et tous vos ordres ont été sauvegardés.");
+    if (notify) toast("La sauvegarde automatique est à jour.");
     return true;
   } catch {
     $("save-status").textContent =
-      "Stockage indisponible — exportez votre sauvegarde.";
-    if (manual) toast("Stockage indisponible. Utilisez Exporter dans le menu.");
+      "Sauvegarde impossible — exportez votre partie.";
+    if (notify)
+      toast("Le stockage n’a pas pu enregistrer la partie. Utilisez Exporter.");
     return false;
   }
 }
-function start(s: State, loading = false) {
+function checkpoint() {
+  if (!inGame || !activeAutosaveId) return;
+  try {
+    localStorage.setItem(CHECKPOINT, saves.checkpoint(activeAutosaveId, state));
+  } catch {}
+}
+function createNamedSave(fromMenu = false, after?: () => void) {
+  if (!inGame) return;
+  const wasPaused = paused;
+  paused = true;
+  updateUI();
+  const cancel = () => {
+    if (after) {
+      after();
+      return;
+    }
+    if (fromMenu) menu();
+    else {
+      closeModal();
+      paused = wasPaused;
+      updateUI();
+    }
+  };
+  showModal(
+    `<span class="eyebrow">Gardez une étape de votre règne</span><h2>Nouvelle sauvegarde</h2><label class="save-label" for="save-name">Nom de la sauvegarde</label><input id="save-name" class="save-input" maxlength="80" value="${escapeText(`Vallée ${state.level + 1} · ${clock(state.time)}`)}"><p>Cette copie restera intacte pendant que votre partie continue. Les sauvegardes automatiques sont séparées.</p><p id="save-error" class="save-error"></p><div class="close-row"><button id="cancel-named-save">Annuler</button><button id="confirm-named-save" class="primary">Enregistrer</button></div>`,
+  );
+  modalCancel = cancel;
+  $("cancel-named-save").onclick = cancel;
+  $("confirm-named-save").onclick = async () => {
+    const button = $<HTMLButtonElement>("confirm-named-save");
+    button.disabled = true;
+    const revision = modalRevision;
+    try {
+      await saves.create(state, $<HTMLInputElement>("save-name").value);
+      void updateLoad();
+      if (modalRevision === revision) cancel();
+      toast("Votre nouvelle sauvegarde est enregistrée.");
+    } catch {
+      if (modalRevision !== revision) return;
+      $("save-error").textContent =
+        "L’enregistrement a échoué. Le stockage peut être plein ; exportez la partie pour la conserver.";
+      button.disabled = false;
+    }
+  };
+  $("save-name").onkeydown = (e) => {
+    if (e.key === "Enter") $("confirm-named-save").click();
+  };
+  $("save-name").focus();
+}
+async function showSavedGames(fromMenu = false) {
+  const wasPaused = paused;
+  paused = true;
+  updateUI();
+  const cancel = () => {
+    if (fromMenu) menu();
+    else {
+      closeModal();
+      paused = wasPaused;
+      updateUI();
+    }
+  };
+  const render = async () => {
+    const revision = showModal(
+      `<span class="eyebrow">Vos royaumes vous attendent</span><h2>Vos sauvegardes</h2><p>Chargement des sauvegardes…</p><div class="close-row"><span></span><button id="close-saves">Retour</button></div>`,
+    );
+    modalCancel = cancel;
+    $("close-saves").onclick = cancel;
+    try {
+      await storageReady;
+      if (inGame) await persist();
+      const entries = await saves.list();
+      if (modalRevision !== revision) return;
+      savedEntries = entries;
+      showModal(
+        `<span class="eyebrow">Vos royaumes vous attendent</span><h2>Vos sauvegardes</h2><p>Chaque nouvelle partie possède sa sauvegarde automatique. Les copies nommées restent intactes. Aucune limite de nombre n’est imposée par le jeu.</p><label class="sr-only" for="save-search">Rechercher une sauvegarde</label><input id="save-search" class="save-input" placeholder="Rechercher une sauvegarde"><div id="saved-list" class="saved-list"></div><p id="library-error" class="save-error"></p><div class="close-row">${inGame ? '<button id="library-new">Nouvelle sauvegarde</button>' : "<span></span>"}<button id="close-saves" class="primary">Retour</button></div>`,
+      );
+      modalCancel = cancel;
+      $("close-saves").onclick = cancel;
+      if (inGame)
+        $("library-new").onclick = () =>
+          createNamedSave(false, () => void render());
+      const paint = () => {
+        const query = $<HTMLInputElement>("save-search")
+          .value.trim()
+          .toLocaleLowerCase("fr");
+        const visible = entries.filter((e) =>
+          `${e.name} ${LEVELS[e.level]?.name ?? ""}`
+            .toLocaleLowerCase("fr")
+            .includes(query),
+        );
+        $("saved-list").innerHTML = visible.length
+          ? visible
+              .map(
+                (e) =>
+                  `<article class="saved-card"><div><h3>${escapeText(e.name)}</h3><p>${e.kind === "auto" ? "Automatique" : "Copie nommée"} · Vallée ${e.level + 1} · ${clock(e.seconds)}<br>${new Date(e.updatedAt).toLocaleString("fr-FR")} · ${e.houses} maisons · ${e.units} unités</p></div><div class="saved-actions"><button data-load="${escapeText(e.id)}" class="primary small">Charger</button><button data-rename="${escapeText(e.id)}" class="small">Renommer</button><button data-delete="${escapeText(e.id)}" class="small" ${inGame && e.id === activeAutosaveId ? 'disabled title="Sauvegarde automatique de la partie en cours"' : ""}>Supprimer</button></div></article>`,
+              )
+              .join("")
+          : "<p>Aucune sauvegarde correspondante.</p>";
+        $("saved-list")
+          .querySelectorAll<HTMLButtonElement>("[data-load]")
+          .forEach(
+            (button) =>
+              (button.onclick = async () => {
+                button.disabled = true;
+                try {
+                  const entry = entries.find(
+                    (e) => e.id === button.dataset.load,
+                  )!;
+                  const loaded = await saves.load(entry.id);
+                  if (!loaded) throw new Error("invalid");
+                  if (inGame && !(await persist(true)))
+                    throw new Error("backup");
+                  start(
+                    loaded,
+                    true,
+                    entry.kind === "auto" ? entry.id : undefined,
+                  );
+                } catch {
+                  $("library-error").textContent =
+                    "La partie n’a pas pu être chargée. Votre partie actuelle est conservée.";
+                  button.disabled = false;
+                }
+              }),
+          );
+        $("saved-list")
+          .querySelectorAll<HTMLButtonElement>("[data-rename]")
+          .forEach(
+            (button) =>
+              (button.onclick = () => {
+                const entry = entries.find(
+                  (e) => e.id === button.dataset.rename,
+                )!;
+                showModal(
+                  `<h2>Renommer la sauvegarde</h2><label class="save-label" for="rename-save">Nom de la sauvegarde</label><input class="save-input" id="rename-save" maxlength="80" value="${escapeText(entry.name)}"><p class="save-error" id="rename-error"></p><div class="close-row"><button id="cancel-rename">Annuler</button><button id="confirm-rename" class="primary">Enregistrer</button></div>`,
+                );
+                modalCancel = () => void render();
+                $("cancel-rename").onclick = () => void render();
+                $("confirm-rename").onclick = async () => {
+                  try {
+                    await saves.rename(
+                      entry.id,
+                      $<HTMLInputElement>("rename-save").value,
+                    );
+                    void updateLoad();
+                    await render();
+                  } catch {
+                    $("rename-error").textContent =
+                      "Le nouveau nom n’a pas pu être enregistré.";
+                  }
+                };
+              }),
+          );
+        $("saved-list")
+          .querySelectorAll<HTMLButtonElement>("[data-delete]")
+          .forEach(
+            (button) =>
+              (button.onclick = () => {
+                const entry = entries.find(
+                  (e) => e.id === button.dataset.delete,
+                )!;
+                showModal(
+                  `<h2>Supprimer cette sauvegarde ?</h2><p>La sauvegarde « ${escapeText(entry.name)} » sera supprimée. Les autres parties seront conservées.</p><p id="delete-error" class="save-error"></p><div class="close-row"><button id="cancel-delete">Annuler</button><button id="confirm-delete" class="primary">Supprimer</button></div>`,
+                );
+                modalCancel = () => void render();
+                $("cancel-delete").onclick = () => void render();
+                $("confirm-delete").onclick = async () => {
+                  try {
+                    await saves.remove(entry.id);
+                    void updateLoad();
+                    await render();
+                  } catch {
+                    $("delete-error").textContent =
+                      "La sauvegarde n’a pas pu être supprimée.";
+                  }
+                };
+              }),
+          );
+      };
+      $("save-search").oninput = paint;
+      paint();
+    } catch {
+      if (modalRevision !== revision) return;
+      $("dialog").querySelector("p")!.textContent =
+        "Le stockage des sauvegardes est indisponible. Vos fichiers exportés restent utilisables.";
+    }
+  };
+  await render();
+}
+function start(s: State, loading = false, autosaveId?: string) {
+  if (inGame) void persist();
+  activeAutosaveId = autosaveId ?? newSaveId("auto");
   if (!loading) {
     s.priorities = [...state.priorities];
     s.doctrine = state.doctrine;
@@ -158,7 +391,9 @@ function start(s: State, loading = false) {
   toast(
     loading
       ? "Partie chargée et en pause. Appuyez sur ▶ pour reprendre."
-      : "Vos habitants vivent déjà leur aventure. Observez ou donnez vos premiers ordres.",
+      : state.level === 0
+        ? "Votre vallée est protégée. Les autres royaumes sont déjà reliés : développez-vous avant d’ouvrir votre pont."
+        : "Vos habitants vivent déjà leur aventure. Observez ou donnez vos premiers ordres.",
   );
 }
 function newGame() {
@@ -167,7 +402,7 @@ function newGame() {
     Math.max(0, Number(read(PROGRESS)) || 0),
   );
   showModal(
-    `<span class="eyebrow">Une nouvelle histoire</span><h2>Choisissez votre vallée</h2><p>Vous incarnez la couronne <strong>Émeraude</strong>. Faites tomber les trois royaumes adverses tout en protégeant votre roi et votre peuple.</p><label class="check" for="level-select">Chapitre de la campagne</label><select id="level-select">${LEVELS.map((l, i) => `${i % 5 === 0 ? `<optgroup label="${l.biome}">` : ""}<option value="${i}" ${i > unlock ? "disabled" : ""}>${i + 1}. ${l.name}${i > unlock ? " · verrouillé" : ""}</option>${i % 5 === 4 ? "</optgroup>" : ""}`).join("")}</select><p>Chaque camp commence avec 5 000 pièces. Chaque victoire ouvre la vallée suivante. Les adversaires se développent plus vite au fil des chapitres.</p>${read(KEY) ? '<p class="confirm">Commencer remplacera la sauvegarde actuelle. Vous pouvez l’exporter depuis le menu en cours de partie.</p>' : ""}<div class="close-row"><button id="cancel-new">Retour</button><button class="primary" id="begin">Entrer dans la vallée</button></div>`,
+    `<span class="eyebrow">Une nouvelle histoire</span><h2>Choisissez votre vallée</h2><p>Vous incarnez la couronne <strong>Émeraude</strong>. Faites tomber les trois royaumes adverses tout en protégeant votre roi et votre peuple.</p><label class="check" for="level-select">Chapitre de la campagne</label><select id="level-select">${LEVELS.map((l, i) => `${i % 5 === 0 ? `<optgroup label="${l.biome}">` : ""}<option value="${i}" ${i > unlock ? "disabled" : ""}>${i + 1}. ${l.name}${i > unlock ? " · verrouillé" : ""}</option>${i % 5 === 4 ? "</optgroup>" : ""}`).join("")}</select><p>Dans la première vallée, votre territoire est plus vaste et isolé par les rivières. Deux ponts relient déjà les trois adversaires entre eux : développez votre royaume avant d’ouvrir votre propre passage.</p><p>Chaque camp commence avec 5 000 pièces. Chaque victoire ouvre la vallée suivante. Les adversaires se développent plus vite au fil des chapitres.</p><p>Vos parties précédentes restent dans la bibliothèque de sauvegardes.</p><div class="close-row"><button id="cancel-new">Retour</button><button class="primary" id="begin">Entrer dans la vallée</button></div>`,
   );
   $("cancel-new").onclick = closeModal;
   $("begin").onclick = () =>
@@ -180,7 +415,7 @@ function newGame() {
 }
 function help() {
   showModal(
-    `<span class="eyebrow">Le livre des couronnes</span><h2>Le monde n’attend pas vos ordres.</h2><p>Chacun des quatre royaumes commence avec <strong>un château de neuf cases et un roi. Le premier chapitre donne cinq maisons au joueur et deux à chaque adversaire ; les suivants, quatre au joueur et quatre à six par adversaire selon la série</strong>. Chaque camp reçoit 5 000 pièces. Les graphismes sont identiques ; seule la couleur change.</p><p>Les maisons produisent chacune des habitants de <strong>100 PV</strong>. Ils cherchent le terrain libre le plus proche, suivent votre doctrine et fondent rapidement de nouvelles maisons dès qu’une case libre respecte l’espacement. Se déplacer, travailler et combattre use leurs vies. Sur le sol, les habitants perdent au moins 0,12 PV par seconde. Au-delà de dix cases de leur roi, cette usure augmente progressivement, jusqu’à cinq fois le rythme de base. L’usure normale s’arrête sur une maison alliée. Un manque de soutien ou d’or peut toutefois continuer à faire perdre des PV. Tenir la position permet d’y rester. Le roi peut aussi s’abriter sur une maison, ou rester dans son château. Couper un arbre coûte 30 pièces, dégager un rocher 3 pièces. Les combats et destructions ne coûtent que des PV. Sans or, l’action attend. Fonder une maison coûte 150 pièces et jusqu’à 100 PV ; une unité plus forte conserve ses vies restantes et poursuit son activité.</p><p><strong>Rencontres :</strong> deux alliés fusionnent en additionnant leurs PV. Entre ennemis, le plus fort survit et perd 70 % des PV du vaincu. À égalité, les deux disparaissent. Le roi commence à 100 PV. Chaque maison au-delà des maisons de départ lui apporte 50 PV de force. Il gagne aussi 25 % des PV de ses autres unités, mais sa force reste plafonnée à 100 PV par maison restante. Les blessures sont conservées, même lorsque ce plafond est atteint. Les alliés qui le rejoignent fusionnent avec lui. Dans les neuf cases de son château, sa puissance défensive est multipliée par huit, avec 2 000 PV de remparts à user. Chaque maison soutient 200 PV d’armée. Au-delà de cette capacité totale, les unités perdent progressivement des PV, même sur une maison. Hors des maisons, les unités perdent davantage de vies lorsque le chemin vers une maison alliée dépasse quatre cases, jusqu’à 6 % de PV supplémentaires par seconde. Les routes de soutien ne traversent pas l’eau sans pont, les arbres, les rochers ou les barricades. Les unités de plus de 500 PV consomment 2 or par seconde pour 1 000 PV près des maisons ; ce coût augmente jusqu’à trois fois avec l’éloignement. Sans financement, elles perdent jusqu’à 3 % de leurs PV par seconde, même sur une maison. Hors d’une maison, les grandes unités ont aussi une usure proportionnelle à leur force. Dehors, le roi perd 5 % de ses PV par seconde (minimum 4 PV/s). Le retour au château arrête cette perte, sans effacer les dégâts. Sélectionnez le roi comme une unité pour le déplacer ; il peut raser les maisons adverses. Détruire du gazon ennemi coûte 2 PV plus 0,2 % des PV actuels par case ; raser une maison coûte 200 PV plus 5 % des PV actuels, sans dépense d’or. Ces coûts concernent aussi le roi et les monstres. Le terrain détruit redevient neutre, jusqu’à ce qu’une nouvelle maison y étende son gazon. Un royaume disparaît si son roi meurt, ou dès qu’il perd sa dernière maison, même si son roi et ses armées ont encore des PV. Le château s’effondre alors. Les adversaires peuvent s’éliminer entre eux.</p><p><strong>Économie :</strong> à 0 %, aucune rentrée d’or, y compris les barrages : seuls les fonds déjà accumulés financent les travaux et l’entretien. Pour chaque maison, le revenu par seconde vaut le taux d’impôt multiplié par 0,035 : 0,35 or à 10 %, 0,70 à 20 % et 1,05 à 30 %. Les revenus augmentent à tous les taux, sans seuil particulier. Les naissances passent progressivement de six secondes par maison à trois minutes. Le mode Bâtisseur fait aussi construire les unités fusionnées ; s’il manque de l’or, elles attendent près du chantier sur une maison et repartent dès qu’elles peuvent financer une fondation.</p><div class="sprite-sheet"><canvas id="sprites-preview" width="300" height="192" aria-label="Sprites quatre directions et trois gabarits"></canvas></div><p><strong>Trois gabarits :</strong> habitant sous 1 000 PV, guerrier de 1 000 à 10 000 PV inclus, colosse au-delà. Chaque gabarit existe de face, de dos, à gauche et à droite, dans les quatre couleurs.</p><ul><li><strong>Planification :</strong> sélectionner une ou plusieurs unités arrête toute la simulation. Cliquez ensuite la destination : seules les actions adaptées à cette case apparaissent. Le jeu reprend après l’ordre, sauf si vous aviez activé la pause manuelle. Échap annule la sélection.</li><li><strong>Affichage des PV :</strong> aucun chiffre au-dessus des unités par défaut, même pour les rois et les unités sélectionnées. Le survol affiche les PV exacts. Dans le menu, « Toujours afficher les PV des unités » active les nombres permanents ; ce choix est mémorisé dans ce navigateur.</li><li><strong>Sélection :</strong> clic ou rectangle sur les unités vertes. Maj ajoute à la sélection. Le roi est exclu des rectangles et de la touche A : il se sélectionne seul par un clic direct. Voir le roi recentre seulement la carte.</li><li><strong>Déplacer :</strong> choisissez une destination. Une case de château adverse vise son roi. À destination, les habitants reprennent leur doctrine ; le roi reste sur place.</li><li><strong>Capture royale :</strong> éliminer le roi d’un royaume transfère toutes ses maisons au vainqueur, avec leur production et leur territoire coloré. Cela vaut aussi entre adversaires. Son château s’effondre. Une mort sans vainqueur ne transfère aucune maison.</li><li><strong>Recommencer :</strong> le bouton ↶ en haut ou Recommencer la carte dans le menu remet le niveau à zéro après confirmation, sans perdre votre doctrine ni les niveaux débloqués.</li><li><strong>Fusionner :</strong> les unités sélectionnées convergent sur un point de rassemblement. Une fois les participants réunis, l’unité fusionnée reprend sa doctrine. Une unité morte ou réaffectée ne bloque pas l’attente.</li><li><strong>Maison :</strong> 150 or et jusqu’à 100 PV du bâtisseur. Une grosse unité conserve le reste de ses vies et peut continuer à bâtir. Aucune maison voisine, même en diagonale. La case doit être dégagée.</li><li><strong>Chantiers progressifs :</strong> un pont ou une barricade peut être ordonné sans disposer de tout son prix. À proximité du chantier, l’ouvrier investit l’or disponible puis les nouvelles rentrées. Le travail et l’or déjà investis restent enregistrés s’il meurt ou change d’ordre ; une autre unité peut terminer le reste. Le pont reste infranchissable et la barricade ne bloque pas la route tant que le chantier n’est pas achevé. L’ouvrier perd normalement des vies hors d’une maison, et doit toujours payer son entretien éventuel.</li><li><strong>Pont :</strong> 1 000 or au premier chantier, 500 pour reconstruire au même endroit. Le pont a 1 000 PV et peut être détruit ; les unités qui s’y trouvent tombent à l’eau. Tout camp peut traverser un pont ouvert ; l’ordre Attaquer permet de le détruire. Cliquez sur une rivière : l’unité rejoint la berge et construit exactement une case de pont. Une rivière plus large se traverse en posant chaque tronçon séparément.</li><li><strong>Barricade :</strong> 750 or, 1 500 PV. Elle bloque une case de terre. Les unités la contournent ; l’ordre Attaquer permet de la détruire.</li><li><strong>Barrage :</strong> 32 or. Il bloque le passage et rapporte 0,2 or par seconde et par case si les impôts sont supérieurs à 0 %. Il ne modifie pas le niveau d’eau.</li><li><strong>Grottes :</strong> présentes seulement dans certains niveaux, elles engendrent des monstres neutres sans économie. Ceux-ci ne perdent des PV qu’au combat ou en détruisant du territoire et fusionnent entre eux. Un pont ou une barricade détruite peut les libérer vers les autres camps. Détruire une grotte arrête les naissances. Ces zones sont facultatives pour la victoire.</li><li><strong>Impôts :</strong> de 0 à 30 %. Plus le taux est élevé, plus l’or rentre et plus les naissances ralentissent. L’automatisme ajuste le taux selon l’or et la population.</li><li><strong>Se déplacer :</strong> à l’arrivée, les habitants reprennent leur expansion et occupent les alentours. Le roi reste sur place. Les ordres par défaut sont réordonnables dans le conseil et la doctrine est sauvegardée.</li><li><strong>Tenir :</strong> arrête les déplacements. Sur une maison alliée, l’usure normale s’arrête ; les pénuries de soutien ou d’or restent dangereuses.</li><li><strong>Autonomie :</strong> annule les ordres et rend leurs choix aux habitants. Quand aucun travail accessible ne reste, ou quand l’or manque, les habitants attendent sur les maisons sans usure normale et sans fusion forcée. Ils repartent si un passage ou du travail s’ouvre. Votre doctrine donne la priorité aux maisons, à la destruction des maisons adverses ou à la coupe des arbres. Réordonnez-la dans le conseil. Une défense locale réagit aussi aux ennemis proches des maisons ou du château. Un ordre manuel reste prioritaire et le roi ne sort jamais seul. Les habitants évitent les rochers et ne construisent pas de ponts ou de barricades sans ordre. Toute autre action nécessite un ordre ; les adversaires gardent leur autonomie. L’épargne chantier réserve 1 000 pièces contre les fondations automatiques.</li></ul><p>Molette pour zoomer ; clic droit glissé ou Alt + glisser pour déplacer la carte. Sur écran tactile : glisser sélectionne, le bouton ↔ active le déplacement de carte. <kbd>Espace</kbd> pause, <kbd>Échap</kbd> annule un ordre, <kbd>F</kbd> fusion. La partie s’arrête quand cet onglet est masqué. Sauvegarde locale automatique et export disponible au menu. Limite : 150 unités par royaume.</p><div class="close-row"><span></span><button class="primary" id="close-help">J’ai compris</button></div>`,
+    `<span class="eyebrow">Le livre des couronnes</span><h2>Le monde n’attend pas vos ordres.</h2><p>Chacun des quatre royaumes commence avec <strong>un château de neuf cases et un roi. Le premier chapitre donne cinq maisons au joueur et deux à chaque adversaire ; les suivants, quatre au joueur et quatre à six par adversaire selon la série</strong>. Dans la première vallée, le vert possède un bassin plus vaste, protégé par des rivières fermées. Les trois adversaires disposent de deux ponts et de chemins dégagés entre leurs territoires ; ils privilégient leurs ennemis déjà accessibles. Chaque camp reçoit 5 000 pièces. Les graphismes sont identiques ; seule la couleur change.</p><p>Les maisons produisent chacune des habitants de <strong>100 PV</strong>. Ils cherchent le terrain libre le plus proche, suivent votre doctrine et fondent rapidement de nouvelles maisons dès qu’une case libre respecte l’espacement. Se déplacer, travailler et combattre use leurs vies. Sur le sol, les habitants perdent au moins 0,12 PV par seconde. Au-delà de dix cases de leur roi, cette usure augmente progressivement, jusqu’à cinq fois le rythme de base. L’usure normale s’arrête sur une maison alliée. Un manque de soutien ou d’or peut toutefois continuer à faire perdre des PV. Tenir la position permet d’y rester. Le roi peut aussi s’abriter sur une maison, ou rester dans son château. Couper un arbre coûte 30 pièces, dégager un rocher 3 pièces. Les combats et destructions ne coûtent que des PV. Sans or, l’action attend. Fonder une maison coûte 150 pièces et jusqu’à 100 PV ; une unité plus forte conserve ses vies restantes et poursuit son activité.</p><p><strong>Rencontres :</strong> deux alliés fusionnent en additionnant leurs PV. Entre ennemis, le plus fort survit et perd 70 % des PV du vaincu. À égalité, les deux disparaissent. Le roi commence à 100 PV. Chaque maison au-delà des maisons de départ lui apporte 50 PV de force. Il gagne aussi 25 % des PV de ses autres unités, mais sa force reste plafonnée à 100 PV par maison restante. Les blessures sont conservées, même lorsque ce plafond est atteint. Les alliés qui le rejoignent fusionnent avec lui. Dans les neuf cases de son château, sa puissance défensive est multipliée par huit, avec 2 000 PV de remparts à user. Chaque maison soutient 200 PV d’armée. Au-delà de cette capacité totale, les unités perdent progressivement des PV, même sur une maison. Hors des maisons, les unités perdent davantage de vies lorsque le chemin vers une maison alliée dépasse quatre cases, jusqu’à 6 % de PV supplémentaires par seconde. Les routes de soutien ne traversent pas l’eau sans pont, les arbres, les rochers ou les barricades. Les unités de plus de 500 PV consomment 2 or par seconde pour 1 000 PV près des maisons ; ce coût augmente jusqu’à trois fois avec l’éloignement. Sans financement, elles perdent jusqu’à 3 % de leurs PV par seconde, même sur une maison. Hors d’une maison, les grandes unités ont aussi une usure proportionnelle à leur force. Dehors, le roi perd 5 % de ses PV par seconde (minimum 4 PV/s). Le retour au château arrête cette perte, sans effacer les dégâts. Sélectionnez le roi comme une unité pour le déplacer ; il peut raser les maisons adverses. Détruire du gazon ennemi coûte 2 PV plus 0,2 % des PV actuels par case ; raser une maison coûte 200 PV plus 5 % des PV actuels, sans dépense d’or. Ces coûts concernent aussi le roi et les monstres. Le terrain détruit redevient neutre, jusqu’à ce qu’une nouvelle maison y étende son gazon. Un royaume disparaît si son roi meurt, ou dès qu’il perd sa dernière maison, même si son roi et ses armées ont encore des PV. Le château s’effondre alors. Les adversaires peuvent s’éliminer entre eux.</p><p><strong>Économie :</strong> à 0 %, aucune rentrée d’or, y compris les barrages : seuls les fonds déjà accumulés financent les travaux et l’entretien. Pour chaque maison, le revenu par seconde vaut le taux d’impôt multiplié par 0,035 : 0,35 or à 10 %, 0,70 à 20 % et 1,05 à 30 %. Les revenus augmentent à tous les taux, sans seuil particulier. Les naissances passent progressivement de six secondes par maison à trois minutes. Le mode Bâtisseur fait aussi construire les unités fusionnées ; s’il manque de l’or, elles attendent près du chantier sur une maison et repartent dès qu’elles peuvent financer une fondation.</p><div class="sprite-sheet"><canvas id="sprites-preview" width="300" height="192" aria-label="Sprites quatre directions et trois gabarits"></canvas></div><p><strong>Trois gabarits :</strong> habitant sous 1 000 PV, guerrier de 1 000 à 10 000 PV inclus, colosse au-delà. Chaque gabarit existe de face, de dos, à gauche et à droite, dans les quatre couleurs.</p><ul><li><strong>Planification :</strong> sélectionner une ou plusieurs unités arrête toute la simulation. Cliquez ensuite la destination : seules les actions adaptées à cette case apparaissent. Le jeu reprend après l’ordre, sauf si vous aviez activé la pause manuelle. Échap annule la sélection.</li><li><strong>Affichage des PV :</strong> aucun chiffre au-dessus des unités par défaut, même pour les rois et les unités sélectionnées. Le survol affiche les PV exacts. Dans le menu, « Toujours afficher les PV des unités » active les nombres permanents ; ce choix est mémorisé dans ce navigateur.</li><li><strong>Sélection :</strong> clic ou rectangle sur les unités vertes. Maj ajoute à la sélection. Le roi est exclu des rectangles et de la touche A : il se sélectionne seul par un clic direct. Voir le roi recentre seulement la carte.</li><li><strong>Déplacer :</strong> choisissez une destination. Une case de château adverse vise son roi. À destination, les habitants reprennent leur doctrine ; le roi reste sur place.</li><li><strong>Capture royale :</strong> éliminer le roi d’un royaume transfère toutes ses maisons au vainqueur, avec leur production et leur territoire coloré. Cela vaut aussi entre adversaires. Son château s’effondre. Une mort sans vainqueur ne transfère aucune maison.</li><li><strong>Recommencer :</strong> le bouton ↶ en haut ou Recommencer la carte dans le menu remet le niveau à zéro après confirmation, sans perdre votre doctrine ni les niveaux débloqués.</li><li><strong>Fusionner :</strong> les unités sélectionnées convergent sur un point de rassemblement. Une fois les participants réunis, l’unité fusionnée reprend sa doctrine. Une unité morte ou réaffectée ne bloque pas l’attente.</li><li><strong>Maison :</strong> 150 or et jusqu’à 100 PV du bâtisseur. Une grosse unité conserve le reste de ses vies et peut continuer à bâtir. Aucune maison voisine, même en diagonale. La case doit être dégagée.</li><li><strong>Chantiers progressifs :</strong> un pont ou une barricade peut être ordonné sans disposer de tout son prix. À proximité du chantier, l’ouvrier investit l’or disponible puis les nouvelles rentrées. Le travail et l’or déjà investis restent enregistrés s’il meurt ou change d’ordre ; une autre unité peut terminer le reste. Le pont reste infranchissable et la barricade ne bloque pas la route tant que le chantier n’est pas achevé. L’ouvrier perd normalement des vies hors d’une maison, et doit toujours payer son entretien éventuel.</li><li><strong>Pont :</strong> 1 000 or au premier chantier, 500 pour reconstruire au même endroit. Le pont a 1 000 PV et peut être détruit ; les unités qui s’y trouvent tombent à l’eau. Tout camp peut traverser un pont ouvert ; l’ordre Attaquer permet de le détruire. Cliquez sur une rivière : l’unité rejoint la berge et construit exactement une case de pont. Une rivière plus large se traverse en posant chaque tronçon séparément.</li><li><strong>Barricade :</strong> 750 or, 1 500 PV. Elle bloque une case de terre. Les unités la contournent ; l’ordre Attaquer permet de la détruire.</li><li><strong>Barrage :</strong> 32 or. Il bloque le passage et rapporte 0,2 or par seconde et par case si les impôts sont supérieurs à 0 %. Il ne modifie pas le niveau d’eau.</li><li><strong>Grottes :</strong> présentes seulement dans certains niveaux, elles engendrent des monstres neutres sans économie. Ceux-ci ne perdent des PV qu’au combat ou en détruisant du territoire et fusionnent entre eux. Un pont ou une barricade détruite peut les libérer vers les autres camps. Détruire une grotte arrête les naissances. Ces zones sont facultatives pour la victoire.</li><li><strong>Impôts :</strong> de 0 à 30 %. Plus le taux est élevé, plus l’or rentre et plus les naissances ralentissent. L’automatisme ajuste le taux selon l’or et la population.</li><li><strong>Se déplacer :</strong> à l’arrivée, les habitants reprennent leur expansion et occupent les alentours. Le roi reste sur place. Les ordres par défaut sont réordonnables dans le conseil et la doctrine est sauvegardée.</li><li><strong>Tenir :</strong> arrête les déplacements. Sur une maison alliée, l’usure normale s’arrête ; les pénuries de soutien ou d’or restent dangereuses.</li><li><strong>Autonomie :</strong> annule les ordres et rend leurs choix aux habitants. Quand aucun travail accessible ne reste, ou quand l’or manque, les habitants attendent sur les maisons sans usure normale et sans fusion forcée. Ils repartent si un passage ou du travail s’ouvre. Votre doctrine donne la priorité aux maisons, à la destruction des maisons adverses ou à la coupe des arbres. Réordonnez-la dans le conseil. Une défense locale réagit aussi aux ennemis proches des maisons ou du château. Un ordre manuel reste prioritaire et le roi ne sort jamais seul. Les habitants évitent les rochers et ne construisent pas de ponts ou de barricades sans ordre. Toute autre action nécessite un ordre ; les adversaires gardent leur autonomie. L’épargne chantier réserve 1 000 pièces contre les fondations automatiques.</li></ul><p>Molette pour zoomer ; clic droit glissé ou Alt + glisser pour déplacer la carte. Sur écran tactile : glisser sélectionne, le bouton ↔ active le déplacement de carte. <kbd>Espace</kbd> pause, <kbd>Échap</kbd> annule un ordre, <kbd>F</kbd> fusion. La partie s’arrête quand cet onglet est masqué. Sauvegardes locales multiples : le bouton Sauver crée une copie nommée, Load game ouvre la bibliothèque et chaque nouvelle partie possède sa sauvegarde automatique. Les anciennes sauvegardes sont conservées. Export et import restent disponibles au menu. Limite : 150 unités par royaume.</p><div class="close-row"><span></span><button class="primary" id="close-help">J’ai compris</button></div>`,
   );
   $("close-help").onclick = closeModal;
   const c = $<HTMLCanvasElement>("sprites-preview").getContext("2d")!;
@@ -201,7 +436,7 @@ function menu() {
   paused = true;
   updateUI();
   showModal(
-    `<span class="eyebrow">La vallée vous attend</span><h2>Conseil du royaume</h2><p>Partie en pause. Sauvegarde locale dans ce navigateur ; exportez-la pour la conserver ou la transférer.</p><div class="orders"><button id="menu-save">Sauvegarder</button><button id="export">Exporter</button><button id="import">Importer</button><button id="back-title">Écran titre</button></div><label class="check"><input type="checkbox" id="show-unit-hp" ${renderer.showUnitHP ? "checked" : ""}> Toujours afficher les PV des unités</label><p class="tax-hint">Sinon, survolez une unité, un roi ou un monstre pour voir ses PV.</p><input type="file" accept=".json,application/json" id="import-file" class="hidden"><div class="close-row"><button id="restart">Recommencer la carte</button><button class="primary" id="resume">Reprendre</button></div>`,
+    `<span class="eyebrow">La vallée vous attend</span><h2>Conseil du royaume</h2><p>Partie en pause. Sauvegarde locale dans ce navigateur ; exportez-la pour la conserver ou la transférer.</p><div class="orders"><button id="menu-save">Nouvelle sauvegarde</button><button id="menu-load">Charger une sauvegarde</button><button id="export">Exporter</button><button id="import">Importer</button><button id="back-title">Écran titre</button></div><label class="check"><input type="checkbox" id="show-unit-hp" ${renderer.showUnitHP ? "checked" : ""}> Toujours afficher les PV des unités</label><p class="tax-hint">Sinon, survolez une unité, un roi ou un monstre pour voir ses PV.</p><input type="file" accept=".json,application/json" id="import-file" class="hidden"><div class="close-row"><button id="restart">Recommencer la carte</button><button class="primary" id="resume">Reprendre</button></div>`,
   );
   $<HTMLInputElement>("show-unit-hp").onchange = (e) => {
     renderer.showUnitHP = (e.target as HTMLInputElement).checked;
@@ -211,14 +446,15 @@ function menu() {
       /* The display preference remains available during this session. */
     }
   };
-  $("menu-save").onclick = () => persist(true);
+  $("menu-save").onclick = () => createNamedSave(true);
+  $("menu-load").onclick = () => showSavedGames(true);
   $("resume").onclick = () => {
     closeModal();
     paused = false;
     updateUI();
   };
-  $("back-title").onclick = () => {
-    persist();
+  $("back-title").onclick = async () => {
+    if (!(await persist(true))) return;
     closeModal();
     inGame = false;
     $("title").classList.remove("hidden");
@@ -250,7 +486,7 @@ function requestRestart(fromMenu = false) {
   paused = true;
   updateUI();
   showModal(
-    `<span class="eyebrow">Une nouvelle tentative</span><h2>Recommencer ce niveau ?</h2><p>Vous retrouverez la même carte et les conditions de départ : 5 000 pièces par royaume, les maisons initiales et les rois à 100 PV. Votre doctrine et les niveaux débloqués sont conservés.</p><p>La partie en cours sera remplacée.</p><div class="close-row"><button id="no-restart">Annuler</button><button id="yes-restart" class="primary">Recommencer le niveau</button></div>`,
+    `<span class="eyebrow">Une nouvelle tentative</span><h2>Recommencer ce niveau ?</h2><p>Vous retrouverez la même carte et les conditions de départ : 5 000 pièces par royaume, les maisons initiales et les rois à 100 PV. Votre doctrine et les niveaux débloqués sont conservés.</p><p>Une nouvelle partie sera créée ; la sauvegarde précédente restera disponible.</p><div class="close-row"><button id="no-restart">Annuler</button><button id="yes-restart" class="primary">Recommencer le niveau</button></div>`,
   );
   $("no-restart").onclick = () => {
     if (fromMenu) menu();
@@ -285,7 +521,8 @@ function finish() {
     showModal(
       `<span class="eyebrow">${state.result === "won" ? "La vallée est réunie" : "Votre roi est tombé"}</span><h2>${state.result === "won" ? "Une seule couronne." : "L’histoire ne s’arrête pas ici."}</h2><p>${state.result === "won" ? "Les trois royaumes adverses ont disparu. La vallée appartient à votre couronne." : "La couronne Émeraude a perdu son roi ou toute sa population et ses maisons. Rassemblez vos forces et protégez les chemins qui mènent au roi."}</p><p>${clock(state.time)} de règne · ${state.kingdoms[0].births} naissances · ${state.stats.merged} fusions dans la vallée</p><div class="close-row"><button id="end-title">Écran titre</button><button class="primary" id="end-next">${state.result === "won" && state.level < LEVELS.length - 1 ? "Vallée suivante" : "Rejouer"}</button></div>`,
     );
-    $("end-title").onclick = () => {
+    $("end-title").onclick = async () => {
+      if (!(await persist(true))) return;
       closeModal();
       inGame = false;
       $("title").classList.remove("hidden");
@@ -512,8 +749,8 @@ $("brand-title").onclick = () => {
     paused = wasPaused;
     updateUI();
   };
-  $("confirm-title").onclick = () => {
-    persist();
+  $("confirm-title").onclick = async () => {
+    if (!(await persist(true))) return;
     inGame = false;
     closeModal();
     $("title").classList.remove("hidden");
@@ -521,17 +758,12 @@ $("brand-title").onclick = () => {
   };
 };
 $("new-game").onclick = newGame;
-$("load-game").onclick = () => {
-  const raw = read(KEY),
-    s = raw ? loadGame(raw) : undefined;
-  if (s) start(s, true);
-  else toast("Aucune sauvegarde valide.");
-};
+$("load-game").onclick = () => showSavedGames();
 $("help").onclick = help;
 $("title-help").onclick = help;
 $("menu").onclick = () => (inGame ? menu() : undefined);
 $("restart-level").onclick = () => requestRestart();
-$("save").onclick = () => persist(true);
+$("save").onclick = () => createNamedSave();
 $("sidebar-toggle").onclick = () => $("sidebar").classList.toggle("open");
 $("pause").onclick = () => {
   if (planning) {
@@ -579,6 +811,8 @@ let pointer:
         cx: number;
         cy: number;
         pan: boolean;
+        right: boolean;
+        moved: boolean;
         shift: boolean;
         id: number;
       }
@@ -597,6 +831,8 @@ canvas.onpointerdown = (e) => {
     cx: renderer.ox,
     cy: renderer.oy,
     pan: e.button === 2 || e.altKey || panTouch,
+    right: e.button === 2,
+    moved: false,
     shift: e.shiftKey,
     id: e.pointerId,
   };
@@ -625,6 +861,8 @@ canvas.onpointermove = (e) => {
   if (monster)
     $("inspect").textContent += ` · Monstre ${Math.ceil(monster.hp)} PV`;
   if (!pointer) return;
+  if ((p.x - pointer.x) ** 2 + (p.y - pointer.y) ** 2 > 25)
+    pointer.moved = true;
   if (pointer.pan) {
     renderer.ox = pointer.cx + p.x - pointer.x;
     renderer.oy = pointer.cy + p.y - pointer.y;
@@ -644,7 +882,13 @@ canvas.onpointerleave = () => {
 canvas.onpointerup = (e) => {
   if (!pointer) return;
   const p = local(e);
-  if (!pointer.pan) {
+  if (
+    pointer.right &&
+    !pointer.moved &&
+    (p.x - pointer.x) ** 2 + (p.y - pointer.y) ** 2 <= 25
+  ) {
+    cancelPlanning();
+  } else if (!pointer.pan) {
     if (!drag && !pointer.shift && planning && selection.size) {
       const dest = renderer.point(p.x, p.y);
       if (tile(state, dest.x, dest.y)) contextPoint = dest;
@@ -701,7 +945,11 @@ document.onkeydown = (e) => {
   if ((e.target as HTMLElement).matches("input,select")) return;
   if (e.code === "Escape") {
     cancelPlanning();
-    if (!$("modal").classList.contains("hidden")) closeModal();
+    if (!$("modal").classList.contains("hidden")) {
+      const cancel = modalCancel;
+      if (cancel) cancel();
+      else closeModal();
+    }
     updateUI();
   }
   if (!inGame || !$("modal").classList.contains("hidden")) return;
@@ -724,10 +972,14 @@ document.onkeydown = (e) => {
     updateUI();
   }
 };
-window.addEventListener("pagehide", () => persist());
+window.addEventListener("pagehide", () => {
+  checkpoint();
+  void persist();
+});
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
-    persist();
+    checkpoint();
+    void persist();
     accumulator = 0;
   }
   last = 0;
@@ -797,8 +1049,9 @@ setupPwa({
         updateUI();
         resolve(false);
       };
-      $("confirm-update").onclick = () => {
-        if (!persist(true)) return;
+      modalCancel = () => $("cancel-update").click();
+      $("confirm-update").onclick = async () => {
+        if (!(await persist(true))) return;
         closeModal();
         resolve(true);
       };
