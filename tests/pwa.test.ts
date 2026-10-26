@@ -80,7 +80,7 @@ async function client(installed = false, waiting = false, allowSave = true) {
   });
   await Promise.resolve();
   await Promise.resolve();
-  return { calls, window, buttons, serviceWorker };
+  return { calls, window, buttons, serviceWorker, registration };
 }
 
 test("install icon changes to refresh after installation and uses update checking", async () => {
@@ -200,4 +200,13 @@ test("the manifest has real square icons and a relative Pages scope", () => {
     assert.equal(png.readUInt32BE(16), size);
     assert.equal(png.readUInt32BE(20), size);
   }
+});
+
+test("an update already applied by another tab does not leave a misleading update button", async () => {
+  const c = await client(false, true);
+  c.registration.waiting = null;
+  await c.buttons[0].onclick!();
+  assert.ok(c.calls.includes("check"));
+  assert.ok(!c.calls.includes("help"));
+  assert.match(c.buttons[0].title, /Installer/);
 });

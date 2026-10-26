@@ -1,6 +1,6 @@
 // Generated from the complete production build. Do not edit by hand.
-const CACHE = 'quatre-couronnes-9dd4c05a261401b5';
-const FILES = ["assets/index-B-D42-vf.js","assets/index-f8jSYoZp.css","biomes.png","crown.svg","icons/crown-192.png","icons/crown-512.png","index.html","kings-atlas.png","manifest.webmanifest","sprites-atlas.png"];
+const CACHE = 'quatre-couronnes-1851485cc4e17293';
+const FILES = ["assets/index-Bu5WDsV2.js","assets/index-f8jSYoZp.css","biomes.png","crown.svg","icons/crown-192.png","icons/crown-512.png","index.html","kings-atlas.png","manifest.webmanifest","sprites-atlas.png"];
 const INDEX = new URL('index.html', self.registration.scope).href;
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES.map(p => new URL(p, self.registration.scope).href))));

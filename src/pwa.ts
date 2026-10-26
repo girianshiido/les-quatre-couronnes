@@ -27,6 +27,7 @@ export function setupPwa(options: PwaOptions) {
   }
   let prompt: InstallPrompt | undefined;
   let registration: ServiceWorkerRegistration | undefined;
+  let advertisedUpdate = false;
   let applying = false;
   let checking = false;
   function remember() {
@@ -40,6 +41,7 @@ export function setupPwa(options: PwaOptions) {
   }
   function render() {
     const update = !!registration?.waiting;
+    advertisedUpdate = update;
     const refresh = installed || update;
     const label = checking
       ? "Recherche…"
@@ -96,7 +98,8 @@ export function setupPwa(options: PwaOptions) {
   }
   for (const button of controls)
     button.onclick = async () => {
-      if (installed || registration?.waiting) return updateGame();
+      if (installed || advertisedUpdate || registration?.waiting)
+        return updateGame();
       if (prompt) {
         const request = prompt;
         prompt = undefined;
@@ -133,6 +136,7 @@ export function setupPwa(options: PwaOptions) {
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (applying) window.location.reload();
+    else render();
   });
   navigator.serviceWorker
     .register(new URL("sw.js", document.baseURI), { updateViaCache: "none" })
