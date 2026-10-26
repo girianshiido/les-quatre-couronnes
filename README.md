@@ -87,3 +87,9 @@ pnpm simulate
 ![Habitants, guerriers et colosses](public/sprites-atlas.png)
 
 ![Rois dans les quatre directions et couleurs](public/kings-atlas.png)
+
+### Expansion et ordres de groupe
+
+Sans ordre explicite, chaque habitant cherche une parcelle libre accessible à proximité, puis au-delà des passages ouverts, pour y construire une maison. Les arbres peuvent être défrichés ; les zones adverses exigent toujours un ordre d’attaque, hors défense locale. Les habitants de moins de 42 PV préfèrent attendre sur une maison. Les parcelles visées sont réparties entre les habitants pour limiter les regroupements inutiles.
+
+Une fusion conserve la mission de déplacement ou d’attaque en cours, sans entraîner le roi. Les attaques traversent les ponts du trajet ; elles ne détruisent un pont que lorsqu’il est lui-même la cible de l’ordre. Un ordre temporairement inaccessible reste en attente et reprend dès qu’un passage s’ouvre. Les chemins dégagés sont privilégiés avant ceux qui nécessitent un défrichage.

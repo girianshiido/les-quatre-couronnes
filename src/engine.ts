@@ -505,11 +505,41 @@ export function refreshKings(s: State) {
 export function combatPower(s: State, u: Unit) {
   return sheltered(s, u) ? u.hp * 8 + s.kingdoms[u.team].fortification : u.hp;
 }
+function hasDestinationOrder(u: Unit) {
+  return (
+    !!u.target &&
+    [
+      "move",
+      "attack",
+      "merge",
+      "shelter",
+      "house",
+      "bridge",
+      "dam",
+      "barricade",
+    ].includes(u.order)
+  );
+}
 export function resolveEncounter(s: State, a: Unit, b: Unit) {
   if (a.team === b.team) {
     const win = b.royal || (!a.royal && b.order === "hold") ? b : a,
       lose = win === a ? b : a;
     if (win.royal) win.reserve = (win.reserve ?? 100) + lose.hp * 1.25;
+    // A moving troop keeps its mission when it joins an idle ally. An automatic
+    // passer-by adopts the stationed troop's mission instead. Kings keep theirs.
+    const mission = hasDestinationOrder(a)
+      ? a
+      : hasDestinationOrder(b)
+        ? b
+        : undefined;
+    if (mission && !win.royal && mission !== win) {
+      win.order = mission.order;
+      win.target = mission.target && { ...mission.target };
+      win.formation = mission.formation;
+      win.pursue = mission.pursue;
+      win.pursueTeam = mission.pursueTeam;
+      delete win.defending;
+    }
     win.hp += lose.hp;
     lose.hp = 0;
     s.stats.merged++;
@@ -564,6 +594,7 @@ function formationStep(
   goal: Point,
   team: number,
   peaceful: boolean,
+  clearObstacles: boolean,
 ) {
   let caches = flowCaches.get(s);
   if (!caches) {
@@ -574,16 +605,17 @@ function formationStep(
     flowCaches.set(s, caches);
   }
   const cache = peaceful ? caches.peaceful : caches.normal;
-  const key = `${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}${peaceful ? `-${s.stats.cleared}-${s.turfRevision}-${Math.floor(s.time * 2)}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}` : ""}`;
+  const key = `${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}${peaceful ? `-${s.stats.cleared}-${s.turfRevision}-${Math.floor(s.time * 2)}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}` : ""}`;
   if (cache.key !== key) {
     cache.key = key;
     cache.fields.clear();
   }
   const target = idx(s, goal.x, goal.y),
-    fieldKey = `${target}-${team}`;
+    fieldKey = `${target}-${team}-${clearObstacles}`;
   let field = cache.fields.get(fieldKey);
   const pass = (x: number, y: number) =>
     inside(s, x, y) &&
+    (clearObstacles || !["tree", "rock"].includes(tile(s, x, y)!.terrain)) &&
     ((walkable(s, x, y, team) && tile(s, x, y)?.terrain !== "barricade") ||
       (x === goal.x &&
         y === goal.y &&
@@ -645,7 +677,23 @@ export function nextStep(
     (start as Unit).formation &&
     ["move", "attack", "merge", "shelter"].includes((start as Unit).order)
   )
-    return formationStep(s, start, goal, team, peaceful);
+    return (
+      formationStep(s, start, goal, team, peaceful, false) ??
+      formationStep(s, start, goal, team, peaceful, true)
+    );
+  return (
+    findStep(s, start, goal, team, peaceful, false) ??
+    findStep(s, start, goal, team, peaceful, true)
+  );
+}
+function findStep(
+  s: State,
+  start: Point,
+  goal: Point,
+  team: number,
+  peaceful: boolean,
+  clearObstacles: boolean,
+): Point | undefined {
   const total = s.size * s.size,
     prev = new Int32Array(total).fill(-1),
     queue = new Int32Array(total);
@@ -675,6 +723,11 @@ export function nextStep(
           ny === goal.y &&
           tile(s, nx, ny)?.terrain === "barricade"
         )
+      )
+        continue;
+      if (
+        !clearObstacles &&
+        ["tree", "rock"].includes(tile(s, nx, ny)!.terrain)
       )
         continue;
       if (peaceful && !peacefulTile(s, nx, ny, team)) continue;
@@ -907,6 +960,7 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
       : undefined;
   for (const u of us) {
     u.order = order;
+    u.wait = 0;
     u.formation =
       us.length >= 8 && ["move", "attack", "merge", "shelter"].includes(order);
     delete u.defending;
@@ -1024,13 +1078,15 @@ function shelterPlan(s: State) {
   shelterPlans.set(s, plan);
   return plan;
 }
-function updateRest(s: State, u: Unit) {
+function updateRest(s: State, u: Unit, noAvailableJob = false) {
   if (u.team !== 0 || u.royal || !["auto", "rest"].includes(u.order)) return;
   const plan = shelterPlan(s),
     region = plan.regions[idx(s, u.x, u.y)],
     work = plan.work.get(region),
     k = s.kingdoms[0];
   const canWork =
+    !noAvailableJob &&
+    u.hp >= 42 &&
     !!work &&
     ((work.trees && k.gold >= 30) ||
       (work.land && k.gold >= 150 + (k.bridgeSaving ? 1000 : 0)));
@@ -1069,6 +1125,76 @@ function updateRest(s: State, u: Unit) {
     u.order = "rest";
     u.target = { x: chosen.x, y: chosen.y };
   }
+}
+// Civilian expansion seeks a real reachable task instead of wandering around
+// the old castle. Keep a chosen plot until it is occupied or an order overrides it.
+function playerExpansionTarget(s: State, u: Unit) {
+  if (u.team !== 0 || u.royal || u.order !== "auto") return;
+  const k = s.kingdoms[0];
+  const canFound = u.hp >= 42 && k.gold >= 150 + buildingReserve(s, 0);
+  const canClear = u.hp >= 42 && k.gold >= 30;
+  const reserved = new Set(
+    s.units
+      .filter(
+        (v) =>
+          v.hp > 0 &&
+          v.team === 0 &&
+          v.id !== u.id &&
+          v.target &&
+          ["auto", "house"].includes(v.order),
+      )
+      .map((v) => idx(s, v.target!.x, v.target!.y)),
+  );
+  const available = (p: Point) =>
+    !reserved.has(idx(s, p.x, p.y)) && autonomousDestination(s, u, p);
+  const job = (p: Point) =>
+    available(p) &&
+    ((canFound && canHouse(s, p.x, p.y)) ||
+      (canClear && tile(s, p.x, p.y)?.terrain === "tree"));
+  if (u.target && job(u.target)) return;
+  delete u.target;
+  if (!canFound && !canClear) return;
+  const queue: Point[] = [{ x: u.x, y: u.y }];
+  const seen = new Uint8Array(s.tiles.length);
+  seen[idx(s, u.x, u.y)] = 1;
+  // Layered search: the nearest open plot wins over clearing an equally near tree.
+  let head = 0;
+  while (head < queue.length) {
+    const end = queue.length;
+    const layer = queue.slice(head, end);
+    const plot =
+      canFound && layer.find((p) => available(p) && canHouse(s, p.x, p.y));
+    const tree =
+      canClear &&
+      layer.find((p) => available(p) && tile(s, p.x, p.y)?.terrain === "tree");
+    if (plot || tree) {
+      u.target = plot || tree || undefined;
+      return;
+    }
+    while (head < end) {
+      const p = queue[head++];
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const x = p.x + dx,
+          y = p.y + dy;
+        if (!inside(s, x, y)) continue;
+        const n = idx(s, x, y);
+        if (
+          seen[n] ||
+          !peacefulTile(s, x, y, 0) ||
+          (!canClear && tile(s, x, y)?.terrain === "tree")
+        )
+          continue;
+        seen[n] = 1;
+        queue.push({ x, y });
+      }
+    }
+  }
+  updateRest(s, u, true);
 }
 const landLinks = new WeakMap<
   State,
@@ -1247,6 +1373,7 @@ function act(s: State, u: Unit) {
   aiSettlementTarget(s, u);
   updateDefence(s, u);
   updateRest(s, u);
+  playerExpansionTarget(s, u);
   let target = u.target;
   if (
     (u.order === "rest" || u.order === "shelter") &&
@@ -1316,6 +1443,7 @@ function act(s: State, u: Unit) {
   if (
     !u.royal &&
     u.order === "auto" &&
+    (!u.target || distance(u, u.target) === 0) &&
     u.age > 1.2 &&
     u.hp >= 42 &&
     k.gold >= 150 + buildingReserve(s, u.team) &&
@@ -1332,10 +1460,13 @@ function act(s: State, u: Unit) {
         u,
         target,
         u.team,
-        u.order === "rest" || u.order === "shelter",
+        u.order === "rest" ||
+          u.order === "shelter" ||
+          (u.team === 0 && u.order === "auto"),
       )
     : undefined;
   if (!target) {
+    if (u.team === 0 && u.order === "auto") return;
     const enemies = s.kingdoms
       .filter((v) => v.alive && v.id !== u.team)
       .sort((a, b) => distance(u, a.castle) - distance(u, b.castle));
@@ -1378,7 +1509,7 @@ function act(s: State, u: Unit) {
     }
   }
   if (!dest) {
-    if (target && u.order !== "merge" && u.order !== "rest") {
+    if (target && !hasDestinationOrder(u) && u.order !== "rest") {
       u.target = undefined;
       u.order = "auto";
     }
@@ -1394,11 +1525,18 @@ function act(s: State, u: Unit) {
   const structure = structureAt(s, dest);
   if (
     structure &&
-    (u.order === "attack" ||
+    ((u.order === "attack" &&
+      (structure.kind === "barricade" ||
+        (target?.x === dest.x && target?.y === dest.y))) ||
       (structure.kind === "barricade" && structure.team !== u.team))
   ) {
     attackStructure(s, u, structure);
-    if (u.order === "attack" && structure.hp <= 0) {
+    if (
+      u.order === "attack" &&
+      structure.hp <= 0 &&
+      target?.x === dest.x &&
+      target?.y === dest.y
+    ) {
       u.order = "hold";
       delete u.target;
     }
