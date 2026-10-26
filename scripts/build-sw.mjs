@@ -14,6 +14,7 @@ async function walk(path = "") {
 }
 const paths = await walk();
 const hash = createHash("sha256");
+hash.update(await readFile(new URL("./build-sw.mjs", import.meta.url)));
 for (const p of paths) {
   hash.update(p);
   hash.update(await readFile(new URL(p, root)));
@@ -26,7 +27,7 @@ const CACHE = 'quatre-couronnes-${version}';
 const FILES = ${JSON.stringify(paths)};
 const INDEX = new URL('index.html', self.registration.scope).href;
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES.map(p => new URL(p, self.registration.scope).href))));
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES.map(p => new Request(new URL(p, self.registration.scope).href, {cache: "reload"})))));
 });
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {

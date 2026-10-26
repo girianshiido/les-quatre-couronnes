@@ -116,8 +116,9 @@ function worker() {
     calls: string[] = [];
   const scope = "https://example.org/game/";
   const cache = {
-    addAll: async (paths: string[]) => {
-      calls.push(...paths);
+    addAll: async (paths: Request[]) => {
+      assert.ok(paths.every((p) => p.cache === "reload"));
+      calls.push(...paths.map((p) => p.url));
     },
     match: async (key: any) =>
       key === scope + "index.html" ? "offline-game" : undefined,
@@ -141,6 +142,7 @@ function worker() {
     self,
     caches,
     URL,
+    Request,
     fetch: () => {
       throw Error("network unavailable");
     },
