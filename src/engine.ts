@@ -46,6 +46,7 @@ export interface Unit extends Point {
   heading: Point;
   royal?: boolean;
   reserve?: number;
+  wounds?: number;
   defending?: number;
   formation?: boolean;
   occupying?: boolean;
@@ -396,12 +397,23 @@ export function territoryAt(s: State, p: Point) {
   if (best && s.clearedTurf[idx(s, p.x, p.y)] !== best.id)
     return { team: best.team, house: best.id, growth: bestGrowth };
 }
-export function destroyTurf(s: State, p: Point, team: number) {
+export function destroyTurf(s: State, p: Point, team: number, hp = 0) {
   const turf = territoryAt(s, p);
   if (!turf || turf.team === team) return 0;
   s.clearedTurf[idx(s, p.x, p.y)] = turf.house;
   s.turfRevision++;
-  return 2;
+  return 2 + hp * 0.002;
+}
+export function houseDestructionCost(hp: number) {
+  return 200 + hp * 0.05;
+}
+export function razeHouse(s: State, house: House) {
+  s.houses = s.houses.filter((h) => h.id !== house.id);
+  delete tile(s, house.x, house.y)!.house;
+  supplyFields.delete(s);
+  if (!s.houses.some((h) => h.team === house.team))
+    destroyKingdom(s, house.team, house.team);
+  else refreshKings(s);
 }
 export function canHouse(s: State, x: number, y: number) {
   const t = tile(s, x, y);
@@ -440,6 +452,7 @@ export function addHouse(
     founded: s.time,
   };
   s.houses.push(h);
+  supplyFields.delete(s);
   tile(s, x, y)!.house = h.id;
   return true;
 }
@@ -496,13 +509,89 @@ export function lifeDrain(s: State, u: Unit) {
     Math.max(0, u.hp - 300) * 0.004
   );
 }
+// These fields describe physical supply routes, not territory colour. Water,
+// mountains and closed barricades cannot supply an army across a sealed border.
+const supplyFields = new WeakMap<State, Map<number, Int16Array>>();
+export function supplyDistance(s: State, u: Unit) {
+  let fields = supplyFields.get(s);
+  if (!fields) supplyFields.set(s, (fields = new Map()));
+  let field = fields.get(u.team);
+  if (!field) {
+    field = new Int16Array(s.tiles.length).fill(-1);
+    const queue: number[] = [];
+    for (const h of s.houses) {
+      if (h.team !== u.team) continue;
+      const i = idx(s, h.x, h.y);
+      field[i] = 0;
+      queue.push(i);
+    }
+    for (let head = 0; head < queue.length; head++) {
+      const i = queue[head],
+        x = i % s.size,
+        y = Math.floor(i / s.size);
+      if (field[i] >= 24) continue;
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const nx = x + dx,
+          ny = y + dy;
+        if (!inside(s, nx, ny)) continue;
+        const n = idx(s, nx, ny),
+          t = s.tiles[n];
+        if (
+          field[n] >= 0 ||
+          ["water", "dam", "rock", "tree", "barricade"].includes(t.terrain) ||
+          t.cave !== undefined ||
+          (t.castle !== undefined && t.castle !== u.team)
+        )
+          continue;
+        field[n] = field[i] + 1;
+        queue.push(n);
+      }
+    }
+    fields.set(u.team, field);
+  }
+  const d = field[idx(s, u.x, u.y)];
+  return d < 0 ? 24 : d;
+}
+export function armyHP(s: State, team: number) {
+  return s.units.reduce(
+    (n, u) => n + (u.team === team && !u.royal && u.hp > 0 ? u.hp : 0),
+    0,
+  );
+}
+export function armyCapacity(s: State, team: number) {
+  return s.houses.filter((h) => h.team === team).length * 200;
+}
+export function kingCapacity(s: State, team: number) {
+  return s.houses.filter((h) => h.team === team).length * 100;
+}
+export function supportDrain(s: State, u: Unit, people = armyHP(s, u.team)) {
+  if (u.royal) return 0;
+  const excess =
+    people > 0 ? Math.max(0, 1 - armyCapacity(s, u.team) / people) : 0;
+  const remote = resting(s, u)
+    ? 0
+    : Math.min(20, Math.max(0, supplyDistance(s, u) - 4)) * 0.003;
+  // Excess is calculated on the entire army: splitting a stack never creates
+  // extra capacity. Houses stop normal ageing, but cannot support infinite PV.
+  return u.hp * (excess * 0.04 + remote);
+}
 function injure(u: Unit, amount: number) {
   u.hp -= amount;
-  if (u.royal) u.reserve = (u.reserve ?? 100) - amount;
+  if (u.royal) u.wounds = (u.wounds ?? 0) + amount;
 }
 export function refreshKings(s: State) {
   for (const k of s.kingdoms) {
     if (!k.alive) continue;
+    const capacity = kingCapacity(s, k.id);
+    if (!capacity) {
+      destroyKingdom(s, k.id, k.id);
+      continue;
+    }
     const king = s.units.find((u) => u.team === k.id && u.royal);
     if (!king) {
       destroyKingdom(s, k.id, k.id);
@@ -511,7 +600,20 @@ export function refreshKings(s: State) {
     const people = s.units
       .filter((u) => u.team === k.id && !u.royal && u.hp > 0)
       .reduce((n, u) => n + u.hp, 0);
-    king.hp = (king.reserve ?? 100) + people * 0.25;
+    const initialHomes =
+      s.level === 0
+        ? k.id === 0
+          ? 5
+          : 2
+        : k.id === 0
+          ? 4
+          : LEVELS[s.level].enemyHouses;
+    const settlementStrength = Math.max(0, capacity / 100 - initialHomes) * 50;
+    king.hp =
+      Math.min(
+        capacity,
+        (king.reserve ?? 100) + people * 0.25 + settlementStrength,
+      ) - (king.wounds ?? 0);
     k.hp = Math.max(0, king.hp);
     if (king.hp <= 0) destroyKingdom(s, k.id, k.id);
   }
@@ -573,6 +675,7 @@ export function resolveEncounter(s: State, a: Unit, b: Unit) {
     }
     win.hp += lose.hp;
     lose.hp = 0;
+    if (win.royal) refreshKings(s);
     s.stats.merged++;
     return win;
   }
@@ -605,12 +708,27 @@ export function resolveEncounter(s: State, a: Unit, b: Unit) {
   return finishEncounter(s, a, b, b);
 }
 export function unitUpkeep(u: Unit) {
-  return !u.royal && u.hp > 500 ? u.hp * 0.0004 : 0;
+  return !u.royal && u.hp > 500 ? u.hp * 0.002 : 0;
+}
+export function suppliedUpkeep(s: State, u: Unit) {
+  const base = unitUpkeep(u);
+  return base
+    ? base * (1 + Math.min(2, Math.max(0, supplyDistance(s, u) - 4) / 8))
+    : 0;
 }
 export function maintenanceCost(s: State, team: number) {
   return s.units
     .filter((u) => u.team === team && u.hp > 0)
-    .reduce((n, u) => n + unitUpkeep(u), 0);
+    .reduce((n, u) => n + suppliedUpkeep(s, u), 0);
+}
+export function goldIncome(s: State, team: number) {
+  const k = s.kingdoms[team];
+  if (!k.alive) return 0;
+  return (
+    0.13 +
+    s.houses.filter((h) => h.team === team).length * k.tax * 0.012 +
+    s.tiles.filter((t) => t.terrain === "dam" && t.owner === team).length * 0.2
+  );
 }
 const flowCaches = new WeakMap<
   State,
@@ -847,6 +965,7 @@ export function buildBarricade(s: State, u: Unit, p: Point) {
   k.bridgeSaving = false;
   const t = tile(s, p.x, p.y)!;
   t.terrain = "barricade";
+  supplyFields.delete(s);
   t.owner = u.team;
   s.structures.push({
     id: s.nextId++,
@@ -865,6 +984,7 @@ export function buildBarricade(s: State, u: Unit, p: Point) {
 export function destroyStructure(s: State, b: Structure) {
   if (!s.structures.includes(b)) return;
   s.structures = s.structures.filter((v) => v.id !== b.id);
+  supplyFields.delete(s);
   for (const p of b.cells) {
     const t = tile(s, p.x, p.y)!;
     t.terrain = b.kind === "bridge" ? "water" : "grass";
@@ -953,6 +1073,7 @@ export function buildCrossing(s: State, u: Unit, p: Point, dam = false) {
   )
     return false;
   k.gold -= dam ? 32 : bridgeCost(s, p);
+  supplyFields.delete(s);
   if (conversion)
     s.structures = s.structures.filter((b) => b.id !== existing!.id);
   for (const c of cr.cells) {
@@ -1053,6 +1174,7 @@ function destroyKingdom(
   s.ruins.push({ team, ...k.castle, time: s.time });
   for (const t of s.tiles) if (t.castle === team) t.castle = undefined;
   const inherited = s.houses.filter((h) => h.team === team);
+  supplyFields.delete(s);
   if (captureHouses && attacker !== team && s.kingdoms[attacker]?.alive) {
     for (const h of inherited) h.team = attacker;
     s.turfRevision++;
@@ -1954,6 +2076,7 @@ function act(s: State, u: Unit) {
       return;
     k.gold -= cost;
     t.terrain = "grass";
+    supplyFields.delete(s);
     injure(u, 3);
     s.stats.cleared++;
     return;
@@ -1975,13 +2098,12 @@ function act(s: State, u: Unit) {
     const winner = resolveEncounter(s, u, other);
     if (winner !== u || u.hp <= 0) return;
   }
-  injure(u, destroyTurf(s, dest, u.team));
+  injure(u, destroyTurf(s, dest, u.team, u.hp));
   if (u.hp <= 0) return;
   const house = s.houses.find((h) => h.id === t.house);
   if (house && house.team !== u.team) {
-    s.houses = s.houses.filter((h) => h.id !== house.id);
-    delete t.house;
-    injure(u, u.royal ? 8 : 12);
+    razeHouse(s, house);
+    injure(u, houseDestructionCost(u.hp));
     log(
       s,
       u.royal
@@ -2005,6 +2127,7 @@ function act(s: State, u: Unit) {
 }
 export function step(s: State, dt = 0.2) {
   if (s.result !== "playing") return;
+  supplyFields.delete(s);
   s.time += dt;
   refreshKings(s);
   for (const k of s.kingdoms) {
@@ -2022,12 +2145,7 @@ export function step(s: State, dt = 0.2) {
               : 14;
       k.tax += (desired - k.tax) * Math.min(1, dt * 0.25);
     }
-    k.gold +=
-      dt *
-      (0.13 +
-        hs * k.tax * 0.012 +
-        s.tiles.filter((t) => t.terrain === "dam" && t.owner === k.id).length *
-          0.2);
+    k.gold += dt * goldIncome(s, k.id);
   }
   for (const h of s.houses) {
     const interval = birthInterval(s.kingdoms[h.team].tax);
@@ -2041,6 +2159,7 @@ export function step(s: State, dt = 0.2) {
     }
   }
   const coverage = new Map<number, number>();
+  const armies = s.kingdoms.map((k) => armyHP(s, k.id));
   for (const k of s.kingdoms) {
     if (!k.alive) continue;
     const needed = maintenanceCost(s, k.id) * dt,
@@ -2055,7 +2174,7 @@ export function step(s: State, dt = 0.2) {
       u.hp -= u.hp * 0.03 * (1 - (coverage.get(u.team) ?? 1)) * dt;
       if (u.hp <= 0) continue;
     }
-    const upkeep = lifeDrain(s, u);
+    const upkeep = lifeDrain(s, u) + supportDrain(s, u, armies[u.team]);
     if (u.royal) injure(u, dt * upkeep);
     else u.hp -= dt * upkeep;
     u.wait -= dt;
@@ -2072,11 +2191,7 @@ export function step(s: State, dt = 0.2) {
   s.units = s.units.filter((u) => u.hp > 0 && s.kingdoms[u.team].alive);
   refreshKings(s);
   for (const k of s.kingdoms)
-    if (
-      k.alive &&
-      !s.houses.some((h) => h.team === k.id) &&
-      !s.units.some((u) => u.team === k.id && !u.royal && u.hp > 0)
-    )
+    if (k.alive && !s.houses.some((h) => h.team === k.id))
       destroyKingdom(s, k.id, k.id);
   s.units = s.units.filter((u) => u.hp > 0 && s.kingdoms[u.team].alive);
   if (!s.kingdoms[0].alive) s.result = "lost";
@@ -2290,6 +2405,7 @@ export function loadGame(data: string): State | undefined {
           (u.pursueTeam === undefined || faction(u.pursueTeam)) &&
           (!u.royal ||
             (typeof u.reserve === "number" && Number.isFinite(u.reserve))) &&
+          (u.wounds === undefined || num(u.wounds)) &&
           orders.includes(u.order) &&
           (!u.target || point(u.target)) &&
           u.heading &&

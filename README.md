@@ -20,9 +20,9 @@ Les habitants naissent à **100 PV**. Ils cherchent des tâches accessibles suiv
 - **Combat :** entre unités ordinaires, la plus forte gagne et perd 70 % des PV du vaincu. À égalité, les deux meurent. Les combats et destructions ne coûtent pas d’or.
 - **Usure :** la marche et le temps consomment des PV, même dans son propre camp. L’usure temporelle augmente avec la distance au roi et avec la taille d’une grosse unité. Sur une maison alliée, l’usure normale s’arrête, quel que soit l’ordre.
 - **Repos :** quand aucun travail accessible ne reste, ou quand l’or manque, les habitants attendent sur les maisons sans fusion forcée. Un passage ouvert ou du nouveau travail les remet en activité.
-- **Entretien :** au-delà de 500 PV, une unité ordinaire consomme **0,4 or par seconde pour 1 000 PV**. Si le trésor ne suffit pas, la part non financée provoque une perte pouvant atteindre **3 % de ses PV par seconde**, même sur une maison. Le roi et les monstres n’ont pas cet entretien financier.
+- **Entretien :** au-delà de 500 PV, une unité ordinaire consomme **2 or par seconde pour 1 000 PV**, jusqu’à trois fois ce coût loin des maisons. Si le trésor ne suffit pas, la part non financée provoque une perte pouvant atteindre **3 % de ses PV par seconde**, même sur une maison. Le roi et les monstres n’ont pas cet entretien financier.
 - **Gabarits :** habitant sous 1 000 PV, guerrier de 1 000 à 10 000 inclus, colosse au-delà. Quatre directions, deux poses de marche et quatre couleurs, avec une couronne pour le roi.
-- **Gazon :** il apparaît progressivement dans les huit cases autour des maisons. Détruire le gazon ennemi coûte **2 PV par case** ; raser une maison coûte **12 PV à un habitant, 8 au roi**. Aucune dépense d’or. Une autre maison peut réétendre son gazon sur le terrain.
+- **Gazon :** il apparaît progressivement dans les huit cases autour des maisons. Détruire le gazon ennemi coûte **2 PV + 0,2 % des PV actuels par case** ; raser une maison coûte **200 PV + 5 % des PV actuels**, pour les habitants, le roi et les monstres. Aucune dépense d’or. Une autre maison peut réétendre son gazon sur le terrain.
 
 ## L’or et les constructions
 
@@ -44,11 +44,11 @@ Les barricades ont 1 500 PV et bloquent la route. Les unités peuvent les contou
 
 ## Le roi et la victoire
 
-Le roi commence à 100 PV. Sa force est sa réserve personnelle augmentée de **25 % des PV de ses autres unités**. Les unités qui le rejoignent lui transmettent leurs vies. Dans les neuf cases de son château, sa force défensive est multipliée par **huit**, avec **2 000 PV de remparts** qui s’usent lors des assauts.
+Le roi commence à 100 PV. Sa force est sa réserve personnelle augmentée de **50 PV par maison au-delà des maisons de départ** et de **25 % des PV de ses autres unités**, avec un **plafond de 100 PV par maison restante**, duquel sont retranchées ses blessures. Les blessures ne disparaissent pas lorsqu’il atteint le plafond, rentre au château ou recharge une sauvegarde. Les unités qui le rejoignent lui transmettent leurs vies. Dans les neuf cases de son château, sa force défensive est multipliée par **huit**, avec **2 000 PV de remparts** qui s’usent lors des assauts.
 
 Dehors, le roi perd **5 % de ses PV par seconde**, au minimum 4 PV/s. Rentrer au château ou s’abriter sur une maison arrête cette usure sans soigner les dégâts. Avancer le roi peut soutenir les soldats proches, mais le rend vulnérable.
 
-Un royaume disparaît si son roi meurt **ou s’il n’a plus aucune maison ni habitant ordinaire**, même si son roi vit encore. Son château s’effondre et laisse des ruines. La partie est gagnée lorsque les trois royaumes adverses ont disparu.
+Un royaume disparaît si son roi meurt **ou dès qu’il perd sa dernière maison**, même si son roi et ses armées ont encore des PV. Son château s’effondre et laisse des ruines. La partie est gagnée lorsque les trois royaumes adverses ont disparu.
 
 ## Les grottes
 
@@ -123,3 +123,13 @@ Les grosses unités adverses choisissent des objectifs accessibles : elles const
 Une fondation coûte **150 or et jusqu’à 100 PV du bâtisseur**. Un habitant à 100 PV ou moins y consacre ses vies restantes ; une unité fusionnée garde le surplus et peut construire plusieurs maisons. La règle vaut pour le joueur, les adversaires et les ordres manuels. Les naissances restent à 100 PV.
 
 Un adversaire peut saisir une occasion locale de prendre le roi : il doit être tout proche, disposer d’une grande marge face à sa défense complète et avoir un trajet immédiat dégagé. Un roi trop fort, un cours d’eau fermé ou une garnison dangereuse ne sont pas des cibles de raid ordinaires. Les ponts traversés restent intacts ; les maisons et le gazon détruits coûtent des PV, sans dépense d’or.
+
+## Maisons et soutien des armées
+
+Chaque maison soutient **200 PV d’armée ordinaire**. Ce total est commun à toutes les unités du camp : fractionner une armée ne crée pas de capacité supplémentaire. La part non soutenue perd **4 % de ses PV par seconde** (par exemple, 3 000 PV pour 2 000 soutenus perdent 40 PV/s au départ), même à l’abri sur une maison. Ce soutien ne soigne pas les dégâts et ne constitue pas une limite dure empêchant les naissances.
+
+Hors d’une maison, l’éloignement des maisons alliées ajoute **0,3 % des PV par seconde pour chaque case au-delà de quatre**, jusqu’à **6 %/s**. La distance suit les chemins ouverts : une rivière fermée, un rocher, un arbre, une grotte, une barricade ou un château adverse ne ravitaille pas au travers. Un pont ouvert prolonge le réseau. Construire des relais sur l’avancée réduit donc les pertes locales et augmente la capacité totale. Ces pertes s’ajoutent à l’usure habituelle et, le cas échéant, au manque d’or.
+
+Au-delà de 500 PV par unité, l’entretien coûte **2 or/s pour 1 000 PV**, multiplié progressivement jusqu’à **trois** loin des maisons. Les revenus restent proportionnels aux maisons et aux impôts : `0,13 + maisons × taux × 0,012 + cases de barrage × 0,2` or/s. Dix maisons à 24 % rapportent **3,01 or/s**, alors qu’une armée de 3 000 PV demande **6 à 18 or/s**. Un gros trésor permet de payer temporairement cet entretien, mais ne supprime ni le manque de maisons ni l’éloignement.
+
+Les règles de soutien, de destruction, d’entretien et d’effondrement sont identiques pour les quatre royaumes. Les monstres conservent leur absence d’économie et d’usure naturelle ; ils paient le même coût de destruction en PV. Les sauvegardes existantes restent lisibles et appliquent les nouvelles règles à la reprise.

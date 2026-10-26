@@ -60,7 +60,7 @@ test("a mission survives fusion into a stationary 7000 HP troop", () => {
   assert.equal(survivor.id, idle.id);
   assert.equal(survivor.x, 22);
   assert.equal(survivor.order, "auto");
-  assert.ok(survivor.hp > 6000);
+  assert.ok(survivor.hp > 1000);
 });
 
 test("an automatic passer-by preserves the mission of its commanded ally", () => {
@@ -97,7 +97,7 @@ test("a group including a 7000 HP troop attacks across a bridge without destroyi
   assert.equal(s.structures[0].hp, 1000);
   assert.equal(tile(s, 24, 20)!.house, undefined);
   assert.ok(
-    s.units.some((u) => !u.royal && u.team === 0 && u.x === 24 && u.hp > 6000),
+    s.units.some((u) => !u.royal && u.team === 0 && u.x === 24 && u.hp > 1000),
   );
 });
 
@@ -117,7 +117,7 @@ test("a blocked explicit order waits and resumes when a bridge opens, including 
   advance(loaded, 10);
   assert.ok(
     loaded.units.some(
-      (v) => !v.royal && v.team === 0 && v.x === 24 && v.hp > 6000,
+      (v) => !v.royal && v.team === 0 && v.x === 24 && v.hp > 1000,
     ),
   );
 });

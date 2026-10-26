@@ -5,6 +5,8 @@ import {
   LEVELS,
   territoryAt,
   lifeDrain,
+  supportDrain,
+  houseDestructionCost,
   combatPower,
   birthInterval,
   canHouse,
@@ -236,14 +238,14 @@ test("all kingdoms start with 5000 gold and a 100 HP movable king on every level
 test("king gains 25% of army HP; absorbing an ally preserves the full sum", () => {
   const s = createGame(),
     king = s.units.find((u) => u.team === 0 && u.royal)!;
-  const ally = unit(0, 400, king.x, king.y + 1);
+  const ally = unit(0, 300, king.x, king.y + 1);
   s.units.push(ally);
   refreshKings(s);
-  assert.equal(king.hp, 200);
+  assert.equal(king.hp, 175);
   const sum = totalHP(s, 0);
   assert.equal(resolveEncounter(s, ally, king), king);
   refreshKings(s);
-  assert.equal(king.hp, 600);
+  assert.equal(king.hp, 475);
   assert.equal(totalHP(s, 0), sum);
   assert.equal(ally.hp, 0);
 });
@@ -520,7 +522,7 @@ test("a manual hold order suppresses automatic pursuit of an invader", () => {
   s.units.push(defender, invader);
   step(s);
   assert.equal(defender.order, "hold");
-  assert.ok(invader.hp > 99);
+  assert.ok(invader.hp > 95);
   assert.equal(defender.x, 20);
 });
 test("destroying enemy turf costs HP, clears its tint and survives save/load", () => {
@@ -535,9 +537,10 @@ test("destroying enemy turf costs HP, clears its tint and survives save/load", (
   u.target = p;
   s.units.push(u);
   assert.equal(territoryAt(s, p)!.team, 1);
-  const drain = lifeDrain(s, u);
+  const drain = lifeDrain(s, u) + supportDrain(s, u);
   step(s);
-  assert.ok(Math.abs(u.hp - (100 - drain * 0.2 - 0.32 - 2)) < 1e-8);
+  const beforeTurf = 100 - drain * 0.2;
+  assert.ok(Math.abs(u.hp - (beforeTurf * 0.998 - 2 - 0.32)) < 1e-8);
   assert.equal(territoryAt(s, p), undefined);
   const loaded = loadGame(saveGame(s))!;
   assert.ok(loaded);
@@ -553,10 +556,13 @@ test("ordinary units raze enemy houses and pay the destruction cost", () => {
   u.order = "move";
   u.target = { x: h.x, y: h.y };
   s.units.push(u);
-  const drain = lifeDrain(s, u);
+  const drain = lifeDrain(s, u) + supportDrain(s, u);
   step(s);
   assert.ok(!s.houses.includes(h));
-  assert.ok(Math.abs(u.hp - (100 - drain * 0.2 - 0.32 - 2 - 12)) < 1e-8);
+  const afterTurf = (100 - drain * 0.2) * 0.998 - 2;
+  assert.ok(
+    Math.abs(u.hp - (afterTurf - houseDestructionCost(afterTurf))) < 1e-8,
+  );
   assert.equal(tile(s, h.x, h.y)!.house, undefined);
 });
 test("legacy multi-cell bridges load as independent single-cell segments without charging the treasury", () => {
@@ -584,9 +590,10 @@ test("manual foundations consume at most 100 HP, allowing a large unit to contin
   u.id = s.nextId++;
   s.units.push(u);
   command(s, [u.id], "house", { x: 20, y: 20 });
+  const drain = lifeDrain(s, u) + supportDrain(s, u);
   step(s);
   assert.ok(tile(s, 20, 20)!.house);
-  assert.ok(u.hp > 59800 && u.hp < 59901);
+  assert.ok(Math.abs(u.hp - (60000 - drain * 0.2 - 100)) < 1e-8);
   assert.ok(s.units.includes(u));
   assert.equal(u.order, "auto");
 });

@@ -12,6 +12,8 @@ import {
   log,
   destroyStructure,
   destroyTurf,
+  houseDestructionCost,
+  razeHouse,
 } from "./engine";
 const proxy = (m: Monster): Unit => ({
   id: m.id,
@@ -207,12 +209,12 @@ export function tickMonsters(s: State, dt: number) {
       continue;
     }
     if (!contact(s, m, dest)) continue;
-    m.hp -= destroyTurf(s, dest, 4);
+    m.hp -= destroyTurf(s, dest, 4, m.hp);
     if (m.hp <= 0) continue;
     if (t.house !== undefined) {
-      s.houses = s.houses.filter((h) => h.id !== t.house);
-      delete t.house;
-      m.hp -= 12;
+      const house = s.houses.find((h) => h.id === t.house);
+      if (house) razeHouse(s, house);
+      m.hp -= houseDestructionCost(m.hp);
       log(s, "Un monstre détruit une maison.", 4);
     }
     if (m.hp <= 0) continue;

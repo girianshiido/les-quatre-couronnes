@@ -143,17 +143,17 @@ test("large troops spend gold and starve rapidly without it, even at a house", (
   a.units.push(u);
   a.kingdoms[0].automatic = false;
   a.kingdoms[0].tax = 0;
-  assert.equal(unitUpkeep(u), 2);
+  assert.equal(unitUpkeep(u), 10);
   const before = a.kingdoms[0].gold;
   step(a, 1);
-  assert.ok(a.kingdoms[0].gold < before - 1.8);
-  assert.equal(u.hp, 5000);
+  assert.ok(a.kingdoms[0].gold < before - 9.8);
+  assert.equal(u.hp, 4840);
   const b = loadGame(saveGame(a))!,
     v = b.units.find((v) => v.id === u.id)!;
   b.kingdoms[0].gold = 0;
   step(b, 1);
-  assert.ok(v.hp < 4900);
-  assert.ok(v.hp > 4500);
+  assert.ok(v.hp < 4600);
+  assert.ok(v.hp > 4400);
 });
 test("ramparts absorb repeated assaults and a modest merged unit cannot instantly kill the king", () => {
   const s = createGame(),
