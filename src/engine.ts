@@ -52,6 +52,7 @@ export interface Unit extends Point {
   occupying?: boolean;
   pursue?: number;
   pursueTeam?: number;
+  mergeGroup?: number;
 }
 export interface House extends Point {
   id: number;
@@ -671,10 +672,18 @@ export function resolveEncounter(s: State, a: Unit, b: Unit) {
       win.pursue = mission.pursue;
       win.pursueTeam = mission.pursueTeam;
       win.occupying = mission.occupying;
+      win.mergeGroup = mission.mergeGroup;
       delete win.defending;
     }
     win.hp += lose.hp;
     lose.hp = 0;
+    if (
+      win.order === "merge" &&
+      (win.pursue === lose.id || win.pursue === win.id)
+    ) {
+      delete win.pursue;
+      delete win.pursueTeam;
+    }
     if (win.royal) refreshKings(s);
     s.stats.merged++;
     return win;
@@ -723,10 +732,9 @@ export function maintenanceCost(s: State, team: number) {
 }
 export function goldIncome(s: State, team: number) {
   const k = s.kingdoms[team];
-  if (!k.alive) return 0;
+  if (!k.alive || k.tax === 0) return 0;
   return (
-    0.13 +
-    s.houses.filter((h) => h.team === team).length * k.tax * 0.012 +
+    s.houses.filter((h) => h.team === team).length * k.tax * 0.035 +
     s.tiles.filter((t) => t.terrain === "dam" && t.owner === team).length * 0.2
   );
 }
@@ -1120,6 +1128,7 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
       (!u.royal || !["house", "bridge", "dam", "barricade"].includes(order)),
   );
   if (!us.length) return;
+  const mergeGroup = order === "merge" ? s.nextId++ : undefined;
   const rally = target ?? { x: us[0].x, y: us[0].y };
   const entity =
     target && ["attack", "merge"].includes(order)
@@ -1139,6 +1148,8 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
       : undefined;
   for (const u of us) {
     u.order = order;
+    if (mergeGroup === undefined) delete u.mergeGroup;
+    else u.mergeGroup = mergeGroup;
     u.wait = 0;
     u.occupying =
       !u.royal &&
@@ -1302,6 +1313,11 @@ function updateRest(s: State, u: Unit, noAvailableJob = false) {
     }
     return;
   }
+  if (resting(s, u)) {
+    u.order = "rest";
+    u.target = { x: u.x, y: u.y };
+    return;
+  }
   if (
     u.order === "rest" &&
     u.target &&
@@ -1323,7 +1339,7 @@ function updateRest(s: State, u: Unit, noAvailableJob = false) {
             ((v.target?.x === h.x && v.target?.y === h.y) ||
               (v.x === h.x && v.y === h.y)),
         ).length *
-          25,
+          0.15,
     }))
     .sort((a, b) => a.score - b.score)[0]?.h;
   if (chosen) {
@@ -1384,7 +1400,7 @@ function guardPost(s: State, u: Unit) {
 function savingForHouse(s: State, u: Unit) {
   if (
     u.team !== 0 ||
-    u.order !== "auto" ||
+    !["auto", "rest"].includes(u.order) ||
     s.doctrine === "conqueror" ||
     (s.doctrine === "custom" &&
       s.priorities.indexOf("house") > s.priorities.indexOf("clear")) ||
@@ -1415,6 +1431,23 @@ function playerExpansionTarget(s: State, u: Unit) {
   }
   const canFound = k.gold >= 150 + buildingReserve(s, 0);
   const canClear = k.gold >= 30 && !savingForHouse(s, u);
+  const prioritisesBuilding =
+    s.doctrine === "custom"
+      ? s.priorities[0] === "house"
+      : s.doctrine !== "conqueror";
+  // A builder short of construction money waits nearby instead of treating a
+  // distant enemy house as the only affordable job and exhausting itself there.
+  if (
+    (prioritisesBuilding && savingForHouse(s, u)) ||
+    (profile &&
+      s.doctrine !== "conqueror" &&
+      !canFound &&
+      !canClear &&
+      u.hp < 1000)
+  ) {
+    updateRest(s, u, true);
+    return;
+  }
   const canRaid = s.priorities.includes("raid");
   const houseTeams = new Map(s.houses.map((h) => [h.id, h.team]));
   const reserved = new Set(
@@ -1466,11 +1499,11 @@ function playerExpansionTarget(s: State, u: Unit) {
         weight:
           profile.weights[p] *
           (p === "house"
-            ? u.hp >= 1000
+            ? u.hp >= 1000 && s.doctrine !== "builder"
               ? 0.15
               : 1.4
             : p === "raid"
-              ? u.hp >= 1000
+              ? u.hp >= 1000 && s.doctrine !== "builder"
                 ? 3
                 : u.hp < 250
                   ? 0.3
@@ -1841,6 +1874,7 @@ function finishTravel(u: Unit) {
   delete u.target;
   delete u.pursue;
   delete u.pursueTeam;
+  delete u.mergeGroup;
   u.formation = false;
 }
 function act(s: State, u: Unit) {
@@ -1922,7 +1956,7 @@ function act(s: State, u: Unit) {
   }
   if (
     (u.order === "house" ||
-      (u.order === "raid" &&
+      (["raid", "auto"].includes(u.order) &&
         canHouse(s, u.x, u.y) &&
         k.gold >= 150 + buildingReserve(s, u.team))) &&
     target &&
@@ -1939,7 +1973,32 @@ function act(s: State, u: Unit) {
     }
     return;
   }
-  if (u.order === "merge" && target && distance(u, target) === 0) return;
+  if (u.order === "merge" && target && distance(u, target) === 0) {
+    // Residents can already share a house when the order is issued. They must
+    // actually fuse here rather than all waiting for one another to move.
+    for (const other of s.units.filter(
+      (v) =>
+        v.id !== u.id &&
+        v.team === u.team &&
+        v.hp > 0 &&
+        v.x === u.x &&
+        v.y === u.y,
+    )) {
+      if (resolveEncounter(s, u, other) !== u) return;
+    }
+    const pending = s.units.some(
+      (v) =>
+        v.id !== u.id &&
+        v.team === u.team &&
+        v.hp > 0 &&
+        v.order === "merge" &&
+        (u.mergeGroup !== undefined
+          ? v.mergeGroup === u.mergeGroup
+          : v.target?.x === target.x && v.target?.y === target.y),
+    );
+    if (!pending) finishTravel(u);
+    return;
+  }
   if (
     (u.order === "move" || u.order === "attack") &&
     target &&
@@ -2403,6 +2462,7 @@ export function loadGame(data: string): State | undefined {
           (u.occupying === undefined || typeof u.occupying === "boolean") &&
           (u.pursue === undefined || int(u.pursue)) &&
           (u.pursueTeam === undefined || faction(u.pursueTeam)) &&
+          (u.mergeGroup === undefined || int(u.mergeGroup)) &&
           (!u.royal ||
             (typeof u.reserve === "number" && Number.isFinite(u.reserve))) &&
           (u.wounds === undefined || num(u.wounds)) &&

@@ -21,7 +21,7 @@ export const DOCTRINES = {
     restBelow: 42,
     weights: { house: 9, raid: 1, clear: 4 },
     description:
-      "Développe le royaume et économise pour les maisons. Les petites unités bâtissent ; les fortes restent disponibles pour défendre ou conquérir. Les combats inutiles sont évités.",
+      "Développe le royaume et économise pour les maisons. Habitants et unités fusionnées favorisent les fondations et attendent à l’abri quand l’or manque. Les combats inutiles sont évités.",
   },
   conqueror: {
     name: "Conquérant",
