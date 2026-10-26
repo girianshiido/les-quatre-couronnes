@@ -1,8 +1,10 @@
+import { seedCaves, tickMonsters, attackMonster, attackCave } from "./monsters";
 export type Terrain =
   "grass" | "tree" | "rock" | "water" | "bridge" | "dam" | "barricade";
 export type Order =
   | "auto"
   | "move"
+  | "attack"
   | "merge"
   | "house"
   | "bridge"
@@ -10,6 +12,7 @@ export type Order =
   | "barricade"
   | "hold"
   | "rest"
+  | "shelter"
   | "defend";
 export interface Point {
   x: number;
@@ -21,6 +24,7 @@ export interface Tile {
   owner?: number;
   house?: number;
   castle?: number;
+  cave?: number;
 }
 export interface Unit extends Point {
   id: number;
@@ -34,23 +38,26 @@ export interface Unit extends Point {
   royal?: boolean;
   reserve?: number;
   defending?: number;
+  formation?: boolean;
+  pursue?: number;
+  pursueTeam?: number;
 }
 export interface House extends Point {
   id: number;
   team: number;
   timer: number;
+  interval: number;
   founded: number;
 }
 export interface Kingdom {
   id: number;
   gold: number;
-  wood: number;
-  stone: number;
   tax: number;
   automatic: boolean;
   bridgeSaving: boolean;
   alive: boolean;
   hp: number;
+  fortification: number;
   castle: Point;
   births: number;
   kills: number;
@@ -68,8 +75,26 @@ export interface Structure {
   maxHp: number;
   cells: Point[];
 }
+export interface Cave extends Point {
+  id: number;
+  hp: number;
+  maxHp: number;
+  timer: number;
+  interval: number;
+  spawnHp: number;
+}
+export interface Monster extends Point {
+  id: number;
+  hp: number;
+  wait: number;
+  heading: Point;
+  cave: number;
+}
 export interface State {
   version: 2;
+  campaignVersion: 2;
+  clearedTurf: Record<string, number>;
+  turfRevision: number;
   size: number;
   level: number;
   seed: number;
@@ -79,6 +104,8 @@ export interface State {
   tiles: Tile[];
   units: Unit[];
   houses: House[];
+  caves: Cave[];
+  monsters: Monster[];
   kingdoms: Kingdom[];
   events: Event[];
   structures: Structure[];
@@ -89,13 +116,65 @@ export interface State {
 }
 export const TEAM_NAMES = ["Émeraude", "Azur", "Ambre", "Carmin"];
 export const COLORS = ["#73cc97", "#70baff", "#edc86b", "#ef8580"];
-export const LEVELS = [
-  { name: "La vallée des premiers jours", biome: "Forêt & montagne", size: 80 },
-  { name: "Les oasis du soleil", biome: "Désert & palmeraies", size: 80 },
-  { name: "Les couronnes du givre", biome: "Terres enneigées", size: 88 },
-  { name: "Le bassin des brumes", biome: "Marais & cyprès", size: 88 },
-  { name: "La vallée de cristal", biome: "Forêt cristalline", size: 96 },
+const BIOME_NAMES = [
+  "Forêt & montagne",
+  "Désert & palmeraies",
+  "Terres enneigées",
+  "Marais & cyprès",
+  "Forêt cristalline",
 ];
+const VALLEYS = [
+  [
+    "La vallée des premiers jours",
+    "Le sentier des pins",
+    "Les îlots du nord",
+    "Les gorges boisées",
+    "Le col des trois bannières",
+  ],
+  [
+    "Les oasis du soleil",
+    "Les dunes jumelles",
+    "Les oasis éparpillées",
+    "La gorge d’ambre",
+    "Les portes de Sable",
+  ],
+  [
+    "Les couronnes du givre",
+    "La passe blanche",
+    "Les rives gelées",
+    "Le refuge des rois",
+    "L’hiver des couronnes",
+  ],
+  [
+    "Le bassin des brumes",
+    "Les îlots oubliés",
+    "Les routes de tourbe",
+    "La forêt noyée",
+    "Le grand delta",
+  ],
+  [
+    "La vallée de cristal",
+    "Les veines du prisme",
+    "Le jardin des éclats",
+    "Les failles d’azur",
+    "Le trône de lumière",
+  ],
+];
+export const LEVELS = VALLEYS.flatMap((names, biomeId) =>
+  names.map((name, stage) => ({
+    name,
+    biome: BIOME_NAMES[biomeId],
+    biomeId,
+    stage,
+    size: 64 + biomeId * 2 + Math.floor(stage / 2) * 4,
+    scenario: ["valley", "ridge", "islands", "gorge", "arena"][stage],
+    enemyHouses: biomeId === 0 ? 4 : biomeId < 2 ? 4 : biomeId < 4 ? 5 : 6,
+    caves: stage === 3 || (stage === 4 && biomeId >= 2),
+  })),
+);
+export function birthInterval(tax: number) {
+  return 6 + 174 * (Math.max(0, Math.min(30, tax)) / 30) ** 2;
+}
 export function random(s: State) {
   s.rng = (Math.imul(1664525, s.rng) + 1013904223) >>> 0;
   return s.rng / 4294967296;
@@ -112,9 +191,16 @@ export function log(s: State, text: string, team = 0) {
   s.events.length = Math.min(30, s.events.length);
 }
 export function createGame(level = 0, seed = 14243): State {
-  const size = LEVELS[level]?.size ?? 80;
+  level = Math.max(0, Math.min(LEVELS.length - 1, Math.floor(level)));
+  const size = LEVELS[level].size,
+    biome = LEVELS[level].biomeId,
+    stage = LEVELS[level].stage,
+    phase = ((seed % 997) / 997) * Math.PI * 2;
   const s: State = {
     version: 2,
+    campaignVersion: 2,
+    clearedTurf: {},
+    turfRevision: 0,
     size,
     level,
     seed,
@@ -124,6 +210,8 @@ export function createGame(level = 0, seed = 14243): State {
     tiles: [],
     units: [],
     houses: [],
+    caves: [],
+    monsters: [],
     kingdoms: [],
     events: [],
     structures: [],
@@ -132,37 +220,51 @@ export function createGame(level = 0, seed = 14243): State {
     result: "playing",
     stats: { cleared: 0, bridges: 0, dams: 0, merged: 0 },
   };
-  // Mirrored vegetation and equally cleared starting areas balance the four kingdoms.
+  // Seeded asymmetric terrain, variable starts, and distinct scenario layouts.
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
-      const ax = Math.min(x, size - 1 - x),
-        ay = Math.min(y, size - 1 - y);
+      const ax = x,
+        ay = y,
+        edge = Math.min(x, y, size - 1 - x, size - 1 - y);
       let hashBits =
         (Math.imul(ax + 37, 73856093) ^ Math.imul(ay + seed, 19349663)) >>> 0;
       hashBits = Math.imul(hashBits ^ (hashBits >>> 16), 0x45d9f3b);
       hashBits = Math.imul(hashBits ^ (hashBits >>> 16), 0x45d9f3b);
       const hash = ((hashBits ^ (hashBits >>> 16)) >>> 0) / 4294967296;
       const forest =
-        (Math.sin(ax * 0.31) +
-          Math.cos(ay * 0.26) +
+        (Math.sin(ax * 0.31 + phase) +
+          Math.cos(ay * 0.26 + phase * 0.7) +
           Math.sin((ax + ay) * 0.22)) /
         3;
       const density =
-        [0.29, 0.16, 0.23, 0.4, 0.28][level] +
-        forest * [0.24, 0.1, 0.2, 0.16, 0.24][level];
-      const riverX = size / 2 - 1 + Math.round(Math.sin(y * 0.16) * 2),
-        riverY = size / 2 - 1 + Math.round(Math.sin(x * 0.16) * 2);
-      const river =
-        level === 0
-          ? x === riverX || y === riverY
-          : Math.abs(x - riverX) < 1.3 ||
-            Math.abs(y - riverY) < 1.3 ||
-            (level === 3 &&
-              (x - size * 0.32) ** 2 + (y - size * 0.62) ** 2 < 20);
+        [0.29, 0.16, 0.23, 0.4, 0.28][biome] +
+        forest * [0.24, 0.1, 0.2, 0.16, 0.24][biome];
+      const riverX = Math.floor(size * 0.45 + Math.sin(y * 0.14 + phase) * 3),
+        riverY = Math.floor(size * 0.54 + Math.sin(x * 0.13 - phase) * 3);
+      const width = biome === 0 && stage < 3 ? 0 : 1 + Math.floor(biome / 3);
+      let river =
+        Math.abs(x - riverX) <= width || Math.abs(y - riverY) <= width;
+      if (stage === 1) river = Math.abs(x - riverX) <= width;
+      if (stage === 2)
+        river =
+          Math.abs(x - Math.floor(size * 0.34 + Math.sin(y * 0.12 + phase))) <=
+            1 ||
+          Math.abs(x - Math.floor(size * 0.66 + Math.sin(y * 0.1 - phase))) <=
+            1 ||
+          Math.abs(y - riverY) <= 1;
+      if (stage === 3) river = Math.abs(x - riverX) <= width;
+      if (stage === 4)
+        river =
+          (x - size * 0.38) ** 2 + (y - size * 0.44) ** 2 < 16 ||
+          (x - size * 0.7) ** 2 + (y - size * 0.61) ** 2 < 25;
+      if (biome === 3 && stage !== 4)
+        river = river || (x - size * 0.29) ** 2 + (y - size * 0.63) ** 2 < 20;
+      const ridge =
+        Math.sin(ax * 0.23 - ay * 0.14 + phase) +
+        Math.cos(ay * 0.2 + phase * 0.5);
       const mountains =
-        ((ax < 5 || ay < 5) && hash < 0.64) ||
-        (Math.sin(ax * 0.32 - ay * 0.14) + Math.cos(ay * 0.29) > 1.25 &&
-          hash < 0.36);
+        (edge < 4 && hash < 0.6) ||
+        (ridge > (stage === 1 ? 0.9 : 1.25) && hash < 0.4);
       s.tiles.push({
         terrain: river
           ? "water"
@@ -170,7 +272,7 @@ export function createGame(level = 0, seed = 14243): State {
             ? "rock"
             : hash < density
               ? "tree"
-              : hash < density + 0.055
+              : hash < density + 0.055 + level * 0.001
                 ? "rock"
                 : "grass",
         variant: Math.floor(hash * 8),
@@ -184,47 +286,60 @@ export function createGame(level = 0, seed = 14243): State {
     { x: m, y: size - 1 - m },
   ];
   for (let team = 0; team < 4; team++) {
-    const c = bases[team];
+    const jitter = () =>
+      level === 0 && team === 0 ? 0 : Math.floor(random(s) * 7) - 3;
+    const c = {
+      x: Math.max(10, Math.min(size - 11, bases[team].x + jitter())),
+      y: Math.max(10, Math.min(size - 11, bases[team].y + jitter())),
+    };
     s.kingdoms.push({
       id: team,
       gold: 5000,
-      wood: 32,
-      stone: 18,
       tax: 12,
       automatic: true,
       bridgeSaving: false,
       alive: true,
       hp: 100,
+      fortification: 2000,
       castle: c,
       births: 0,
       kills: 0,
     });
-    for (let dy = -7; dy <= 7; dy++)
-      for (let dx = -7; dx <= 7; dx++)
-        tile(s, c.x + dx, c.y + dy)!.terrain = "grass";
+    const radius =
+      level === 0 ? (team === 0 ? 8 : 6) : 5 + Math.floor(random(s) * 3);
+    for (let dy = -radius; dy <= radius; dy++)
+      for (let dx = -radius; dx <= radius; dx++)
+        if (dx * dx + dy * dy <= radius * radius)
+          tile(s, c.x + dx, c.y + dy)!.terrain = "grass";
+    if (level >= 2 && (team === seed % 4 || random(s) < 0.3)) {
+      const side = random(s) < 0.5 ? -1 : 1;
+      for (let n = -6; n <= 6; n++)
+        if (Math.abs(n) > 1) {
+          const t = tile(s, c.x + side * 6, c.y + n);
+          if (t) t.terrain = "rock";
+        }
+    }
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++)
         tile(s, c.x + dx, c.y + dy)!.castle = team;
+    const allOffsets = [
+      [-4, -3],
+      [3, -4],
+      [-3, 4],
+      [4, 3],
+      [0, 5],
+      [0, -5],
+    ];
     const houseOffsets =
-      level === 0
-        ? team === 0
-          ? [
-              [-4, -3],
-              [3, -4],
-              [-3, 4],
-              [4, 3],
-              [0, 5],
-            ]
-          : [
-              [-4, -3],
-              [4, 3],
-            ]
-        : [
+      level === 0 && team !== 0
+        ? [
             [-4, -3],
-            [3, -4],
-            [-3, 4],
             [4, 3],
-          ];
+          ]
+        : allOffsets.slice(
+            0,
+            team === 0 ? (level === 0 ? 5 : 4) : LEVELS[level].enemyHouses,
+          );
     for (const [dx, dy] of houseOffsets)
       addHouse(s, team, c.x + dx, c.y + dy, false);
     s.units.push({
@@ -240,8 +355,39 @@ export function createGame(level = 0, seed = 14243): State {
       heading: { x: 0, y: 1 },
     });
   }
+  seedCaves(s);
   log(s, "Quatre couronnes. Une seule vallée. L’histoire commence.");
   return s;
+}
+export function territoryAt(s: State, p: Point) {
+  if (tile(s, p.x, p.y)?.terrain !== "grass") return;
+  let best: House | undefined,
+    bestDistance = 99,
+    bestGrowth = 0;
+  for (const h of s.houses) {
+    const dx = p.x - h.x,
+      dy = p.y - h.y;
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) continue;
+    const growth = Math.max(0, Math.min(1, (s.time - h.founded - 3) / 5)),
+      d = dx * dx + dy * dy;
+    if (
+      growth &&
+      (d < bestDistance || (d === bestDistance && growth > bestGrowth))
+    ) {
+      best = h;
+      bestDistance = d;
+      bestGrowth = growth;
+    }
+  }
+  if (best && s.clearedTurf[idx(s, p.x, p.y)] !== best.id)
+    return { team: best.team, house: best.id, growth: bestGrowth };
+}
+export function destroyTurf(s: State, p: Point, team: number) {
+  const turf = territoryAt(s, p);
+  if (!turf || turf.team === team) return 0;
+  s.clearedTurf[idx(s, p.x, p.y)] = turf.house;
+  s.turfRevision++;
+  return 2;
 }
 export function canHouse(s: State, x: number, y: number) {
   const t = tile(s, x, y);
@@ -249,6 +395,7 @@ export function canHouse(s: State, x: number, y: number) {
     !t ||
     t.terrain !== "grass" ||
     t.house !== undefined ||
+    t.cave !== undefined ||
     t.castle !== undefined
   )
     return false;
@@ -265,9 +412,9 @@ export function addHouse(
   pay = true,
 ) {
   const k = s.kingdoms[team];
-  if (!k.alive || !canHouse(s, x, y) || (pay && k.gold < 100)) return false;
+  if (!k.alive || !canHouse(s, x, y) || (pay && k.gold < 150)) return false;
   if (pay) {
-    k.gold -= 100;
+    k.gold -= 150;
   }
   const h = {
     id: s.nextId++,
@@ -275,6 +422,7 @@ export function addHouse(
     x,
     y,
     timer: pay ? 2 : random(s) * 6,
+    interval: birthInterval(k.tax),
     founded: s.time,
   };
   s.houses.push(h);
@@ -322,13 +470,16 @@ export function totalHP(s: State, team: number) {
 }
 export function resting(s: State, u: Unit) {
   const h = s.houses.find((h) => h.id === tile(s, u.x, u.y)?.house);
+  return !!h && h.team === u.team;
+}
+export function lifeDrain(s: State, u: Unit) {
+  if (resting(s, u) || (u.royal && sheltered(s, u))) return 0;
+  if (u.royal) return Math.max(4, u.hp * 0.05);
+  const king = s.units.find((v) => v.team === u.team && v.royal && v.hp > 0),
+    d = distance(u, king ?? s.kingdoms[u.team].castle);
   return (
-    !!h &&
-    h.team === u.team &&
-    (u.order === "hold" ||
-      (u.order === "rest" && !!u.target && distance(u, u.target) === 0) ||
-      (u.order === "merge" && !!u.target && distance(u, u.target) === 0) ||
-      (!!u.royal && u.order === "auto"))
+    0.12 * Math.min(5, 1 + Math.max(0, d - 10) / 12) +
+    Math.max(0, u.hp - 300) * 0.004
   );
 }
 function injure(u: Unit, amount: number) {
@@ -351,6 +502,9 @@ export function refreshKings(s: State) {
     if (king.hp <= 0) destroyKingdom(s, k.id, k.id);
   }
 }
+export function combatPower(s: State, u: Unit) {
+  return sheltered(s, u) ? u.hp * 8 + s.kingdoms[u.team].fortification : u.hp;
+}
 export function resolveEncounter(s: State, a: Unit, b: Unit) {
   if (a.team === b.team) {
     const win = b.royal || (!a.royal && b.order === "hold") ? b : a,
@@ -361,21 +515,123 @@ export function resolveEncounter(s: State, a: Unit, b: Unit) {
     s.stats.merged++;
     return win;
   }
-  const af = 1,
-    bf = sheltered(s, b) ? 4 : 1;
-  if (a.hp * af === b.hp * bf) {
+  const ap = a.hp,
+    bp = combatPower(s, b),
+    protectedKing = sheltered(s, b),
+    fort = protectedKing ? s.kingdoms[b.team] : undefined;
+  if (ap === bp) {
     injure(a, a.hp);
     injure(b, b.hp);
+    if (fort) fort.fortification = 0;
     return null;
   }
-  const win = a.hp * af > b.hp * bf ? a : b,
-    lose = win === a ? b : a,
-    wf = win === a ? af : bf,
-    lf = win === a ? bf : af;
-  injure(win, Math.min(win.hp - 1, (lose.hp * lf * 0.7) / wf));
-  injure(lose, lose.hp);
-  s.kingdoms[win.team].kills++;
-  return win;
+  if (ap > bp) {
+    injure(a, Math.min(a.hp - 1, bp * 0.7));
+    injure(b, b.hp);
+    if (fort) fort.fortification = 0;
+    if (s.kingdoms[a.team]) s.kingdoms[a.team].kills++;
+    return a;
+  }
+  let damage = ap * 0.7;
+  if (fort) {
+    const absorbed = Math.min(fort.fortification, damage);
+    fort.fortification -= absorbed;
+    damage = (damage - absorbed) / 8;
+  }
+  injure(b, Math.min(b.hp - 1, damage));
+  injure(a, a.hp);
+  if (s.kingdoms[b.team]) s.kingdoms[b.team].kills++;
+  return b;
+}
+export function unitUpkeep(u: Unit) {
+  return !u.royal && u.hp > 500 ? u.hp * 0.0004 : 0;
+}
+export function maintenanceCost(s: State, team: number) {
+  return s.units
+    .filter((u) => u.team === team && u.hp > 0)
+    .reduce((n, u) => n + unitUpkeep(u), 0);
+}
+const flowCaches = new WeakMap<
+  State,
+  {
+    normal: { key: string; fields: Map<string, Int32Array> };
+    peaceful: { key: string; fields: Map<string, Int32Array> };
+  }
+>();
+function formationStep(
+  s: State,
+  start: Point,
+  goal: Point,
+  team: number,
+  peaceful: boolean,
+) {
+  let caches = flowCaches.get(s);
+  if (!caches) {
+    caches = {
+      normal: { key: "", fields: new Map() },
+      peaceful: { key: "", fields: new Map() },
+    };
+    flowCaches.set(s, caches);
+  }
+  const cache = peaceful ? caches.peaceful : caches.normal;
+  const key = `${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}${peaceful ? `-${s.stats.cleared}-${s.turfRevision}-${Math.floor(s.time * 2)}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}` : ""}`;
+  if (cache.key !== key) {
+    cache.key = key;
+    cache.fields.clear();
+  }
+  const target = idx(s, goal.x, goal.y),
+    fieldKey = `${target}-${team}`;
+  let field = cache.fields.get(fieldKey);
+  const pass = (x: number, y: number) =>
+    inside(s, x, y) &&
+    ((walkable(s, x, y, team) && tile(s, x, y)?.terrain !== "barricade") ||
+      (x === goal.x &&
+        y === goal.y &&
+        tile(s, x, y)?.terrain === "barricade")) &&
+    (!peaceful || peacefulTile(s, x, y, team));
+  if (!field) {
+    field = new Int32Array(s.tiles.length).fill(-1);
+    if (!pass(goal.x, goal.y)) return;
+    const queue = new Int32Array(s.tiles.length);
+    let head = 0,
+      tail = 0;
+    queue[tail++] = target;
+    field[target] = 0;
+    while (head < tail) {
+      const n = queue[head++],
+        x = n % s.size,
+        y = Math.floor(n / s.size);
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const nx = x + dx,
+          ny = y + dy;
+        if (!pass(nx, ny)) continue;
+        const ni = idx(s, nx, ny);
+        if (field[ni] >= 0) continue;
+        field[ni] = field[n] + 1;
+        queue[tail++] = ni;
+      }
+    }
+    if (cache.fields.size >= 32)
+      cache.fields.delete(cache.fields.keys().next().value!);
+    cache.fields.set(fieldKey, field);
+  }
+  const current = field[idx(s, start.x, start.y)];
+  if (current <= 0) return;
+  for (const [dx, dy] of [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ]) {
+    const x = start.x + dx,
+      y = start.y + dy;
+    if (pass(x, y) && field[idx(s, x, y)] === current - 1) return { x, y };
+  }
 }
 // Shortest path on the hidden four-neighbour lattice. Clearing obstacles is allowed; water is not.
 export function nextStep(
@@ -385,6 +641,11 @@ export function nextStep(
   team: number,
   peaceful = false,
 ): Point | undefined {
+  if (
+    (start as Unit).formation &&
+    ["move", "attack", "merge", "shelter"].includes((start as Unit).order)
+  )
+    return formationStep(s, start, goal, team, peaceful);
   const total = s.size * s.size,
     prev = new Int32Array(total).fill(-1),
     queue = new Int32Array(total);
@@ -407,7 +668,15 @@ export function nextStep(
     ]) {
       const nx = x + dx,
         ny = y + dy;
-      if (!walkable(s, nx, ny, team)) continue;
+      if (
+        !walkable(s, nx, ny, team) &&
+        !(
+          nx === goal.x &&
+          ny === goal.y &&
+          tile(s, nx, ny)?.terrain === "barricade"
+        )
+      )
+        continue;
       if (peaceful && !peacefulTile(s, nx, ny, team)) continue;
       if (
         tile(s, nx, ny)?.terrain === "barricade" &&
@@ -432,27 +701,16 @@ export function crossing(
   p: Point,
 ): { cells: Point[]; banks: Point[] } | undefined {
   if (tile(s, p.x, p.y)?.terrain !== "water") return;
-  for (const d of [
-    { x: 1, y: 0 },
-    { x: 0, y: 1 },
-  ]) {
-    const cells: Point[] = [p],
-      banks: Point[] = [];
-    for (const sign of [-1, 1]) {
-      let n = 1;
-      while (
-        n <= 6 &&
-        tile(s, p.x + d.x * n * sign, p.y + d.y * n * sign)?.terrain === "water"
-      ) {
-        cells.push({ x: p.x + d.x * n * sign, y: p.y + d.y * n * sign });
-        n++;
-      }
-      const bank = { x: p.x + d.x * n * sign, y: p.y + d.y * n * sign };
-      if (walkable(s, bank.x, bank.y, -1)) banks.push(bank);
-    }
-    if (banks.length === 2 && cells.length <= 6) return { cells, banks };
-  }
-  return;
+  const banks = [
+    { x: p.x + 1, y: p.y },
+    { x: p.x - 1, y: p.y },
+    { x: p.x, y: p.y + 1 },
+    { x: p.x, y: p.y - 1 },
+  ].filter((b) => {
+    const t = tile(s, b.x, b.y);
+    return !!t && !["water", "dam", "barricade"].includes(t.terrain);
+  });
+  return banks.length ? { cells: [{ ...p }], banks } : undefined;
 }
 export function structureAt(s: State, p: Point) {
   return s.structures.find((b) =>
@@ -472,22 +730,16 @@ export function canBarricade(s: State, p: Point) {
     !!t &&
     t.terrain === "grass" &&
     t.house === undefined &&
+    t.cave === undefined &&
     t.castle === undefined &&
     !s.units.some((u) => u.hp > 0 && u.x === p.x && u.y === p.y)
   );
 }
 export function buildBarricade(s: State, u: Unit, p: Point) {
   const k = s.kingdoms[u.team];
-  if (
-    u.royal ||
-    distance(u, p) !== 1 ||
-    !canBarricade(s, p) ||
-    k.gold < 750 ||
-    k.wood < 12
-  )
+  if (u.royal || distance(u, p) !== 1 || !canBarricade(s, p) || k.gold < 750)
     return false;
   k.gold -= 750;
-  k.wood -= 12;
   k.bridgeSaving = false;
   const t = tile(s, p.x, p.y)!;
   t.terrain = "barricade";
@@ -526,12 +778,9 @@ export function destroyStructure(s: State, b: Structure) {
   );
 }
 export function attackStructure(s: State, u: Unit, b: Structure) {
-  const k = s.kingdoms[u.team];
-  if (k.gold < 1) return false;
-  k.gold -= 1;
   const proxy: Unit = {
     id: -b.id,
-    team: b.team,
+    team: b.team === u.team ? 4 : b.team,
     hp: b.hp,
     x: b.cells[0].x,
     y: b.cells[0].y,
@@ -549,33 +798,52 @@ function autonomousDestination(s: State, u: Unit, p: Point) {
   if (!walkable(s, p.x, p.y, u.team)) return false;
   if (u.team !== 0) return true;
   const t = tile(s, p.x, p.y)!;
-  if (t.terrain === "rock" || t.terrain === "barricade") return false;
+  if (t.terrain === "rock" || t.terrain === "barricade" || t.cave !== undefined)
+    return false;
+  const turf = territoryAt(s, p);
+  if (turf && turf.team !== u.team) return false;
   const building = structureAt(s, p);
-  if (building && building.team !== u.team) return false;
+  if (building?.kind === "barricade" && building.team !== u.team) return false;
   if (t.castle !== undefined && t.castle !== u.team) return false;
   if (
     t.house !== undefined &&
     s.houses.find((h) => h.id === t.house)?.team !== u.team
   )
     return false;
+  if (s.monsters.some((m) => m.hp > 0 && m.x === p.x && m.y === p.y))
+    return false;
   return !s.units.some(
     (v) => v.hp > 0 && v.team !== u.team && v.x === p.x && v.y === p.y,
   );
 }
 export function buildCrossing(s: State, u: Unit, p: Point, dam = false) {
-  const cr = crossing(s, p),
+  const existing = structureAt(s, p);
+  const conversion =
+    dam &&
+    existing?.kind === "bridge" &&
+    existing.team === u.team &&
+    !s.units.some((v) => v.hp > 0 && v.x === p.x && v.y === p.y);
+  const cr = conversion
+      ? {
+          cells: [p],
+          banks: [
+            { x: p.x - 1, y: p.y },
+            { x: p.x + 1, y: p.y },
+            { x: p.x, y: p.y - 1 },
+            { x: p.x, y: p.y + 1 },
+          ].filter((b) => walkable(s, b.x, b.y, u.team)),
+        }
+      : crossing(s, p),
     k = s.kingdoms[u.team];
   if (
     !cr ||
-    !cr.banks.some((b) => distance(u, b) <= 1) ||
-    k.gold < (dam ? 32 : bridgeCost(s, p)) ||
-    k.wood < cr.cells.length * 4 ||
-    (dam && k.stone < 12)
+    !cr.banks.some((b) => distance(u, b) === 0) ||
+    k.gold < (dam ? 32 : bridgeCost(s, p))
   )
     return false;
   k.gold -= dam ? 32 : bridgeCost(s, p);
-  k.wood -= cr.cells.length * 4;
-  if (dam) k.stone -= 12;
+  if (conversion)
+    s.structures = s.structures.filter((b) => b.id !== existing!.id);
   for (const c of cr.cells) {
     const t = tile(s, c.x, c.y)!;
     t.terrain = dam ? "dam" : "bridge";
@@ -621,9 +889,33 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
   );
   if (!us.length) return;
   const rally = target ?? { x: us[0].x, y: us[0].y };
+  const entity =
+    target && ["attack", "merge"].includes(order)
+      ? (s.units.find(
+          (u) =>
+            u.hp > 0 &&
+            u.x === target.x &&
+            u.y === target.y &&
+            !ids.includes(u.id) &&
+            (order === "merge" ? u.team === 0 : u.team !== 0),
+        ) ??
+        (order === "attack"
+          ? s.monsters.find(
+              (m) => m.hp > 0 && m.x === target.x && m.y === target.y,
+            )
+          : undefined))
+      : undefined;
   for (const u of us) {
     u.order = order;
+    u.formation =
+      us.length >= 8 && ["move", "attack", "merge", "shelter"].includes(order);
     delete u.defending;
+    delete u.pursue;
+    delete u.pursueTeam;
+    if (entity) {
+      u.pursue = entity.id;
+      u.pursueTeam = "team" in entity ? entity.team : 4;
+    }
     u.target = order === "auto" || order === "hold" ? undefined : rally;
   }
 }
@@ -652,16 +944,19 @@ function peacefulTile(s: State, x: number, y: number, team: number) {
     !t ||
     !walkable(s, x, y, team) ||
     t.terrain === "rock" ||
-    t.terrain === "barricade"
+    t.terrain === "barricade" ||
+    t.cave !== undefined
   )
     return false;
+  const turf = territoryAt(s, { x, y });
+  if (turf && turf.team !== team) return false;
   if (t.castle !== undefined && t.castle !== team) return false;
   if (
     t.house !== undefined &&
     s.houses.find((h) => h.id === t.house)?.team !== team
   )
     return false;
-  return t.terrain !== "bridge" || t.owner === team;
+  return true;
 }
 const shelterPlans = new WeakMap<
   State,
@@ -673,7 +968,7 @@ const shelterPlans = new WeakMap<
   }
 >();
 function shelterPlan(s: State) {
-  const key = `${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}-${s.ruins.length}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}`;
+  const key = `${s.turfRevision}-${Math.floor(s.time / 5)}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}-${s.ruins.length}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}`;
   const previous = shelterPlans.get(s);
   if (previous?.key === key) return previous;
   const regions = new Int32Array(s.tiles.length).fill(-1),
@@ -737,8 +1032,8 @@ function updateRest(s: State, u: Unit) {
     k = s.kingdoms[0];
   const canWork =
     !!work &&
-    ((work.trees && k.gold >= 2) ||
-      (work.land && k.gold >= 100 + (k.bridgeSaving ? 1000 : 0)));
+    ((work.trees && k.gold >= 30) ||
+      (work.land && k.gold >= 150 + (k.bridgeSaving ? 1000 : 0)));
   if (canWork) {
     if (u.order === "rest") {
       u.order = "auto";
@@ -775,11 +1070,124 @@ function updateRest(s: State, u: Unit) {
     u.target = { x: chosen.x, y: chosen.y };
   }
 }
+const landLinks = new WeakMap<
+  State,
+  { key: string; links: Map<number, boolean> }
+>();
+function landConnected(s: State, team: number) {
+  const key = `${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}-${s.ruins.length}`;
+  let cache = landLinks.get(s);
+  if (cache?.key !== key) {
+    cache = { key, links: new Map() };
+    landLinks.set(s, cache);
+  }
+  if (cache.links.has(team)) return cache.links.get(team)!;
+  const start = s.kingdoms[team].castle,
+    seen = new Uint8Array(s.tiles.length),
+    q = [idx(s, start.x, start.y)];
+  seen[q[0]] = 1;
+  let connected = false;
+  for (let i = 0; i < q.length && !connected; i++) {
+    const index = q[i],
+      x = index % s.size,
+      y = Math.floor(index / s.size),
+      t = s.tiles[index];
+    if (
+      t.castle !== undefined &&
+      t.castle !== team &&
+      s.kingdoms[t.castle].alive
+    ) {
+      connected = true;
+      break;
+    }
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = x + dx,
+        ny = y + dy;
+      if (!inside(s, nx, ny)) continue;
+      const ni = idx(s, nx, ny),
+        nt = s.tiles[ni];
+      if (
+        seen[ni] ||
+        !walkable(s, nx, ny, team) ||
+        nt.terrain === "barricade" ||
+        nt.cave !== undefined
+      )
+        continue;
+      seen[ni] = 1;
+      q.push(ni);
+    }
+  }
+  cache.links.set(team, connected);
+  return connected;
+}
+function buildingReserve(s: State, team: number) {
+  if (team === 0) return s.kingdoms[0].bridgeSaving ? 1000 : 0;
+  return s.time > 60 &&
+    s.houses.filter((h) => h.team === team).length >= 6 &&
+    !landConnected(s, team)
+    ? 1000
+    : 0;
+}
+function aiSettlementTarget(s: State, u: Unit) {
+  if (u.team === 0 || u.royal || u.order !== "auto") return;
+  if (u.target && !canHouse(s, u.target.x, u.target.y)) delete u.target;
+  if (
+    u.target ||
+    u.age < 1.2 ||
+    u.hp >= 1000 ||
+    s.kingdoms[u.team].gold < 150 + buildingReserve(s, u.team) ||
+    canHouse(s, u.x, u.y)
+  )
+    return;
+  const homes = s.houses.filter((h) => h.team === u.team).length;
+  if (homes >= 8 && u.id % 3 === 0) return;
+  const q = [{ x: u.x, y: u.y }],
+    seen = new Set<number>([idx(s, u.x, u.y)]);
+  for (let i = 0; i < q.length; i++) {
+    const p = q[i];
+    if (
+      canHouse(s, p.x, p.y) &&
+      !s.units.some(
+        (v) => v.hp > 0 && v.team !== u.team && v.x === p.x && v.y === p.y,
+      ) &&
+      !s.monsters.some((m) => m.hp > 0 && m.x === p.x && m.y === p.y)
+    ) {
+      u.target = p;
+      return;
+    }
+    if (distance(u, p) >= 8) continue;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = p.x + dx,
+        ny = p.y + dy;
+      if (
+        !inside(s, nx, ny) ||
+        !walkable(s, nx, ny, u.team) ||
+        tile(s, nx, ny)?.terrain === "barricade" ||
+        tile(s, nx, ny)?.cave !== undefined
+      )
+        continue;
+      const index = idx(s, nx, ny);
+      if (seen.has(index)) continue;
+      seen.add(index);
+      q.push({ x: nx, y: ny });
+    }
+  }
+}
 function updateDefence(s: State, u: Unit) {
   if (u.team !== 0 || u.royal || !["auto", "rest", "defend"].includes(u.order))
     return;
   const houses = s.houses.filter((h) => h.team === u.team);
-  const threats = s.units
+  const threats = [...s.units, ...s.monsters.map((m) => ({ ...m, team: 4 }))]
     .filter(
       (v) =>
         v.team !== u.team &&
@@ -810,10 +1218,42 @@ function act(s: State, u: Unit) {
   const k = s.kingdoms[u.team];
   if (!k.alive || u.hp <= 0) return;
   if (u.order === "hold" || (u.royal && u.order === "auto")) return;
+  if (u.pursue !== undefined && ["attack", "merge"].includes(u.order)) {
+    let entity =
+      s.units.find((v) => v.id === u.pursue && v.hp > 0) ??
+      s.monsters.find((m) => m.id === u.pursue && m.hp > 0);
+    if (!entity && u.target) {
+      const old = u.target;
+      entity =
+        u.pursueTeam === 4
+          ? s.monsters.find((m) => m.hp > 0 && distance(m, old) <= 1)
+          : s.units.find(
+              (v) =>
+                v.id !== u.id &&
+                v.hp > 0 &&
+                v.team === u.pursueTeam &&
+                distance(v, old) <= 1,
+            );
+      if (entity) u.pursue = entity.id;
+    }
+    if (entity) u.target = { x: entity.x, y: entity.y };
+    else {
+      u.order = "hold";
+      delete u.target;
+      delete u.pursue;
+      delete u.pursueTeam;
+    }
+  }
+  aiSettlementTarget(s, u);
   updateDefence(s, u);
   updateRest(s, u);
   let target = u.target;
-  if (u.order === "rest" && target && distance(u, target) === 0) return;
+  if (
+    (u.order === "rest" || u.order === "shelter") &&
+    target &&
+    distance(u, target) === 0
+  )
+    return;
   if (u.order === "barricade" && target && distance(u, target) <= 1) {
     if (!buildBarricade(s, u, target) && !canBarricade(s, target)) {
       u.order = "auto";
@@ -823,13 +1263,25 @@ function act(s: State, u: Unit) {
   }
   if ((u.order === "bridge" || u.order === "dam") && target) {
     if (buildCrossing(s, u, target, u.order === "dam")) return;
-    const cr = crossing(s, target);
+    const existing = structureAt(s, target);
+    const cr =
+      u.order === "dam" && existing?.kind === "bridge"
+        ? {
+            cells: [target],
+            banks: [
+              { x: target.x - 1, y: target.y },
+              { x: target.x + 1, y: target.y },
+              { x: target.x, y: target.y - 1 },
+              { x: target.x, y: target.y + 1 },
+            ].filter((p) => walkable(s, p.x, p.y, u.team)),
+          }
+        : crossing(s, target);
     if (!cr) {
       u.order = "auto";
       u.target = undefined;
       return;
     }
-    if (cr.banks.some((b) => distance(u, b) <= 1)) return;
+    if (cr.banks.some((b) => distance(u, b) === 0)) return;
     const reachable = cr.banks
       .map((b) => ({ b, step: nextStep(s, u, b, u.team) }))
       .filter((v) => v.step || distance(u, v.b) === 0)
@@ -852,7 +1304,11 @@ function act(s: State, u: Unit) {
     return;
   }
   if (u.order === "merge" && target && distance(u, target) === 0) return;
-  if (u.order === "move" && target && distance(u, target) === 0) {
+  if (
+    (u.order === "move" || u.order === "attack") &&
+    target &&
+    distance(u, target) === 0
+  ) {
     u.order = "hold";
     u.target = undefined;
     return;
@@ -862,15 +1318,8 @@ function act(s: State, u: Unit) {
     u.order === "auto" &&
     u.age > 1.2 &&
     u.hp >= 42 &&
-    k.gold >=
-      100 +
-        (k.bridgeSaving ||
-        (u.team !== 0 &&
-          s.time > 45 &&
-          !s.structures.some((b) => b.kind === "bridge" && b.team === u.team))
-          ? 1000
-          : 0) &&
-    random(s) < 0.72 &&
+    k.gold >= 150 + buildingReserve(s, u.team) &&
+    (u.team !== 0 || random(s) < 0.72) &&
     addHouse(s, u.team, u.x, u.y)
   ) {
     u.hp = 0;
@@ -878,7 +1327,13 @@ function act(s: State, u: Unit) {
   }
   // Independent wandering with a growing outward bias. Every inhabitant still makes local random choices.
   let dest = target
-    ? nextStep(s, u, target, u.team, u.order === "rest")
+    ? nextStep(
+        s,
+        u,
+        target,
+        u.team,
+        u.order === "rest" || u.order === "shelter",
+      )
     : undefined;
   if (!target) {
     const enemies = s.kingdoms
@@ -902,13 +1357,17 @@ function act(s: State, u: Unit) {
           (u.team !== 0 && enemy && distance(p, enemy) < distance(u, enemy)
             ? nearCastle
               ? 2
-              : Math.min(1.3, s.time / 180)
+              : Math.min(1.3 + s.level * 0.02, s.time / 180)
             : 0) -
           (tile(s, p.x, p.y)?.terrain === "barricade" ? 4 : 0),
       }))
       .sort((a, b) => b.score - a.score)[0]?.p;
     // Only opponents initiate infrastructure work without a direct order.
-    if (u.team !== 0 && s.time > 65 && random(s) < 0.12) {
+    if (
+      u.team !== 0 &&
+      s.time > 65 - Math.min(20, s.level) &&
+      random(s) < 0.12
+    ) {
       for (const [dx, dy] of [
         [1, 0],
         [-1, 0],
@@ -926,17 +1385,35 @@ function act(s: State, u: Unit) {
     return;
   }
   const t = tile(s, dest.x, dest.y)!;
+  const cave = s.caves.find((c) => c.id === t.cave);
+  if (cave && !attackCave(s, u, cave)) return;
+  for (const monster of s.monsters.filter(
+    (m) => m.hp > 0 && m.x === dest!.x && m.y === dest!.y,
+  ))
+    if (!attackMonster(s, u, monster)) return;
   const structure = structureAt(s, dest);
-  if (structure && structure.team !== u.team) {
+  if (
+    structure &&
+    (u.order === "attack" ||
+      (structure.kind === "barricade" && structure.team !== u.team))
+  ) {
     attackStructure(s, u, structure);
+    if (u.order === "attack" && structure.hp <= 0) {
+      u.order = "hold";
+      delete u.target;
+    }
     return;
   }
   if (t.terrain === "barricade") return;
   if (t.terrain === "tree" || t.terrain === "rock") {
-    const cost = t.terrain === "tree" ? 2 : 3;
-    if (k.gold < cost) return;
+    const cost = t.terrain === "tree" ? 30 : 3;
+    if (
+      k.gold <
+      cost +
+        (u.team !== 0 && u.order === "auto" ? buildingReserve(s, u.team) : 0)
+    )
+      return;
     k.gold -= cost;
-    k[t.terrain === "tree" ? "wood" : "stone"] += t.terrain === "tree" ? 5 : 4;
     t.terrain = "grass";
     injure(u, 3);
     s.stats.cleared++;
@@ -949,49 +1426,43 @@ function act(s: State, u: Unit) {
     if (other.hp <= 0) continue;
     if (u.order === "rest" && other.team !== u.team) return;
     if (
-      u.order === "rest" &&
       other.team === u.team &&
+      !u.royal &&
       !other.royal &&
-      t.house !== undefined
+      t.house !== undefined &&
+      u.order !== "merge"
     )
       continue;
-    if (other.team !== u.team) {
-      if (k.gold < 1) return;
-      k.gold -= 1;
-    }
     const winner = resolveEncounter(s, u, other);
     if (u.royal && u.hp <= 0) destroyKingdom(s, u.team, other.team);
     if (other.royal && other.hp <= 0) destroyKingdom(s, other.team, u.team);
     if (winner !== u || u.hp <= 0) return;
   }
+  injure(u, destroyTurf(s, dest, u.team));
+  if (u.hp <= 0) return;
   const house = s.houses.find((h) => h.id === t.house);
   if (house && house.team !== u.team) {
-    if (u.royal) {
-      s.houses = s.houses.filter((h) => h.id !== house.id);
-      t.house = undefined;
-      injure(u, 8);
-      log(s, "Le roi rase une maison adverse.", u.team);
-    } else {
-      const defenders = s.units.some(
-        (other) =>
-          other.team === house.team &&
-          other.hp > 0 &&
-          distance(other, house) < 2,
-      );
-      if (!defenders) {
-        house.team = u.team;
-        house.timer = 0;
-        house.founded = s.time;
-        u.hp -= 12;
-        log(s, "Une maison change de bannière.", u.team);
-      }
-    }
+    s.houses = s.houses.filter((h) => h.id !== house.id);
+    delete t.house;
+    injure(u, u.royal ? 8 : 12);
+    log(
+      s,
+      u.royal
+        ? "Le roi rase une maison adverse."
+        : "Une maison adverse est détruite.",
+      u.team,
+    );
+    if (u.hp <= 0) return;
   }
   u.heading = { x: dest.x - u.x, y: dest.y - u.y };
   u.x = dest.x;
   u.y = dest.y;
-  if (!u.royal) u.hp -= 0.32;
-  if (u.order === "move" && u.target && distance(u, u.target) === 0) {
+  if (!u.royal && !resting(s, u)) u.hp -= 0.32;
+  if (
+    (u.order === "move" || u.order === "attack") &&
+    u.target &&
+    distance(u, u.target) === 0
+  ) {
     u.order = "hold";
     delete u.target;
   }
@@ -1006,7 +1477,13 @@ export function step(s: State, dt = 0.2) {
       us = s.units.filter((u) => u.team === k.id).length;
     if (k.automatic) {
       const desired =
-        k.gold < 300 ? 24 : k.gold > 1200 ? 4 : us < hs * 1.5 ? 8 : 14;
+        (k.id !== 0 && buildingReserve(s, k.id) > 0) || k.gold < 300
+          ? 24
+          : k.gold > 1200
+            ? 4
+            : us < hs * 1.5
+              ? 8
+              : 14;
       k.tax += (desired - k.tax) * Math.min(1, dt * 0.25);
     }
     k.gold +=
@@ -1017,27 +1494,41 @@ export function step(s: State, dt = 0.2) {
           0.2);
   }
   for (const h of s.houses) {
+    const interval = birthInterval(s.kingdoms[h.team].tax);
+    if (h.interval && h.interval !== interval)
+      h.timer = (h.timer * interval) / h.interval;
+    h.interval = interval;
     h.timer += dt;
-    const k = s.kingdoms[h.team];
-    const interval = (10 + k.tax * 0.72) / (h.team ? 1 + s.level * 0.1 : 1);
     if (h.timer >= interval) {
       h.timer -= interval;
       spawn(s, h);
     }
   }
+  const coverage = new Map<number, number>();
+  for (const k of s.kingdoms) {
+    if (!k.alive) continue;
+    const needed = maintenanceCost(s, k.id) * dt,
+      paid = Math.min(k.gold, needed);
+    k.gold -= paid;
+    coverage.set(k.id, needed ? paid / needed : 1);
+  }
   for (const u of s.units) {
     if (u.hp <= 0 || !s.kingdoms[u.team].alive) continue;
     u.age += dt;
-    if (u.royal) {
-      if (!sheltered(s, u) && !resting(s, u))
-        injure(u, dt * Math.max(4, u.hp * 0.05));
-    } else if (!resting(s, u)) u.hp -= dt * 0.12;
+    if (unitUpkeep(u) > 0) {
+      u.hp -= u.hp * 0.03 * (1 - (coverage.get(u.team) ?? 1)) * dt;
+      if (u.hp <= 0) continue;
+    }
+    const upkeep = lifeDrain(s, u);
+    if (u.royal) injure(u, dt * upkeep);
+    else u.hp -= dt * upkeep;
     u.wait -= dt;
     if (u.hp > 0 && u.wait <= 0) {
       u.wait = 0.42 + random(s) * 0.28;
       act(s, u);
     }
   }
+  tickMonsters(s, dt);
   for (const k of s.kingdoms) {
     const king = s.units.find((u) => u.team === k.id && u.royal);
     if (k.alive && (!king || king.hp <= 0)) destroyKingdom(s, k.id, k.id);
@@ -1062,6 +1553,16 @@ export function loadGame(data: string): State | undefined {
   try {
     if (data.length > 5_000_000) return;
     const s = JSON.parse(data) as State;
+    if (
+      s.version === 2 &&
+      s.campaignVersion === undefined &&
+      Number.isInteger(s.level) &&
+      s.level >= 0 &&
+      s.level < 5
+    ) {
+      s.level *= 5;
+      s.campaignVersion = 2;
+    }
     if (
       s.version === 2 &&
       Array.isArray(s.tiles) &&
@@ -1108,15 +1609,50 @@ export function loadGame(data: string): State | undefined {
         if (k && k.bridgeSaving === undefined) k.bridgeSaving = false;
     if (s.version === 2 && Array.isArray(s.houses))
       for (const h of s.houses) if (h && h.founded === undefined) h.founded = 0;
+    if (Array.isArray(s.kingdoms))
+      for (const k of s.kingdoms) {
+        const old = k as Kingdom & { wood?: number; stone?: number };
+        if (old) {
+          delete old.wood;
+          delete old.stone;
+        }
+      }
+    if (Array.isArray(s.structures))
+      s.structures = s.structures.flatMap((b) =>
+        b && b.kind === "bridge" && Array.isArray(b.cells) && b.cells.length > 1
+          ? b.cells.map((p, i) => ({
+              ...b,
+              id: i ? s.nextId++ : b.id,
+              cells: [p],
+            }))
+          : [b],
+      );
+    if (Array.isArray(s.bridgeSites))
+      s.bridgeSites = s.bridgeSites.flatMap((site) =>
+        Array.isArray(site) ? site.map((p) => [p]) : [site],
+      );
+    if (Array.isArray(s.kingdoms))
+      for (const k of s.kingdoms)
+        if (k && k.fortification === undefined) k.fortification = 2000;
+    if (s.clearedTurf === undefined) s.clearedTurf = {};
+    if (s.turfRevision === undefined) s.turfRevision = 0;
+    if (s.caves === undefined) s.caves = [];
+    if (s.monsters === undefined) s.monsters = [];
+    if (Array.isArray(s.houses))
+      for (const h of s.houses)
+        if (h && h.interval === undefined)
+          h.interval = birthInterval(s.kingdoms?.[h.team]?.tax ?? 12);
     const num = (n: unknown) =>
       typeof n === "number" && Number.isFinite(n) && n >= 0;
     const int = (n: unknown) => num(n) && Number.isInteger(n);
+    const faction = (n: unknown) => int(n) && (n as number) < 5;
     const team = (n: unknown) => int(n) && (n as number) < 4;
     const point = (p: Point) =>
       p && int(p.x) && int(p.y) && p.x < s.size && p.y < s.size;
     const orders = [
       "auto",
       "move",
+      "attack",
       "merge",
       "house",
       "bridge",
@@ -1124,16 +1660,17 @@ export function loadGame(data: string): State | undefined {
       "barricade",
       "hold",
       "rest",
+      "shelter",
       "defend",
     ];
     if (
       s.version !== 2 ||
+      s.campaignVersion !== 2 ||
       !int(s.size) ||
       s.size < 32 ||
       s.size > 128 ||
       !int(s.level) ||
       s.level >= LEVELS.length ||
-      s.size !== LEVELS[s.level].size ||
       !num(s.seed) ||
       !num(s.rng) ||
       !num(s.time) ||
@@ -1158,7 +1695,8 @@ export function loadGame(data: string): State | undefined {
           ].includes(t.terrain) &&
           int(t.variant) &&
           t.variant < 8 &&
-          (t.owner === undefined || team(t.owner)) &&
+          (t.owner === undefined || faction(t.owner)) &&
+          (t.cave === undefined || int(t.cave)) &&
           (t.castle === undefined || team(t.castle)) &&
           (t.house === undefined || int(t.house)),
       )
@@ -1173,14 +1711,14 @@ export function loadGame(data: string): State | undefined {
           k.id === i &&
           point(k.castle) &&
           num(k.gold) &&
-          num(k.wood) &&
-          num(k.stone) &&
           num(k.tax) &&
           k.tax <= 30 &&
           typeof k.automatic === "boolean" &&
           typeof k.bridgeSaving === "boolean" &&
           typeof k.alive === "boolean" &&
           num(k.hp) &&
+          num(k.fortification) &&
+          k.fortification <= 2000 &&
           int(k.births) &&
           int(k.kills),
       )
@@ -1201,6 +1739,9 @@ export function loadGame(data: string): State | undefined {
           typeof u.wait === "number" &&
           Number.isFinite(u.wait) &&
           (u.defending === undefined || int(u.defending)) &&
+          (u.formation === undefined || typeof u.formation === "boolean") &&
+          (u.pursue === undefined || int(u.pursue)) &&
+          (u.pursueTeam === undefined || faction(u.pursueTeam)) &&
           (!u.royal ||
             (typeof u.reserve === "number" && Number.isFinite(u.reserve))) &&
           orders.includes(u.order) &&
@@ -1221,6 +1762,8 @@ export function loadGame(data: string): State | undefined {
           team(h.team) &&
           int(h.id) &&
           num(h.timer) &&
+          num(h.interval) &&
+          h.interval > 0 &&
           num(h.founded) &&
           tile(s, h.x, h.y)?.house === h.id,
       )
@@ -1233,7 +1776,7 @@ export function loadGame(data: string): State | undefined {
         (e) =>
           e &&
           num(e.time) &&
-          team(e.team) &&
+          faction(e.team) &&
           typeof e.text === "string" &&
           e.text.length < 500,
       )
@@ -1261,14 +1804,14 @@ export function loadGame(data: string): State | undefined {
           b &&
           int(b.id) &&
           ["bridge", "barricade"].includes(b.kind) &&
-          team(b.team) &&
+          faction(b.team) &&
           num(b.hp) &&
           b.hp > 0 &&
           num(b.maxHp) &&
           b.maxHp > 0 &&
           b.hp <= b.maxHp &&
           Array.isArray(b.cells) &&
-          b.cells.length > 0 &&
+          b.cells.length === 1 &&
           b.cells.every(
             (p) => point(p) && tile(s, p.x, p.y)?.terrain === b.kind,
           ),
@@ -1291,6 +1834,57 @@ export function loadGame(data: string): State | undefined {
       !s.stats ||
       !["cleared", "bridges", "dams", "merged"].every((k) =>
         int(s.stats[k as keyof typeof s.stats]),
+      )
+    )
+      return;
+    if (
+      !Array.isArray(s.caves) ||
+      s.caves.length > 8 ||
+      !s.caves.every(
+        (c) =>
+          c &&
+          point(c) &&
+          int(c.id) &&
+          num(c.hp) &&
+          c.hp > 0 &&
+          num(c.maxHp) &&
+          c.hp <= c.maxHp &&
+          num(c.timer) &&
+          num(c.interval) &&
+          c.interval > 0 &&
+          num(c.spawnHp) &&
+          c.spawnHp > 0 &&
+          tile(s, c.x, c.y)?.cave === c.id,
+      )
+    )
+      return;
+    if (
+      !Array.isArray(s.monsters) ||
+      s.monsters.length > 100 ||
+      !s.monsters.every(
+        (m) =>
+          m &&
+          point(m) &&
+          int(m.id) &&
+          num(m.hp) &&
+          m.hp > 0 &&
+          int(m.cave) &&
+          Number.isFinite(m.wait) &&
+          m.heading &&
+          [-1, 0, 1].includes(m.heading.x) &&
+          [-1, 0, 1].includes(m.heading.y),
+      )
+    )
+      return;
+    if (
+      !s.clearedTurf ||
+      typeof s.clearedTurf !== "object" ||
+      Array.isArray(s.clearedTurf) ||
+      !int(s.turfRevision) ||
+      Object.keys(s.clearedTurf).length > s.size * s.size ||
+      !Object.entries(s.clearedTurf).every(
+        ([key, value]) =>
+          int(Number(key)) && Number(key) < s.size * s.size && int(value),
       )
     )
       return;

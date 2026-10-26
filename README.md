@@ -1,50 +1,72 @@
 # Les Quatre Couronnes
 
-Un jeu de stratégie autonome en **TypeScript**, Canvas et Vite. Quatre couleurs, les mêmes habitants, des royaumes qui grandissent seuls. Vous incarnez la couronne Émeraude face à trois adversaires, qui peuvent aussi se détruire entre eux.
+**[Jouer dans le navigateur](https://girianshiido.github.io/les-quatre-couronnes/)**
 
-**Jouer en local :** `pnpm dev`. Le dossier `docs/` est prêt pour une activation de GitHub Pages lors de la publication publique.
+Jeu de stratégie autonome en TypeScript et Canvas : quatre royaumes identiques, distingués par leur couleur, et un monde qui continue de vivre sans vos ordres. Vous incarnez la couronne Émeraude face à trois adversaires qui peuvent aussi se combattre entre eux.
 
-## Une vallée vivante
+## La campagne
 
-La première carte contient 80 × 80 petites cases, sans quadrillage visible : terre, sapins, rochers, montagnes et rivières. Chaque camp commence avec **5 000 pièces**, un château de **3 × 3 cases**, un roi de **100 PV** et des maisons espacées. Le premier chapitre donne **cinq maisons au joueur et deux à chacun de ses adversaires**, avec des bras de rivière d’une case de large. À partir du deuxième chapitre, chaque camp reçoit quatre maisons. Cinq chapitres proposent des cartes de 80 à 96 cases de côté et une production adverse progressivement accélérée. Les thèmes se succèdent : forêt et montagne, désert avec palmiers et cactus, terres enneigées, marais à cyprès, puis forêt de cristal. Les chapitres se débloquent uniquement après la victoire du précédent.
+**25 niveaux en cinq séries** : forêt et montagne, désert, neige, marais, forêt de cristal. Chaque victoire débloque le niveau suivant. Les cartes sont asymétriques : départs plus ouverts ou confinés, rivières, plateaux, îlots, gorges et clairières. Certaines cartes proposent des grottes facultatives.
 
-Chaque maison produit régulièrement une unité de 100 PV. Les habitants choisissent seuls leurs déplacements. Une terre libre et suffisamment éloignée des autres maisons les encourage à fonder rapidement une nouvelle maison. Pour le joueur, les seules initiatives de développement sont la construction de maisons et la coupe des arbres. En cas d’invasion près des maisons ou du château, les habitants proches défendent automatiquement leur territoire, puis reprennent leur activité. Un ordre manuel interrompt cette défense et reste prioritaire ; le roi ne sort pas seul. Déblayer les rochers, lancer une offensive, capturer des maisons et construire les autres éléments exige un ordre. L’errance, les fusions au contact et la défense restent les règles de la simulation. Les adversaires prennent leurs propres initiatives. On peut observer toute la partie ou intervenir.
+Les nouvelles cartes vont de **64 × 64 à 80 × 80**, sans quadrillage visible. Tous les camps commencent avec **5 000 or**, un château de neuf cases et un roi de 100 PV. Le premier niveau donne **cinq maisons au joueur et deux à chaque adversaire**, avec des cours d’eau d’une case de large. Ensuite le joueur en reçoit quatre ; les adversaires quatre à six selon la série. Les règles et les impôts s’appliquent de façon identique aux quatre camps.
 
-## Les règles
+![Les cinq séries de vallées](public/biomes.png)
 
-- **Maisons :** 100 pièces. Deux maisons ne peuvent jamais être voisines, même en diagonale. Fonder une maison transforme l’habitant en bâtiment.
-- **Travail :** couper un arbre coûte 2 pièces et rapporte 5 bois ; dégager un rocher coûte 3 pièces et rapporte 4 pierres. L’unité perd 3 PV. Si l’or manque, l’action attend.
-- **Territoire :** trois secondes après la fondation, les huit cases de terre voisines reçoivent progressivement un gazon de la couleur du camp. Les zones voisines forment une masse continue, sans quadrillage.
-- **Vie :** un habitant perd 0,12 PV par seconde et 0,32 PV par déplacement. Avec l’ordre **Tenir**, immobile sur une maison alliée, il ne perd plus de PV avec le temps. Quand le secteur accessible n’offre plus de travail, ou quand l’or manque, les habitants rejoignent seuls les maisons, sans fusion forcée durant ce repos. Un nouveau passage ou du travail accessible les réveille.
-- **Fusion :** durant les déplacements ordinaires, les vies de deux alliés s’additionnent exactement. Les unités qui rejoignent leur roi fusionnent avec lui, et le roi conserve son identité.
-- **Combat :** l’attaquant paie 1 pièce. Entre unités ordinaires, la plus forte gagne ; elle perd 70 % des PV du vaincu. À égalité, les deux meurent. La défense ne coûte pas d’or.
-- **Gabarits :** habitant sous 1 000 PV, guerrier de 1 000 à 10 000 PV inclus, colosse au-delà de 10 000 PV. Quatre directions et deux poses de marche, dans les quatre couleurs. Le roi possède sa couronne dans chacune de ses directions.
-- **Pont :** 1 000 pièces au premier chantier, 500 pièces pour reconstruire au même endroit, plus 4 bois par case d’eau. 1 000 PV. Le pont traverse complètement un bras de rivière de six cases au maximum. Un ennemi doit le combattre avant de passer ; sa destruction rétablit l’eau et fait tomber les unités présentes. Le joueur ne construit jamais un pont sans ordre.
-- **Barricade :** 750 pièces, 12 bois, 1 500 PV. Elle bloque une case de terre. Les unités cherchent un détour ; un ordre vers une barricade ennemie permet de l’attaquer et de la détruire.
-- **Barrage :** 32 pièces, 12 pierres et 4 bois par case. Il est infranchissable et rapporte 0,2 pièce par seconde et par case. Cette première version ne simule pas les crues ni les changements du niveau de l’eau.
-- **Impôts :** de 0 à 30 %. Les revenus augmentent avec le taux, tandis que l’intervalle entre naissances passe de 10 à 31,6 secondes par maison. L’ajustement automatique prend en compte le trésor et la population. Les quatre camps ont les mêmes coûts ; les chapitres avancés accélèrent les naissances adverses.
+## Habitants, vie et territoire
 
-## Le roi
+Les habitants naissent à **100 PV**. Ils errent, fondent rapidement des maisons sur les terres libres et coupent les arbres. Une maison ne peut jamais toucher une autre maison, même en diagonale. Les autres travaux et les offensives du joueur demandent un ordre. En cas d’invasion, les habitants proches des maisons ou du château défendent leur territoire ; un ordre manuel reste prioritaire.
 
-Le roi est une unité sélectionnable et mobile. Sa force est sa réserve personnelle, initialement de 100 PV, **augmentée de 25 % des PV de ses autres unités**. Les PV totaux du royaume, roi compris, sont affichés à côté de l’or. La formule évite qu’un roi augmente récursivement sa propre force.
+- **Fusion :** deux alliés qui se rencontrent additionnent leurs PV. Sur une maison, les habitants peuvent cohabiter sans fusion forcée ; l’ordre Fusionner permet de les rassembler. Les unités qui rejoignent leur roi fusionnent avec lui.
+- **Combat :** entre unités ordinaires, la plus forte gagne et perd 70 % des PV du vaincu. À égalité, les deux meurent. Les combats et destructions ne coûtent pas d’or.
+- **Usure :** la marche et le temps consomment des PV, même dans son propre camp. L’usure temporelle augmente avec la distance au roi et avec la taille d’une grosse unité. Sur une maison alliée, l’usure normale s’arrête, quel que soit l’ordre.
+- **Repos :** quand aucun travail accessible ne reste, ou quand l’or manque, les habitants attendent sur les maisons sans fusion forcée. Un passage ouvert ou du nouveau travail les remet en activité.
+- **Entretien :** au-delà de 500 PV, une unité ordinaire consomme **0,4 or par seconde pour 1 000 PV**. Si le trésor ne suffit pas, la part non financée provoque une perte pouvant atteindre **3 % de ses PV par seconde**, même sur une maison. Le roi et les monstres n’ont pas cet entretien financier.
+- **Gabarits :** habitant sous 1 000 PV, guerrier de 1 000 à 10 000 inclus, colosse au-delà. Quatre directions, deux poses de marche et quatre couleurs, avec une couronne pour le roi.
+- **Gazon :** il apparaît progressivement dans les huit cases autour des maisons. Détruire le gazon ennemi coûte **2 PV par case** ; raser une maison coûte **12 PV à un habitant, 8 au roi**. Aucune dépense d’or. Une autre maison peut réétendre son gazon sur le terrain.
 
-Dans les neuf cases de son château, sa puissance de combat défensive est **multipliée par quatre**. Un assaillant un peu plus fort que lui ne suffit donc pas. Hors du château, le roi perd **5 % de ses PV par seconde**, avec un minimum de 4 PV/s. Revenir arrête cette perte ; cela ne soigne pas les dégâts. Tenir immobile sur une maison alliée permet aussi de s’abriter, sans le bonus défensif du château.
+## L’or et les constructions
 
-Le roi peut raser les maisons ennemies en les traversant, au prix de 8 PV par maison. Les habitants ordinaires peuvent capturer une maison sans défense proche. Un bouton **Rentrer** rappelle le roi dans son château.
+| Action                                     |          Prix |
+| ------------------------------------------ | ------------: |
+| Maison                                     |        150 or |
+| Couper un arbre                            | 30 or et 3 PV |
+| Dégager un rocher                          |  3 or et 3 PV |
+| Une case de pont                           |      1 000 or |
+| Reconstruire cette même case de pont       |        500 or |
+| Barricade                                  |        750 or |
+| Transformer un pont allié libre en barrage |         32 or |
 
-Un royaume disparaît lorsque son roi meurt **ou lorsqu’il n’a plus aucune maison et aucun habitant ordinaire**. Un roi seul ne suffit pas à maintenir son royaume. Son château s’effondre et laisse des ruines. La partie est gagnée lorsque les trois autres royaumes ont disparu ; elle est perdue dès l’élimination du joueur.
+**Un ordre de pont construit exactement une case**, avec 1 000 PV. Une rivière plus large exige plusieurs ordres. Tous les camps peuvent traverser un pont ouvert ; l’ordre Attaquer permet de le détruire. Sa destruction rétablit l’eau et fait tomber les habitants qui s’y trouvent. Les anciens ponts de sauvegardes sont conservés sous forme de tronçons indépendants.
+
+Les barricades ont 1 500 PV et bloquent la route. Les unités peuvent les contourner ou les attaquer. Les barrages sont infranchissables et rapportent 0,2 or par seconde ; cette version ne simule pas les crues.
+
+**Impôts :** 0 % donne une naissance toutes les **6 secondes par maison**, 24 % environ toutes les **117 secondes**, 30 % toutes les **180 secondes**. Le taux augmente les revenus mais ralentit fortement les naissances, pour le joueur comme pour les adversaires. Changer le taux conserve la progression du cycle et ne libère pas de stock caché. L’automatisme ajuste le taux selon le trésor, la population et les besoins. L’option Épargner pour un chantier réserve 1 000 pièces contre les fondations automatiques.
+
+## Le roi et la victoire
+
+Le roi commence à 100 PV. Sa force est sa réserve personnelle augmentée de **25 % des PV de ses autres unités**. Les unités qui le rejoignent lui transmettent leurs vies. Dans les neuf cases de son château, sa force défensive est multipliée par **huit**, avec **2 000 PV de remparts** qui s’usent lors des assauts.
+
+Dehors, le roi perd **5 % de ses PV par seconde**, au minimum 4 PV/s. Rentrer au château ou s’abriter sur une maison arrête cette usure sans soigner les dégâts. Avancer le roi peut soutenir les soldats proches, mais le rend vulnérable.
+
+Un royaume disparaît si son roi meurt **ou s’il n’a plus aucune maison ni habitant ordinaire**, même si son roi vit encore. Son château s’effondre et laisse des ruines. La partie est gagnée lorsque les trois royaumes adverses ont disparu.
+
+## Les grottes
+
+Seulement certains niveaux contiennent des grottes. Leurs monstres ne gagnent pas d’argent, ne paient pas d’entretien et ne perdent pas de PV avec le temps ou la marche. Ils fusionnent et deviennent de plus en plus forts si on les laisse s’accumuler. Ils perdent des vies au combat et lorsqu’ils détruisent du gazon ou des maisons.
+
+Ils commencent dans des zones fermées par l’eau ou une barricade. **Ouvrir un pont ou détruire une barricade peut les libérer vers les autres camps.** Détruire une grotte arrête les nouvelles sorties mais ne supprime pas les monstres existants. Les éliminer n’est pas une condition de victoire.
 
 ## Commandes et sauvegarde
 
-- Clic sur un habitant vert ; glisser pour une sélection multiple ; Maj pour ajouter à la sélection. Le roi se sélectionne seul, uniquement par clic direct. Les rectangles et la touche A l’excluent ; Voir le roi recentre seulement la vue. Un petit menu d’ordres apparaît sur la carte.
-- Choisir un ordre puis sa destination : déplacer, fusionner, maison, pont, barrage, barricade. Déplacer sur une cible ennemie ordonne une attaque ; sur un rocher, le déblaiement. Les constructions nécessitent un habitant ordinaire.
-- L’option **Épargner pour un chantier** réserve 1 000 pièces contre les fondations automatiques, afin de pouvoir financer une infrastructure. Les ponts et barricades désactivent cette épargne après leur construction.
-- **Tenir** immobilise les unités. **Autonomie** leur rend leurs choix.
-- Molette ou boutons +/− pour zoomer ; clic droit glissé ou Alt + glisser pour déplacer la carte. Sur écran tactile, le bouton ↔ active le déplacement de la carte.
-- Espace : pause ; F : fusion ; A : sélectionner tout ; Échap : annuler. Vitesses ×1, ×2, ×4, ×8 et ×16. Une nouvelle partie démarre à ×1.
-- Un clic sur le titre en haut à gauche demande confirmation, sauvegarde la partie et revient à l’écran titre. Le texte de l’interface ne se sélectionne pas pendant les gestes.
-- Écran titre **New game / Load game**. Sauvegarde locale automatique toutes les 10 secondes, bouton manuel, export et import JSON au menu. La reprise se fait en pause. Le hasard, les ordres, les ressources, les rois et les ruines sont conservés.
-- La partie ne progresse pas lorsque son onglet est masqué. Aucune progression hors ligne n’est calculée. Le stockage dépend du navigateur et de l’adresse utilisée ; l’export permet de transférer une sauvegarde.
+1. Cliquez une unité verte ou tracez un rectangle. **Toute la simulation s’arrête.** Le roi est toujours ignoré par les rectangles ; un clic direct permet de le sélectionner seul.
+2. Cliquez une destination. Les actions proposées dépendent de la case : eau accessible → seulement un pont ; maison alliée → abri ; arbre → coupe ; ennemi → attaque ; terre libre → déplacement, maison, barricade ou rassemblement.
+3. Choisissez l’action pour reprendre la simulation. Échap ou Annuler retire la sélection. La pause manuelle reste prioritaire.
+
+Molette ou +/− : zoom ; clic droit ou Alt + glisser : déplacer la carte. Le bouton ↔ permet le déplacement tactile. A sélectionne les habitants sans le roi. Vitesses **×1, ×2, ×4, ×8, ×16** ; une nouvelle partie démarre à ×1.
+
+Un clic sur le titre en haut à gauche demande confirmation, sauvegarde et revient à **New game / Load game**. Le texte ne se sélectionne pas pendant les gestes. Sauvegarde automatique toutes les 10 secondes, bouton manuel, export/import JSON au menu. La reprise se fait en pause. Les anciennes sauvegardes conservent leur carte complète et migrent vers la nouvelle campagne.
+
+Le jeu ne progresse pas lorsque son onglet est masqué. Le stockage dépend du navigateur et de l’adresse utilisée ; l’export permet de transférer une sauvegarde. Limites : 150 unités simultanées par camp, roi compris, et 100 monstres.
 
 ## Développer
 
@@ -60,18 +82,8 @@ pnpm biomes
 pnpm simulate
 ```
 
-`src/engine.ts` contient la simulation déterministe, `src/render.ts` les sprites et la carte, `src/main.ts` l’interface et la sauvegarde. `pnpm build` vérifie les types et produit `docs/`, prêt pour GitHub Pages. Les sprites sont dessinés par le code du jeu ; les deux planches PNG sont des exports de référence régénérables, sans asset emprunté.
-
-La limite est de 150 unités simultanées par camp, roi compris. Cette première version est destinée à être équilibrée par les parties réelles : vitesse d’expansion, coûts, usure et protection royale sont centralisés dans le moteur.
-
-## Les cinq thèmes
-
-![Les cinq vallées du jeu](public/biomes.png)
-
-## Planches des sprites
-
-Les lignes des habitants correspondent aux quatre camps, avec trois gabarits par camp ; les colonnes montrent face, dos, gauche et droite, chacune en deux poses.
+`src/engine.ts` : simulation déterministe et économie ; `src/monsters.ts` : grottes et monstres ; `src/orders.ts` et `src/selection.ts` : commandes ; `src/render.ts` : carte et sprites ; `src/main.ts` : interface et sauvegarde. Le build vérifie les types et produit `docs/` pour GitHub Pages. Les trajets des grandes formations sont partagés et les éléments hors champ ne sont pas dessinés. Voir `VALIDATION.md` pour les essais et leurs limites.
 
 ![Habitants, guerriers et colosses](public/sprites-atlas.png)
 
-![Rois, quatre couleurs et quatre directions](public/kings-atlas.png)
+![Rois dans les quatre directions et couleurs](public/kings-atlas.png)

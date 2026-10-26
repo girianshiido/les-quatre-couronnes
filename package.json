@@ -9,7 +9,8 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "sprites": "node --import tsx scripts/sprite-atlas.ts",
     "simulate": "node --import tsx scripts/simulate.ts",
-    "biomes": "node --import tsx scripts/biome-preview.ts"
+    "biomes": "node --import tsx scripts/biome-preview.ts",
+    "benchmark": "node --import tsx scripts/benchmark.ts"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^1.0.13",

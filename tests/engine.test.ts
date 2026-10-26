@@ -2,6 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   createGame,
+  LEVELS,
+  territoryAt,
+  lifeDrain,
+  combatPower,
+  birthInterval,
   canHouse,
   addHouse,
   resolveEncounter,
@@ -37,10 +42,10 @@ const unit = (team = 0, hp = 100, x = 20, y = 20): Unit => ({
   order: "auto",
   heading: { x: 0, y: 1 },
 });
-test("80 × 80, four castles of nine cells; tutorial grants five houses versus two", () => {
+test("64 × 64, four castles of nine cells; tutorial grants five houses versus two", () => {
   const s = createGame();
-  assert.equal(s.size, 80);
-  assert.equal(s.tiles.length, 6400);
+  assert.equal(s.size, 64);
+  assert.equal(s.tiles.length, 4096);
   assert.equal(s.kingdoms.length, 4);
   for (let team = 0; team < 4; team++) {
     assert.equal(s.tiles.filter((t) => t.castle === team).length, 9);
@@ -65,8 +70,8 @@ test("houses cannot touch even diagonally; costs are real", () => {
   const k = s.kingdoms[0];
   tile(s, 20, 20)!.terrain = "grass";
   assert.ok(addHouse(s, 0, 20, 20));
-  assert.equal(k.gold, 4900);
-  assert.equal(k.wood, 32);
+  assert.equal(k.gold, 4850);
+  assert.equal("wood" in k, false);
   assert.equal(addHouse(s, 0, 21, 21), false);
 });
 test("births have exactly 100 HP", () => {
@@ -129,7 +134,7 @@ test("impôts 30 slow each house compared to zero and produce more gold", () => 
     }
   }
 });
-test("water blocks routing, a complete bridge connects both banks", () => {
+test("a bridge builds exactly one water cell; a wider river needs another explicit segment", () => {
   const s = createGame();
   for (let y = 0; y < s.size; y++)
     for (let x = 0; x < s.size; x++) {
@@ -141,20 +146,24 @@ test("water blocks routing, a complete bridge connects both banks", () => {
   s.houses = [];
   assert.equal(nextStep(s, { x: 28, y: 20 }, { x: 33, y: 20 }, 0), undefined);
   const cr = crossing(s, { x: 30, y: 20 })!;
-  assert.equal(cr.cells.length, 2);
+  assert.equal(cr.cells.length, 1);
   const u = unit(0, 100, 29, 20);
   assert.ok(buildCrossing(s, u, { x: 30, y: 20 }));
-  assert.ok(nextStep(s, u, { x: 33, y: 20 }, 0));
+  assert.equal(nextStep(s, u, { x: 33, y: 20 }, 0), undefined);
   assert.equal(s.kingdoms[0].gold, 4000);
-  assert.equal(s.kingdoms[0].wood, 24);
+  assert.equal(tile(s, 31, 20)!.terrain, "water");
+  u.x = 30;
+  assert.ok(buildCrossing(s, u, { x: 31, y: 20 }));
+  assert.ok(nextStep(s, u, { x: 33, y: 20 }, 0));
+  assert.equal(s.kingdoms[0].gold, 3000);
 });
-test("dam costs stone, remains impassable and yields income", () => {
+test("dam costs gold, remains impassable and yields income", () => {
   const s = createGame();
   for (let x = 20; x < 25; x++)
     tile(s, x, 20)!.terrain = x === 22 ? "water" : "grass";
   const u = unit(0, 100, 21, 20);
   assert.ok(buildCrossing(s, u, { x: 22, y: 20 }, true));
-  assert.equal(s.kingdoms[0].stone, 6);
+
   assert.equal(tile(s, 22, 20)!.terrain, "dam");
   const before = s.kingdoms[0].gold;
   step(s, 1);
@@ -186,11 +195,7 @@ test("seeded simulations are reproducible; population, HP and resources stay val
   assert.ok(a.kingdoms.every((k) => k.births > 0));
   assert.ok(a.houses.length > 11);
   assert.ok(a.units.every((u) => u.hp > 0 && Number.isFinite(u.hp)));
-  assert.ok(
-    a.kingdoms.every(
-      (k) => k.gold >= 0 && k.wood >= 0 && k.tax >= 0 && k.tax <= 30,
-    ),
-  );
+  assert.ok(a.kingdoms.every((k) => k.gold >= 0 && k.tax >= 0 && k.tax <= 30));
 });
 test("king elimination yields defeat/victory", () => {
   const s = createGame();
@@ -218,7 +223,7 @@ test("malformed nested saves are rejected without crashing", () => {
   }
 });
 test("all kingdoms start with 5000 gold and a 100 HP movable king on every level", () => {
-  for (let level = 0; level < 5; level++) {
+  for (let level = 0; level < LEVELS.length; level++) {
     const s = createGame(level);
     for (const k of s.kingdoms) {
       assert.equal(k.gold, 5000);
@@ -248,7 +253,7 @@ test("castle defence requires a large advantage to kill a king", () => {
   const attacker = unit(0, 200, king.x, king.y + 1);
   assert.equal(resolveEncounter(s, attacker, king), king);
   assert.ok(king.hp > 0);
-  const huge = unit(0, king.hp * 4 + 1, king.x, king.y + 1);
+  const huge = unit(0, combatPower(s, king) + 1, king.x, king.y + 1);
   assert.equal(resolveEncounter(s, huge, king), huge);
   assert.equal(king.hp, 0);
 });
@@ -284,7 +289,7 @@ test("holding on an allied house stops ageing for inhabitants and king", () => {
   step(s);
   assert.ok(u.hp < 100);
 });
-test("empty terrain prompts rapid founding and charges 100 gold", () => {
+test("empty terrain prompts rapid founding and charges 150 gold", () => {
   const s = createGame(),
     u = unit(0, 100, 20, 20);
   tile(s, 20, 20)!.terrain = "grass";
@@ -296,7 +301,7 @@ test("empty terrain prompts rapid founding and charges 100 gold", () => {
   step(s);
   assert.ok(s.houses.some((h) => h.x === 20 && h.y === 20));
   assert.ok(!s.units.includes(u));
-  assert.ok(s.kingdoms[0].gold < before - 99);
+  assert.ok(s.kingdoms[0].gold < before - 149);
 });
 test("clearing costs gold and pauses when the treasury is empty", () => {
   const s = createGame(),
@@ -308,12 +313,11 @@ test("clearing costs gold and pauses when the treasury is empty", () => {
   s.kingdoms[0].gold = 0;
   step(s);
   assert.equal(tile(s, 21, 20)!.terrain, "tree");
-  s.kingdoms[0].gold = 10;
+  s.kingdoms[0].gold = 100;
   u.wait = 0;
   step(s);
   assert.equal(tile(s, 21, 20)!.terrain, "grass");
-  assert.ok(s.kingdoms[0].gold < 9);
-  assert.equal(s.kingdoms[0].wood, 37);
+  assert.ok(s.kingdoms[0].gold < 71);
 });
 test("a royal raid razes an enemy house", () => {
   const s = createGame(),
@@ -388,7 +392,7 @@ test("barricades cost 750 gold, block friendly traffic, can be routed around or 
     p = { x: 22, y: 20 };
   assert.ok(buildBarricade(s, builder, p));
   assert.equal(s.kingdoms[0].gold, 4250);
-  assert.equal(s.kingdoms[0].wood, 20);
+
   let pos = { x: 20, y: 20 };
   for (let i = 0; i < 20 && (pos.x !== 24 || pos.y !== 20); i++) {
     pos = nextStep(s, pos, { x: 24, y: 20 }, 1)!;
@@ -514,4 +518,57 @@ test("a manual hold order suppresses automatic pursuit of an invader", () => {
   assert.equal(defender.order, "hold");
   assert.ok(invader.hp > 99);
   assert.equal(defender.x, 20);
+});
+test("destroying enemy turf costs HP, clears its tint and survives save/load", () => {
+  const s = createGame();
+  s.time = 20;
+  const h = s.houses.find((h) => h.team === 1)!,
+    p = { x: h.x + 1, y: h.y };
+  tile(s, p.x, p.y)!.terrain = "grass";
+  tile(s, p.x, p.y - 1)!.terrain = "grass";
+  const u = unit(0, 100, p.x, p.y - 1);
+  u.order = "move";
+  u.target = p;
+  s.units.push(u);
+  assert.equal(territoryAt(s, p)!.team, 1);
+  const drain = lifeDrain(s, u);
+  step(s);
+  assert.ok(Math.abs(u.hp - (100 - drain * 0.2 - 0.32 - 2)) < 1e-8);
+  assert.equal(territoryAt(s, p), undefined);
+  const loaded = loadGame(saveGame(s))!;
+  assert.ok(loaded);
+  assert.equal(territoryAt(loaded, p), undefined);
+});
+test("ordinary units raze enemy houses and pay the destruction cost", () => {
+  const s = createGame();
+  s.time = 20;
+  const h = s.houses.find((h) => h.team === 1)!;
+  tile(s, h.x, h.y)!.terrain = "grass";
+  tile(s, h.x - 1, h.y)!.terrain = "grass";
+  const u = unit(0, 100, h.x - 1, h.y);
+  u.order = "move";
+  u.target = { x: h.x, y: h.y };
+  s.units.push(u);
+  const drain = lifeDrain(s, u);
+  step(s);
+  assert.ok(!s.houses.includes(h));
+  assert.ok(Math.abs(u.hp - (100 - drain * 0.2 - 0.32 - 2 - 12)) < 1e-8);
+  assert.equal(tile(s, h.x, h.y)!.house, undefined);
+});
+test("legacy multi-cell bridges load as independent single-cell segments without charging the treasury", () => {
+  const s = createGame();
+  for (let x = 29; x <= 32; x++)
+    tile(s, x, 20)!.terrain = x === 30 || x === 31 ? "water" : "grass";
+  const u = unit(0, 100, 29, 20);
+  assert.ok(buildCrossing(s, u, { x: 30, y: 20 }));
+  const b = s.structures[0];
+  b.cells.push({ x: 31, y: 20 });
+  tile(s, 31, 20)!.terrain = "bridge";
+  tile(s, 31, 20)!.owner = 0;
+  s.bridgeSites[0].push({ x: 31, y: 20 });
+  const loaded = loadGame(saveGame(s))!;
+  assert.ok(loaded);
+  assert.equal(loaded.structures.length, 2);
+  assert.ok(loaded.structures.every((b) => b.cells.length === 1));
+  assert.equal(loaded.kingdoms[0].gold, s.kingdoms[0].gold);
 });

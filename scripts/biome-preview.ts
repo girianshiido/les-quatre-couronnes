@@ -11,13 +11,14 @@ c.font = "30px Georgia";
 c.fillText("Les Quatre Couronnes", 35, 130);
 c.fillStyle = "#c2d0bc";
 c.font = "17px sans-serif";
-c.fillText("Cinq vallées à conquérir", 35, 176);
+c.fillText("25 vallées en cinq séries", 35, 176);
 c.fillText("Forêt · désert · neige", 35, 216);
 c.fillText("Marais · cristaux", 35, 247);
 c.font = "13px sans-serif";
 c.fillStyle = "#94a89d";
 c.fillText("Chaque victoire ouvre le chapitre suivant.", 35, 304);
-for (let level = 0; level < 5; level++) {
+for (let biome = 0; biome < 5; biome++) {
+  const level = biome * 5;
   const s = createGame(level, 5321);
   for (let i = 0; i < 100; i++) step(s);
   const terrain = createCanvas(s.size * 16, s.size * 16),
@@ -62,14 +63,18 @@ for (let level = 0; level < 5; level++) {
       0,
       !!u.royal,
     );
-  const panel = level + 1,
+  const panel = biome + 1,
     x = (panel % 3) * 400,
     y = Math.floor(panel / 3) * 400;
   c.imageSmoothingEnabled = false;
   c.drawImage(terrain, x + 12, y + 42, 376, 346);
   c.fillStyle = "#ead7ac";
   c.font = "18px Georgia";
-  c.fillText(`${level + 1}. ${LEVELS[level].name}`, x + 14, y + 27);
+  c.fillText(
+    `${level + 1}–${level + 5}. ${LEVELS[level].name}`,
+    x + 14,
+    y + 27,
+  );
 }
 writeFileSync("public/biomes.png", out.toBuffer("image/png"));
 console.log("Five rendered biome previews exported.");

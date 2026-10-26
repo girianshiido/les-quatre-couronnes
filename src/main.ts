@@ -1,4 +1,5 @@
 import "./style.css";
+import { destinationActions } from "./orders";
 import { rectangleSelection, clickSelection } from "./selection";
 import {
   createGame,
@@ -18,6 +19,10 @@ import {
   totalHP,
   sheltered,
   resting,
+  lifeDrain,
+  birthInterval,
+  unitUpkeep,
+  maintenanceCost,
   type State,
   type Order,
   type Point,
@@ -36,6 +41,8 @@ function read(key: string) {
 }
 let state = createGame(),
   paused = false,
+  planning = false,
+  contextPoint: Point | undefined,
   speed = 1,
   inGame = false,
   targetOrder: Order | undefined,
@@ -50,10 +57,10 @@ let state = createGame(),
 const saved = read(KEY);
 lastStored = saved ? loadGame(saved) : undefined;
 const app = $("app");
-app.innerHTML = `<header><button id="brand-title" class="brand" aria-label="Revenir à l’écran titre"><span class="crown">♛</span><div><h1>Les Quatre Couronnes</h1><p class="eyebrow">Des royaumes qui prennent vie</p></div></button><div class="top-resources"><div class="resource"><i>◈</i><div><b id="gold">5 000</b><small>Or</small></div></div><div class="resource"><i>♠</i><div><b id="wood">32</b><small>Bois</small></div></div><div class="resource"><i>⬟</i><div><b id="stone">18</b><small>Pierre</small></div></div><div class="resource"><i>⚑</i><div><b id="population">100</b><small>PV totaux</small></div></div></div><div class="header-actions"><button id="help" title="Règles et commandes">?</button><button id="save" title="Sauvegarder">↓<span class="wide-label"> Sauver</span></button><button id="menu" title="Écran titre">☰</button></div><button class="mobile-tab" id="sidebar-toggle">Conseil</button></header>
-<main class="layout"><section class="battlefield" aria-label="Carte du jeu"><canvas id="map" tabindex="0" aria-label="Carte. Cliquez une unité verte ou tracez un rectangle pour sélectionner. Les ordres sont dans le conseil à droite."></canvas><div class="map-head"><span class="eyebrow" id="chapter">Chapitre I · Forêt & montagne</span><h2 id="level-name">La vallée des premiers jours</h2><p id="map-sub">80 × 80 · Quatre royaumes · Aucune frontière</p></div><span class="time" id="time">☀ 00:00</span><div class="map-help">Clic : sélectionner · Glisser : sélection multiple<br>Molette : zoom · Clic droit glissé : déplacer la carte</div><div class="map-controls"><button id="pause" title="Pause (Espace)">Ⅱ</button><button id="speed" title="Vitesse : ×1, ×2, ×4, ×8, ×16">×1</button><button id="zoom-out" title="Dézoomer">−</button><button id="zoom-in" title="Zoomer">+</button><button id="fit" title="Voir toute la carte">⊡</button></div><div id="selection-menu" class="selection-menu hidden" aria-label="Ordres de la sélection"><button data-order="move">⚑ Déplacer</button><button data-order="merge">✦ Fusionner</button><button data-order="house">⌂ Maison</button><button data-order="bridge">≋ Pont</button><button data-order="dam">▤ Barrage</button><button data-order="barricade">╳ Barricade</button><button data-order="auto">↝ Autonomie</button><button data-order="hold">⏸ Tenir</button></div><div id="target-banner" class="status-banner hidden"></div><div id="paused-label" class="paused-label hidden">Ⅱ Partie en pause</div></section>
-<aside class="sidebar" id="sidebar"><span class="eyebrow">Votre royaume</span><h2>La couronne Émeraude</h2><p class="subtitle">Laissez vivre. Choisissez quand agir.</p><div class="section"><div class="label-row"><h3>Les quatre couronnes</h3><span class="badge" id="alive">4 en lice</span></div><div id="kingdoms"></div></div><div class="section"><div class="label-row"><h3>Votre roi</h3><span class="badge" id="king-hp">100 PV</span></div><p class="selection-info" id="king-info">À l’abri du château</p><div class="orders"><button id="select-king">♛ Voir le roi</button><button id="return-king">⌂ Rentrer</button></div></div><div class="section"><div class="label-row"><h3>Impôts du royaume</h3><span class="tax-number" id="tax-value">12<span>%</span></span></div><input id="tax" type="range" min="0" max="30" value="12" aria-label="Taux des impôts de 0 à 30 pour cent"><div class="range-labels"><span>0 % · Plus de naissances</span><span>30 % · Plus d’or</span></div><label class="check"><input id="auto-tax" type="checkbox" checked> Ajustement automatique</label><label class="check"><input id="save-gold" type="checkbox"> Épargner 1 000 pièces pour un chantier</label><p class="tax-hint" id="tax-hint"></p></div><div class="section"><div class="label-row"><h3>Vos ordres</h3><span class="badge" id="selection-count">0 unité</span></div><p class="selection-info" id="selection-info">Sélectionnez vos habitants verts sur la carte, par clic ou par rectangle.</p><div class="orders"><button data-order="move">⚑ Déplacer</button><button data-order="merge">✦ Fusionner</button><button data-order="house">⌂ Maison</button><button data-order="bridge">≋ Pont</button><button data-order="dam">▤ Barrage</button><button data-order="barricade">╳ Barricade</button><button data-order="auto">↝ Autonomie</button><button data-order="hold">⏸ Tenir</button></div><div id="inspect" class="inspect"></div></div><div class="section"><div class="label-row"><h3>Échos de la vallée</h3><span style="color:var(--gold)">✧</span></div><div id="events"></div></div><p class="save-status" id="save-status">Sauvegarde automatique toutes les 10 s</p></aside></main>
-<div class="overlay" id="title"><div class="title-panel"><p class="eyebrow">Un jeu de stratégie vivant</p><div class="crest">♛</div><h1>Les Quatre<br>Couronnes</h1><div class="title-colors">${COLORS.map((c) => `<span style="background:${c}"></span>`).join("")}</div><p class="intro">Dans la vallée, chaque habitant suit son chemin.<br>Les royaumes grandissent, se croisent et s’affrontent.<br>Votre couronne. Leur histoire.</p><div class="title-buttons"><button class="primary" id="new-game">New game</button><button id="load-game" ${lastStored ? "" : "disabled"}>Load game</button></div><p class="load-note" id="load-note"></p><div class="title-detail"><span>4 royaumes</span><span>80 × 80 cases</span><span>Un monde autonome</span></div><button class="small" id="title-help">Découvrir les règles</button><p class="title-foot">Observez la vie. Prenez le commandement.</p></div></div>
+app.innerHTML = `<header><button id="brand-title" class="brand" aria-label="Revenir à l’écran titre"><span class="crown">♛</span><div><h1>Les Quatre Couronnes</h1><p class="eyebrow">Des royaumes qui prennent vie</p></div></button><div class="top-resources"><div class="resource"><i>◈</i><div><b id="gold">5 000</b><small>Or</small></div></div><div class="resource"><i>⚑</i><div><b id="population">100</b><small>PV totaux</small></div></div></div><div class="header-actions"><button id="help" title="Règles et commandes">?</button><button id="save" title="Sauvegarder">↓<span class="wide-label"> Sauver</span></button><button id="menu" title="Écran titre">☰</button></div><button class="mobile-tab" id="sidebar-toggle">Conseil</button></header>
+<main class="layout"><section class="battlefield" aria-label="Carte du jeu"><canvas id="map" tabindex="0" aria-label="Carte. Cliquez une unité verte ou tracez un rectangle pour sélectionner. Les ordres sont dans le conseil à droite."></canvas><div class="map-head"><span class="eyebrow" id="chapter">Chapitre I · Forêt & montagne</span><h2 id="level-name">La vallée des premiers jours</h2><p id="map-sub">64 × 64 · Quatre royaumes · Aucune frontière</p></div><span class="time" id="time">☀ 00:00</span><div class="map-help">Clic : sélectionner · Glisser : sélection multiple<br>Molette : zoom · Clic droit glissé : déplacer la carte</div><div class="map-controls"><button id="pause" title="Pause (Espace)">Ⅱ</button><button id="speed" title="Vitesse : ×1, ×2, ×4, ×8, ×16">×1</button><button id="zoom-out" title="Dézoomer">−</button><button id="zoom-in" title="Zoomer">+</button><button id="fit" title="Voir toute la carte">⊡</button></div><div id="selection-menu" class="selection-menu hidden" aria-label="Actions pour la destination"></div><div id="target-banner" class="status-banner hidden"></div><div id="paused-label" class="paused-label hidden">Ⅱ Partie en pause</div></section>
+<aside class="sidebar" id="sidebar"><span class="eyebrow">Votre royaume</span><h2>La couronne Émeraude</h2><p class="subtitle">Laissez vivre. Choisissez quand agir.</p><div class="section"><div class="label-row"><h3>Les quatre couronnes</h3><span class="badge" id="alive">4 en lice</span></div><div id="kingdoms"></div></div><div class="section"><div class="label-row"><h3>Votre roi</h3><span class="badge" id="king-hp">100 PV</span></div><p class="selection-info" id="king-info">À l’abri du château</p><button id="select-king" class="small">♛ Voir le roi</button></div><div class="section"><div class="label-row"><h3>Impôts du royaume</h3><span class="tax-number" id="tax-value">12<span>%</span></span></div><input id="tax" type="range" min="0" max="30" value="12" aria-label="Taux des impôts de 0 à 30 pour cent"><div class="range-labels"><span>0 % · Plus de naissances</span><span>30 % · Plus d’or</span></div><label class="check"><input id="auto-tax" type="checkbox" checked> Ajustement automatique</label><label class="check"><input id="save-gold" type="checkbox"> Épargner 1 000 pièces pour un chantier</label><p class="tax-hint" id="tax-hint"></p></div><div class="section"><div class="label-row"><h3>Vos ordres</h3><span class="badge" id="selection-count">0 unité</span></div><p class="selection-info" id="selection-info">Sélectionnez vos habitants verts, puis cliquez une destination. Le jeu attend votre ordre.</p><p id="command-help" class="selection-info">Sélectionnez, puis cliquez une destination.</p><button id="cancel-selection" class="small hidden">Annuler la sélection</button><div id="inspect" class="inspect"></div></div><div class="section"><div class="label-row"><h3>Échos de la vallée</h3><span style="color:var(--gold)">✧</span></div><p id="monster-status" class="tax-hint hidden"></p><div id="events"></div></div><p class="save-status" id="save-status">Sauvegarde automatique toutes les 10 s</p></aside></main>
+<div class="overlay" id="title"><div class="title-panel"><p class="eyebrow">Un jeu de stratégie vivant</p><div class="crest">♛</div><h1>Les Quatre<br>Couronnes</h1><div class="title-colors">${COLORS.map((c) => `<span style="background:${c}"></span>`).join("")}</div><p class="intro">Dans la vallée, chaque habitant suit son chemin.<br>Les royaumes grandissent, se croisent et s’affrontent.<br>Votre couronne. Leur histoire.</p><div class="title-buttons"><button class="primary" id="new-game">New game</button><button id="load-game" ${lastStored ? "" : "disabled"}>Load game</button></div><p class="load-note" id="load-note"></p><div class="title-detail"><span>4 royaumes</span><span>64 × 64 cases</span><span>25 vallées</span></div><button class="small" id="title-help">Découvrir les règles</button><p class="title-foot">Observez la vie. Prenez le commandement.</p></div></div>
 <div class="overlay hidden" id="modal"><div class="dialog" id="dialog" role="dialog" aria-modal="true" aria-label="Conseil des couronnes"></div></div><div class="toast hidden" id="toast" role="status"></div>`;
 const renderer = new Renderer($<HTMLCanvasElement>("map"));
 const canvas = renderer.canvas;
@@ -116,6 +123,8 @@ function start(s: State, loading = false) {
   ended = false;
   speed = 1;
   selection.clear();
+  planning = false;
+  contextPoint = undefined;
   targetOrder = undefined;
   accumulator = 0;
   saveTime = 0;
@@ -133,9 +142,12 @@ function start(s: State, loading = false) {
   );
 }
 function newGame() {
-  const unlock = Math.min(4, Math.max(0, Number(read(PROGRESS)) || 0));
+  const unlock = Math.min(
+    LEVELS.length - 1,
+    Math.max(0, Number(read(PROGRESS)) || 0),
+  );
   showModal(
-    `<span class="eyebrow">Une nouvelle histoire</span><h2>Choisissez votre vallée</h2><p>Vous incarnez la couronne <strong>Émeraude</strong>. Faites tomber les trois royaumes adverses tout en protégeant votre roi et votre peuple.</p><label class="check" for="level-select">Chapitre de la campagne</label><select id="level-select">${LEVELS.map((l, i) => `<option value="${i}" ${i > unlock ? "disabled" : ""}>${i + 1}. ${l.name}${i > unlock ? " · verrouillé" : ""}</option>`).join("")}</select><p>Chaque camp commence avec 5 000 pièces. Chaque victoire ouvre la vallée suivante. Les adversaires se développent plus vite au fil des chapitres.</p>${read(KEY) ? '<p class="confirm">Commencer remplacera la sauvegarde actuelle. Vous pouvez l’exporter depuis le menu en cours de partie.</p>' : ""}<div class="close-row"><button id="cancel-new">Retour</button><button class="primary" id="begin">Entrer dans la vallée</button></div>`,
+    `<span class="eyebrow">Une nouvelle histoire</span><h2>Choisissez votre vallée</h2><p>Vous incarnez la couronne <strong>Émeraude</strong>. Faites tomber les trois royaumes adverses tout en protégeant votre roi et votre peuple.</p><label class="check" for="level-select">Chapitre de la campagne</label><select id="level-select">${LEVELS.map((l, i) => `${i % 5 === 0 ? `<optgroup label="${l.biome}">` : ""}<option value="${i}" ${i > unlock ? "disabled" : ""}>${i + 1}. ${l.name}${i > unlock ? " · verrouillé" : ""}</option>${i % 5 === 4 ? "</optgroup>" : ""}`).join("")}</select><p>Chaque camp commence avec 5 000 pièces. Chaque victoire ouvre la vallée suivante. Les adversaires se développent plus vite au fil des chapitres.</p>${read(KEY) ? '<p class="confirm">Commencer remplacera la sauvegarde actuelle. Vous pouvez l’exporter depuis le menu en cours de partie.</p>' : ""}<div class="close-row"><button id="cancel-new">Retour</button><button class="primary" id="begin">Entrer dans la vallée</button></div>`,
   );
   $("cancel-new").onclick = closeModal;
   $("begin").onclick = () =>
@@ -148,7 +160,7 @@ function newGame() {
 }
 function help() {
   showModal(
-    `<span class="eyebrow">Le livre des couronnes</span><h2>Le monde n’attend pas vos ordres.</h2><p>Chacun des quatre royaumes commence avec <strong>un château de neuf cases et un roi. Le premier chapitre donne cinq maisons au joueur et deux à chaque adversaire ; les suivants, quatre à chaque camp</strong>. Chaque camp reçoit 5 000 pièces. Les graphismes sont identiques ; seule la couleur change.</p><p>Les maisons produisent chacune des habitants de <strong>100 PV</strong>. Ils errent, défrichent les arbres et rochers pour récupérer des ressources et fondent rapidement de nouvelles maisons dès qu’une case libre respecte l’espacement. Se déplacer, travailler et combattre use leurs vies. Sur le sol, les habitants perdent aussi 0,12 PV par seconde. L’ordre Tenir la position permet de rester immobile sur une maison alliée et d’arrêter cette usure. Le roi peut aussi s’abriter sur une maison, ou rester dans son château. Couper un arbre coûte 2 pièces, dégager un rocher 3 pièces et engager un combat 1 pièce. Sans or, l’action attend. Fonder une maison transforme l’habitant en bâtiment.</p><p><strong>Rencontres :</strong> deux alliés fusionnent en additionnant leurs PV. Entre ennemis, le plus fort survit et perd 70 % des PV du vaincu. À égalité, les deux disparaissent. Le roi commence à 100 PV. Sa force gagne 25 % des PV de ses autres unités. Les alliés qui le rejoignent fusionnent avec lui. Dans les neuf cases de son château, sa puissance défensive est multipliée par quatre. Dehors, il perd 5 % de ses PV par seconde (minimum 4 PV/s). Le retour au château arrête cette perte, sans effacer les dégâts. Sélectionnez le roi comme une unité pour le déplacer ; il peut raser les maisons adverses. Un royaume disparaît si son roi meurt, ou s’il n’a plus aucune maison ni unité ordinaire, même si son roi vit encore. Le château s’effondre alors. Les adversaires peuvent s’éliminer entre eux.</p><div class="sprite-sheet"><canvas id="sprites-preview" width="300" height="192" aria-label="Sprites quatre directions et trois gabarits"></canvas></div><p><strong>Trois gabarits :</strong> habitant sous 1 000 PV, guerrier de 1 000 à 10 000 PV inclus, colosse au-delà. Chaque gabarit existe de face, de dos, à gauche et à droite, dans les quatre couleurs.</p><ul><li><strong>Sélection :</strong> clic ou rectangle sur les unités vertes. Maj ajoute à la sélection. Le roi est exclu des rectangles et de la touche A : il se sélectionne seul par un clic direct. Voir le roi recentre seulement la carte.</li><li><strong>Déplacer :</strong> choisissez une destination. Une case de château adverse vise son roi. À destination, l’unité tient sa position.</li><li><strong>Fusionner :</strong> les unités sélectionnées convergent sur un point de rassemblement.</li><li><strong>Maison :</strong> 100 or. Aucune maison voisine, même en diagonale. La case doit être dégagée.</li><li><strong>Pont :</strong> 1 000 or au premier chantier, 500 pour reconstruire au même endroit, plus 4 bois par case. Le pont a 1 000 PV et peut être détruit ; les unités qui s’y trouvent tombent à l’eau. Cliquez sur une rivière : l’unité rejoint la berge et construit un passage complet (6 cases maximum).</li><li><strong>Barricade :</strong> 750 or + 12 bois, 1 500 PV. Elle bloque une case de terre. Les unités la contournent ; un ordre Déplacer sur la barricade ennemie permet de l’attaquer.</li><li><strong>Barrage :</strong> 32 or + 12 pierres + 4 bois par case. Il bloque le passage et rapporte 0,2 or par seconde et par case. Il ne modifie pas le niveau d’eau.</li><li><strong>Impôts :</strong> de 0 à 30 %. Plus le taux est élevé, plus l’or rentre et plus les naissances ralentissent. L’automatisme ajuste le taux selon l’or et la population.</li><li><strong>Tenir :</strong> arrête les déplacements. Sur une maison alliée, l’unité ne perd plus de vies avec le temps.</li><li><strong>Autonomie :</strong> annule les ordres et rend leurs choix aux habitants. Quand aucun travail accessible ne reste, ou quand l’or manque, les habitants attendent sur les maisons sans usure et sans fusion forcée. Ils repartent si un passage ou du travail s’ouvre. Pour votre camp, seules les maisons et les coupes d’arbres sont spontanées, avec une défense locale si un ennemi menace les maisons ou le château. Un ordre manuel reste prioritaire et le roi ne sort jamais seul. Les habitants évitent les rochers et les ennemis hors de leur territoire. Toute autre action nécessite un ordre ; les adversaires gardent leur autonomie. L’épargne chantier réserve 1 000 pièces contre les fondations automatiques.</li></ul><p>Molette pour zoomer ; clic droit glissé ou Alt + glisser pour déplacer la carte. Sur écran tactile : glisser sélectionne, le bouton ↔ active le déplacement de carte. <kbd>Espace</kbd> pause, <kbd>Échap</kbd> annule un ordre, <kbd>F</kbd> fusion. La partie s’arrête quand cet onglet est masqué. Sauvegarde locale automatique et export disponible au menu. Limite : 150 unités par royaume.</p><div class="close-row"><span></span><button class="primary" id="close-help">J’ai compris</button></div>`,
+    `<span class="eyebrow">Le livre des couronnes</span><h2>Le monde n’attend pas vos ordres.</h2><p>Chacun des quatre royaumes commence avec <strong>un château de neuf cases et un roi. Le premier chapitre donne cinq maisons au joueur et deux à chaque adversaire ; les suivants, quatre au joueur et quatre à six par adversaire selon la série</strong>. Chaque camp reçoit 5 000 pièces. Les graphismes sont identiques ; seule la couleur change.</p><p>Les maisons produisent chacune des habitants de <strong>100 PV</strong>. Ils errent, défrichent les arbres et rochers pour libérer le terrain et fondent rapidement de nouvelles maisons dès qu’une case libre respecte l’espacement. Se déplacer, travailler et combattre use leurs vies. Sur le sol, les habitants perdent au moins 0,12 PV par seconde. Au-delà de dix cases de leur roi, cette usure augmente progressivement, jusqu’à cinq fois le rythme de base. L’usure s’arrête dès qu’une unité se trouve sur une maison alliée, quel que soit son ordre. Tenir la position permet d’y rester. Le roi peut aussi s’abriter sur une maison, ou rester dans son château. Couper un arbre coûte 30 pièces, dégager un rocher 3 pièces Les combats et destructions ne coûtent que des PV. Sans or, l’action attend. Fonder une maison transforme l’habitant en bâtiment.</p><p><strong>Rencontres :</strong> deux alliés fusionnent en additionnant leurs PV. Entre ennemis, le plus fort survit et perd 70 % des PV du vaincu. À égalité, les deux disparaissent. Le roi commence à 100 PV. Sa force gagne 25 % des PV de ses autres unités. Les alliés qui le rejoignent fusionnent avec lui. Dans les neuf cases de son château, sa puissance défensive est multipliée par huit, avec 2 000 PV de remparts à user. Les unités de plus de 500 PV consomment 0,4 or par seconde pour 1 000 PV. Sans financement, elles perdent jusqu’à 3 % de leurs PV par seconde, même sur une maison. Hors d’une maison, les grandes unités ont aussi une usure proportionnelle à leur force. Dehors, il perd 5 % de ses PV par seconde (minimum 4 PV/s). Le retour au château arrête cette perte, sans effacer les dégâts. Sélectionnez le roi comme une unité pour le déplacer ; il peut raser les maisons adverses. Détruire du gazon ennemi coûte 2 PV par case ; raser une maison coûte 12 PV à un habitant et 8 au roi. Le terrain détruit redevient neutre, jusqu’à ce qu’une nouvelle maison y étende son gazon. Un royaume disparaît si son roi meurt, ou s’il n’a plus aucune maison ni unité ordinaire, même si son roi vit encore. Le château s’effondre alors. Les adversaires peuvent s’éliminer entre eux.</p><div class="sprite-sheet"><canvas id="sprites-preview" width="300" height="192" aria-label="Sprites quatre directions et trois gabarits"></canvas></div><p><strong>Trois gabarits :</strong> habitant sous 1 000 PV, guerrier de 1 000 à 10 000 PV inclus, colosse au-delà. Chaque gabarit existe de face, de dos, à gauche et à droite, dans les quatre couleurs.</p><ul><li><strong>Planification :</strong> sélectionner une ou plusieurs unités arrête toute la simulation. Cliquez ensuite la destination : seules les actions adaptées à cette case apparaissent. Le jeu reprend après l’ordre, sauf si vous aviez activé la pause manuelle. Échap annule la sélection.</li><li><strong>Sélection :</strong> clic ou rectangle sur les unités vertes. Maj ajoute à la sélection. Le roi est exclu des rectangles et de la touche A : il se sélectionne seul par un clic direct. Voir le roi recentre seulement la carte.</li><li><strong>Déplacer :</strong> choisissez une destination. Une case de château adverse vise son roi. À destination, l’unité tient sa position.</li><li><strong>Fusionner :</strong> les unités sélectionnées convergent sur un point de rassemblement.</li><li><strong>Maison :</strong> 150 or. Aucune maison voisine, même en diagonale. La case doit être dégagée.</li><li><strong>Pont :</strong> 1 000 or au premier chantier, 500 pour reconstruire au même endroit. Le pont a 1 000 PV et peut être détruit ; les unités qui s’y trouvent tombent à l’eau. Tout camp peut traverser un pont ouvert ; l’ordre Attaquer permet de le détruire. Cliquez sur une rivière : l’unité rejoint la berge et construit exactement une case de pont. Une rivière plus large se traverse en posant chaque tronçon séparément.</li><li><strong>Barricade :</strong> 750 or, 1 500 PV. Elle bloque une case de terre. Les unités la contournent ; l’ordre Attaquer permet de la détruire.</li><li><strong>Barrage :</strong> 32 or. Il bloque le passage et rapporte 0,2 or par seconde et par case. Il ne modifie pas le niveau d’eau.</li><li><strong>Grottes :</strong> présentes seulement dans certains niveaux, elles engendrent des monstres neutres sans économie. Ceux-ci ne perdent des PV qu’au combat ou en détruisant du territoire et fusionnent entre eux. Un pont ou une barricade détruite peut les libérer vers les autres camps. Détruire une grotte arrête les naissances. Ces zones sont facultatives pour la victoire.</li><li><strong>Impôts :</strong> de 0 à 30 %. Plus le taux est élevé, plus l’or rentre et plus les naissances ralentissent. L’automatisme ajuste le taux selon l’or et la population.</li><li><strong>Tenir :</strong> arrête les déplacements. Sur une maison alliée, l’unité ne perd plus de vies avec le temps.</li><li><strong>Autonomie :</strong> annule les ordres et rend leurs choix aux habitants. Quand aucun travail accessible ne reste, ou quand l’or manque, les habitants attendent sur les maisons sans usure et sans fusion forcée. Ils repartent si un passage ou du travail s’ouvre. Pour votre camp, seules les maisons et les coupes d’arbres sont spontanées, avec une défense locale si un ennemi menace les maisons ou le château. Un ordre manuel reste prioritaire et le roi ne sort jamais seul. Les habitants évitent les rochers et les ennemis hors de leur territoire. Toute autre action nécessite un ordre ; les adversaires gardent leur autonomie. L’épargne chantier réserve 1 000 pièces contre les fondations automatiques.</li></ul><p>Molette pour zoomer ; clic droit glissé ou Alt + glisser pour déplacer la carte. Sur écran tactile : glisser sélectionne, le bouton ↔ active le déplacement de carte. <kbd>Espace</kbd> pause, <kbd>Échap</kbd> annule un ordre, <kbd>F</kbd> fusion. La partie s’arrête quand cet onglet est masqué. Sauvegarde locale automatique et export disponible au menu. Limite : 150 unités par royaume.</p><div class="close-row"><span></span><button class="primary" id="close-help">J’ai compris</button></div>`,
   );
   $("close-help").onclick = closeModal;
   const c = $<HTMLCanvasElement>("sprites-preview").getContext("2d")!;
@@ -219,7 +231,10 @@ function finish() {
       localStorage.setItem(
         PROGRESS,
         String(
-          Math.max(Number(read(PROGRESS)) || 0, Math.min(4, state.level + 1)),
+          Math.max(
+            Number(read(PROGRESS)) || 0,
+            Math.min(LEVELS.length - 1, state.level + 1),
+          ),
         ),
       );
     } catch {}
@@ -227,7 +242,7 @@ function finish() {
   window.setTimeout(() => {
     if (!inGame) return;
     showModal(
-      `<span class="eyebrow">${state.result === "won" ? "La vallée est réunie" : "Votre roi est tombé"}</span><h2>${state.result === "won" ? "Une seule couronne." : "L’histoire ne s’arrête pas ici."}</h2><p>${state.result === "won" ? "Les trois royaumes adverses ont disparu. La vallée appartient à votre couronne." : "La couronne Émeraude a perdu son roi ou toute sa population et ses maisons. Rassemblez vos forces et protégez les chemins qui mènent au roi."}</p><p>${clock(state.time)} de règne · ${state.kingdoms[0].births} naissances · ${state.stats.merged} fusions dans la vallée</p><div class="close-row"><button id="end-title">Écran titre</button><button class="primary" id="end-next">${state.result === "won" && state.level < 4 ? "Vallée suivante" : "Rejouer"}</button></div>`,
+      `<span class="eyebrow">${state.result === "won" ? "La vallée est réunie" : "Votre roi est tombé"}</span><h2>${state.result === "won" ? "Une seule couronne." : "L’histoire ne s’arrête pas ici."}</h2><p>${state.result === "won" ? "Les trois royaumes adverses ont disparu. La vallée appartient à votre couronne." : "La couronne Émeraude a perdu son roi ou toute sa population et ses maisons. Rassemblez vos forces et protégez les chemins qui mènent au roi."}</p><p>${clock(state.time)} de règne · ${state.kingdoms[0].births} naissances · ${state.stats.merged} fusions dans la vallée</p><div class="close-row"><button id="end-title">Écran titre</button><button class="primary" id="end-next">${state.result === "won" && state.level < LEVELS.length - 1 ? "Vallée suivante" : "Rejouer"}</button></div>`,
     );
     $("end-title").onclick = () => {
       closeModal();
@@ -238,7 +253,7 @@ function finish() {
     $("end-next").onclick = () =>
       start(
         createGame(
-          state.result === "won" && state.level < 4
+          state.result === "won" && state.level < LEVELS.length - 1
             ? state.level + 1
             : state.level,
           Date.now() >>> 0,
@@ -251,13 +266,11 @@ function updateUI() {
     us = state.units.filter((u) => selection.has(u.id) && u.team === 0);
   selection = new Set(us.map((u) => u.id));
   $("gold").textContent = Math.floor(k.gold).toLocaleString("fr-FR");
-  $("wood").textContent = Math.floor(k.wood).toString();
-  $("stone").textContent = Math.floor(k.stone).toString();
   $("population").textContent = Math.ceil(totalHP(state, 0)).toLocaleString(
     "fr-FR",
   );
   $("chapter").textContent =
-    `Chapitre ${state.level + 1} · ${LEVELS[state.level].biome}`;
+    `${LEVELS[state.level].biome} · Vallée ${LEVELS[state.level].stage + 1}/5`;
   $("level-name").textContent = LEVELS[state.level].name;
   $("map-sub").textContent =
     `${state.size} × ${state.size} · Quatre royaumes · Aucune frontière`;
@@ -279,7 +292,7 @@ function updateUI() {
     : "Roi tombé";
   $("king-info").textContent = king
     ? sheltered(state, king)
-      ? "Dans le château · Défense ×4"
+      ? `Dans le château · Défense ×8 · Remparts ${Math.ceil(k.fortification)} PV`
       : resting(state, king)
         ? "À l’abri sur une maison · Aucune usure"
         : `Hors du château · −${Math.max(4, king.hp * 0.05).toFixed(0)} PV/s`
@@ -289,22 +302,38 @@ function updateUI() {
   $<HTMLInputElement>("tax").value = String(Math.round(k.tax));
   $<HTMLInputElement>("auto-tax").checked = k.automatic;
   $("tax-hint").textContent =
-    `Une naissance par maison toutes les ${(10 + k.tax * 0.72).toFixed(0)} s. ${k.automatic ? "Le conseil ajuste vos impôts." : "Vous fixez vous-même le taux."}`;
-  $("selection-menu").classList.toggle("hidden", !us.length || !!targetOrder);
+    `Une naissance par maison toutes les ${birthInterval(k.tax).toFixed(0)} s. Entretien : ${maintenanceCost(state, 0).toFixed(2)} or/s. ${k.gold < maintenanceCost(state, 0) ? "Trésor insuffisant : les grosses unités perdent des PV." : k.automatic ? "Le conseil ajuste vos impôts." : "Vous fixez vous-même le taux."}`;
+  if (!us.length) {
+    planning = false;
+    contextPoint = undefined;
+  }
   $("selection-count").textContent =
     `${us.length} unité${us.length > 1 ? "s" : ""}`;
   $("selection-info").textContent = us.length
-    ? `${Math.ceil(us.reduce((n, u) => n + u.hp, 0)).toLocaleString("fr-FR")} PV au total · ${us.length === 1 ? (us[0].royal ? "Roi · " : "") + ["Habitant", "Guerrier", "Colosse"][tier(us[0].hp)] : "Choisissez un ordre puis une destination."}`
-    : "Sélectionnez vos habitants verts sur la carte, par clic ou par rectangle.";
-  document.querySelectorAll<HTMLButtonElement>("[data-order]").forEach((b) => {
-    b.disabled =
-      !us.length ||
-      (us.every((u) => u.royal) &&
-        ["house", "bridge", "dam", "barricade"].includes(
-          b.dataset.order ?? "",
-        ));
-    b.classList.toggle("active", b.dataset.order === targetOrder);
-  });
+    ? `${Math.ceil(us.reduce((n, u) => n + u.hp, 0)).toLocaleString("fr-FR")} PV au total${us.length === 1 ? ` · ${us[0].royal ? "Roi · " : ""}${["Habitant", "Guerrier", "Colosse"][tier(us[0].hp)]} · ${lifeDrain(state, us[0]).toFixed(2)} PV/s · ${unitUpkeep(us[0]).toFixed(2)} or/s` : ""}`
+    : "Cliquez une unité verte ou tracez un rectangle. Le roi se sélectionne seul par clic.";
+  $("command-help").textContent = planning
+    ? contextPoint
+      ? "Choisissez une action pour cette destination."
+      : "La vallée est en pause. Cliquez une case de destination."
+    : "Sélectionnez, puis cliquez une destination.";
+  $("cancel-selection").classList.toggle("hidden", !planning);
+  const actions =
+    contextPoint && planning ? destinationActions(state, us, contextPoint) : [];
+  $("selection-menu").classList.toggle("hidden", !contextPoint || !planning);
+  $("selection-menu").innerHTML =
+    contextPoint && planning
+      ? `<span class="context-caption">Destination ${contextPoint.x}, ${contextPoint.y}</span>${actions.length ? actions.map((a) => `<button data-order="${a.order}" ${a.disabled ? "disabled" : ""}>${a.label}</button>`).join("") : '<span class="context-caption">Aucune action possible ici. Cliquez une autre case.</span>'}`
+      : "";
+  $("selection-menu")
+    .querySelectorAll<HTMLButtonElement>("[data-order]")
+    .forEach((b) => (b.onclick = () => chooseOrder(b.dataset.order as Order)));
+  $("monster-status").classList.toggle(
+    "hidden",
+    !state.caves.length && !state.monsters.length,
+  );
+  $("monster-status").textContent =
+    `☠ ${state.caves.length} grotte(s) · ${state.monsters.length} monstre(s) · ${Math.ceil(state.monsters.reduce((n, m) => n + m.hp, 0)).toLocaleString("fr-FR")} PV neutres`;
   $("events").innerHTML = state.events
     .slice(0, 4)
     .map(
@@ -312,47 +341,47 @@ function updateUI() {
         `<div class="event"><time>${clock(e.time)}</time><span>${escapeText(e.text)}</span></div>`,
     )
     .join("");
-  $("pause").textContent = paused ? "▶" : "Ⅱ";
+  $("pause").textContent = paused || planning ? "▶" : "Ⅱ";
+  $("pause").title = planning
+    ? "Annuler la sélection et reprendre"
+    : "Pause (Espace)";
   $("speed").textContent = `×${speed}`;
   $("paused-label").classList.toggle(
     "hidden",
-    !paused || !inGame || !$("modal").classList.contains("hidden"),
+    !(paused || planning) ||
+      !inGame ||
+      !$("modal").classList.contains("hidden"),
   );
-  $("target-banner").classList.toggle("hidden", !targetOrder);
-  $("target-banner").textContent = targetOrder
-    ? {
-        move: "Choisissez une destination ou un château adverse.",
-        merge: "Choisissez un point de rassemblement pour fusionner.",
-        house: "Choisissez une case libre sans maison voisine. 100 or.",
-        bridge:
-          "Cliquez une rivière. Pont : 1 000 or ; reconstruction : 500. + 4 bois / case.",
-        dam: "Cliquez une rivière. 32 or + 12 pierres + 4 bois / case.",
-        barricade: "Choisissez une terre libre. 750 or + 12 bois · 1 500 PV.",
-        auto: "",
-        hold: "",
-        rest: "",
-        defend: "",
-      }[targetOrder] + " · Échap pour annuler"
-    : "";
+  $("paused-label").textContent = planning
+    ? "Planification · choisissez une destination"
+    : "Ⅱ Partie en pause";
+  $("target-banner").classList.add("hidden");
 }
-function chooseOrder(order: Order) {
-  if (!selection.size) return toast("Sélectionnez d’abord des unités vertes.");
-  if (order === "auto" || order === "hold") {
-    command(state, [...selection], order);
-    targetOrder = undefined;
-    toast(
-      order === "hold"
-        ? "Les unités tiennent leur position. Une maison alliée les abrite."
-        : "Les habitants reprennent leur autonomie.",
-    );
-  } else {
-    targetOrder = order;
-    toast("Choisissez la destination sur la carte.");
-    $("sidebar").classList.remove("open");
-  }
+function cancelPlanning() {
+  selection.clear();
+  planning = false;
+  contextPoint = undefined;
+  targetOrder = undefined;
   updateUI();
 }
-function issue(p: Point) {
+function chooseOrder(order: Order) {
+  if (!contextPoint || !planning) return;
+  const action = destinationActions(
+    state,
+    state.units.filter((u) => selection.has(u.id)),
+    contextPoint,
+  ).find((a) => a.order === order);
+  if (!action || action.disabled) return;
+  if (order === "auto" || order === "hold") {
+    command(state, [...selection], order);
+    cancelPlanning();
+    return;
+  }
+  targetOrder = order;
+  issue(contextPoint, action.workerId);
+}
+
+function issue(p: Point, workerId?: number) {
   if (!targetOrder) return;
   const order = targetOrder;
   if (!tile(state, p.x, p.y)) return;
@@ -360,20 +389,19 @@ function issue(p: Point) {
     return toast(
       "Une maison exige une case de terre libre, sans maison voisine, même en diagonale.",
     );
-  if (order === "house" && state.kingdoms[0].gold < 100)
-    return toast("Il faut 100 pièces pour une maison.");
-  if (order === "bridge" || order === "dam") {
+  if (order === "house" && state.kingdoms[0].gold < 150)
+    return toast("Il faut 150 pièces pour une maison.");
+  if (
+    order === "bridge" ||
+    (order === "dam" && tile(state, p.x, p.y)?.terrain !== "bridge")
+  ) {
     const cr = crossing(state, p);
     if (!cr)
       return toast(
-        "Choisissez une rivière avec deux berges, large de 6 cases au maximum.",
+        "Choisissez une case d’eau adjacente à une terre ou à un pont accessible.",
       );
     const k = state.kingdoms[0];
-    if (
-      k.gold < (order === "dam" ? 32 : bridgeCost(state, p)) ||
-      k.wood < cr.cells.length * 4 ||
-      (order === "dam" && k.stone < 12)
-    )
+    if (k.gold < (order === "dam" ? 32 : bridgeCost(state, p)))
       return toast("Ressources insuffisantes pour cette construction.");
   }
   if (order === "barricade") {
@@ -381,25 +409,31 @@ function issue(p: Point) {
       return toast(
         "Choisissez une case de terre libre, sans maison, château ni unité.",
       );
-    if (state.kingdoms[0].gold < 750 || state.kingdoms[0].wood < 12)
-      return toast("Il faut 750 pièces et 12 bois pour une barricade.");
+    if (state.kingdoms[0].gold < 750)
+      return toast("Il faut 750 pièces pour une barricade.");
   }
   const construction = ["house", "bridge", "dam", "barricade"].includes(order);
-  const ids = [...selection].filter(
+  let ids = [...selection].filter(
     (id) => !construction || !state.units.find((u) => u.id === id)?.royal,
   );
   if (!ids.length)
     return toast(
       "Le roi commande et combat ; choisissez un habitant pour construire.",
     );
-  if (order === "move") {
+  if (order === "move" || order === "attack") {
     const t = tile(state, p.x, p.y);
     if (t?.castle !== undefined && t.castle !== 0) {
       const king = state.units.find((u) => u.team === t.castle && u.royal);
       if (king) p = { x: king.x, y: king.y };
     }
   }
+  if (workerId) ids = [workerId];
+  if (order === "bridge" || order === "barricade")
+    state.kingdoms[0].bridgeSaving = true;
   command(state, construction ? ids.slice(0, 1) : ids, order, p);
+  planning = false;
+  contextPoint = undefined;
+  selection.clear();
   targetOrder = undefined;
   toast("Ordre transmis. Les habitants rejoignent la destination.");
   updateUI();
@@ -411,14 +445,6 @@ $("select-king").onclick = () => {
     renderer.ox = renderer.width / 2 - (king.x + 0.5) * CELL * renderer.zoom;
     renderer.oy = renderer.height / 2 - (king.y + 0.5) * CELL * renderer.zoom;
     targetOrder = undefined;
-    updateUI();
-  }
-};
-$("return-king").onclick = () => {
-  const king = state.units.find((u) => u.team === 0 && u.royal);
-  if (king) {
-    command(state, [king.id], "move", state.kingdoms[0].castle);
-    toast("Le roi rejoint son château.");
     updateUI();
   }
 };
@@ -456,7 +482,10 @@ $("menu").onclick = () => (inGame ? menu() : undefined);
 $("save").onclick = () => persist(true);
 $("sidebar-toggle").onclick = () => $("sidebar").classList.toggle("open");
 $("pause").onclick = () => {
-  paused = !paused;
+  if (planning) {
+    cancelPlanning();
+    paused = false;
+  } else paused = !paused;
   updateUI();
 };
 $("speed").onclick = () => {
@@ -480,9 +509,7 @@ $<HTMLInputElement>("save-gold").onchange = (e) => {
   state.kingdoms[0].bridgeSaving = (e.target as HTMLInputElement).checked;
   updateUI();
 };
-document
-  .querySelectorAll<HTMLButtonElement>("[data-order]")
-  .forEach((b) => (b.onclick = () => chooseOrder(b.dataset.order as Order)));
+$("cancel-selection").onclick = cancelPlanning;
 // Mouse and touch share the same pointer path. Panning is explicit on touch.
 let panTouch = false;
 const panButton = document.createElement("button");
@@ -537,6 +564,13 @@ canvas.onpointermove = (e) => {
       ` · ${Math.ceil(construction.hp)} / ${construction.maxHp} PV`;
   else if (hover && t?.terrain === "water" && bridgeCost(state, hover) === 500)
     $("inspect").textContent += " · Reconstruction : 500 or";
+  const cave = state.caves.find((c) => c.id === t?.cave);
+  if (cave) $("inspect").textContent += ` · Grotte ${Math.ceil(cave.hp)} PV`;
+  const monster = state.monsters.find(
+    (m) => m.x === hover!.x && m.y === hover!.y,
+  );
+  if (monster)
+    $("inspect").textContent += ` · Monstre ${Math.ceil(monster.hp)} PV`;
   if (!pointer) return;
   if (pointer.pan) {
     renderer.ox = pointer.cx + p.x - pointer.x;
@@ -553,10 +587,14 @@ canvas.onpointerup = (e) => {
   if (!pointer) return;
   const p = local(e);
   if (!pointer.pan) {
-    if (targetOrder && !drag) issue(renderer.point(p.x, p.y));
-    else {
-      if (drag) {
-        targetOrder = undefined;
+    if (!drag && !pointer.shift && planning && selection.size) {
+      const dest = renderer.point(p.x, p.y);
+      if (tile(state, dest.x, dest.y)) contextPoint = dest;
+      updateUI();
+    } else {
+      contextPoint = undefined;
+      targetOrder = undefined;
+      if (drag)
         selection = rectangleSelection(
           state.units,
           selection,
@@ -564,7 +602,7 @@ canvas.onpointerup = (e) => {
           (u) => renderer.screen(u.x, u.y),
           pointer.shift,
         );
-      } else {
+      else {
         const nearest = state.units
           .filter((u) => u.team === 0)
           .map((u) => ({
@@ -584,6 +622,8 @@ canvas.onpointerup = (e) => {
           pointer.shift,
         );
       }
+      planning = selection.size > 0;
+      accumulator = 0;
       updateUI();
     }
   }
@@ -602,15 +642,17 @@ canvas.onwheel = (e) => {
 document.onkeydown = (e) => {
   if ((e.target as HTMLElement).matches("input,select")) return;
   if (e.code === "Escape") {
-    targetOrder = undefined;
-    selection.clear();
+    cancelPlanning();
     if (!$("modal").classList.contains("hidden")) closeModal();
     updateUI();
   }
   if (!inGame || !$("modal").classList.contains("hidden")) return;
   if (e.code === "Space") {
     e.preventDefault();
-    paused = !paused;
+    if (planning) {
+      cancelPlanning();
+      paused = false;
+    } else paused = !paused;
     updateUI();
   }
   if (e.key.toLowerCase() === "f") chooseOrder("merge");
@@ -618,6 +660,9 @@ document.onkeydown = (e) => {
     selection = new Set(
       state.units.filter((u) => u.team === 0 && !u.royal).map((u) => u.id),
     );
+    planning = selection.size > 0;
+    contextPoint = undefined;
+    accumulator = 0;
     updateUI();
   }
 };
@@ -640,6 +685,7 @@ function frame(now: number) {
   if (
     inGame &&
     !paused &&
+    !planning &&
     $("modal").classList.contains("hidden") &&
     !document.hidden &&
     state.result === "playing"
@@ -661,7 +707,13 @@ function frame(now: number) {
     }
     if (state.result !== "playing") finish();
   }
-  renderer.draw(state, selection, hover, drag, targetOrder);
+  renderer.draw(
+    state,
+    selection,
+    contextPoint ?? hover,
+    drag,
+    contextPoint ? "destination" : targetOrder,
+  );
   requestAnimationFrame(frame);
 }
 renderer.resize();

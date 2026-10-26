@@ -1,5 +1,6 @@
-import { type State, type Unit, COLORS, tile } from "./engine";
+import { type State, type Unit, COLORS, tile, LEVELS } from "./engine";
 export const CELL = 16;
+const factionColor = (team: number) => COLORS[team] ?? "#c3a1db";
 export function tier(hp: number) {
   return hp > 10000 ? 2 : hp >= 1000 ? 1 : 0;
 }
@@ -65,6 +66,7 @@ export class Renderer {
     this.zoom = z;
   }
   paintTerrain(s: State) {
+    const biome = LEVELS[s.level].biomeId;
     this.terrain.width = s.size * CELL;
     this.terrain.height = s.size * CELL;
     const c = this.tctx;
@@ -124,10 +126,10 @@ export class Renderer {
             "#6b6181",
             "#746a8c",
           ],
-        ][s.level];
+        ][biome];
         c.fillStyle =
           t.terrain === "water" || t.terrain === "dam"
-            ? ["#407d86", "#4a9796", "#61889f", "#355e68", "#626eab"][s.level]
+            ? ["#407d86", "#4a9796", "#61889f", "#355e68", "#626eab"][biome]
             : grass[t.variant];
         c.fillRect(px, py, CELL, CELL);
         if (t.terrain === "water") {
@@ -142,7 +144,7 @@ export class Renderer {
           c.fillRect(px + 3, py + 3, 1, 2);
           c.fillRect(px + 11, py + 12, 2, 1);
         }
-        if (t.terrain === "tree" && s.level === 1) {
+        if (t.terrain === "tree" && biome === 1) {
           c.fillStyle = "#4e693d";
           if (t.variant % 2) {
             c.fillRect(px + 6, py + 1, 4, 14);
@@ -170,7 +172,7 @@ export class Renderer {
               c.fill();
             }
           }
-        } else if (t.terrain === "tree" && s.level === 3) {
+        } else if (t.terrain === "tree" && biome === 3) {
           c.fillStyle = "#665d3f";
           c.fillRect(px + 7, py + 4, 3, 11);
           c.fillStyle = "#254e43";
@@ -182,7 +184,7 @@ export class Renderer {
           c.fillStyle = "#506b4a";
           c.fillRect(px + 2, py + 6, 1, 6);
           c.fillRect(px + 12, py + 6, 1, 5);
-        } else if (t.terrain === "tree" && s.level === 4) {
+        } else if (t.terrain === "tree" && biome === 4) {
           c.fillStyle = "#37314988";
           c.fillRect(px + 3, py + 10, 12, 6);
           c.fillStyle = "#8fc9c9";
@@ -219,7 +221,7 @@ export class Renderer {
           c.fill();
           c.fillStyle = "#658252";
           c.fillRect(px + 6, py + 2, 2, 3);
-          if (s.level === 2) {
+          if (biome === 2) {
             c.fillStyle = "#eff4ec";
             c.beginPath();
             c.moveTo(px + 8, py - 2);
@@ -262,7 +264,7 @@ export class Renderer {
             c.fillRect(px + i, py + 1, 2, 2);
             c.fillStyle = "#a38556";
           }
-          c.fillStyle = COLORS[t.owner ?? 0];
+          c.fillStyle = factionColor(t.owner ?? 0);
           c.fillRect(px, py + 6, 16, 2);
         }
         if (t.terrain === "bridge" || t.terrain === "dam") {
@@ -270,14 +272,17 @@ export class Renderer {
           c.fillRect(px, py + 1, 16, 14);
           c.fillStyle = t.terrain === "dam" ? "#d1c8a8" : "#c7a573";
           for (let j = 2; j < 15; j += 4) c.fillRect(px, py + j, 16, 2);
-          c.fillStyle = COLORS[t.owner ?? 0];
+          c.fillStyle = factionColor(t.owner ?? 0);
           c.fillRect(px, py + 1, 2, 14);
         }
       }
     this.cached = `${s.level}-${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}`;
   }
   paintInfluence(s: State) {
-    const key = `${s.level}-${s.seed}-${Math.floor(s.time * 2)}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}-${s.stats.cleared}`;
+    const growthClock = s.houses.some((h) => s.time - h.founded < 8)
+      ? Math.floor(s.time * 2)
+      : 0;
+    const key = `${s.level}-${s.seed}-${s.turfRevision}-${growthClock}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}-${s.stats.cleared}`;
     if (key === this.influenceKey) return;
     this.influenceKey = key;
     this.influence.width = s.size * CELL;
@@ -285,6 +290,7 @@ export class Renderer {
     const c = this.influence.getContext("2d")!,
       owners = new Int8Array(s.tiles.length).fill(-1),
       strength = new Float32Array(s.tiles.length),
+      sources = new Int32Array(s.tiles.length),
       nearest = new Float32Array(s.tiles.length).fill(99);
     for (const h of s.houses) {
       const growth = Math.max(0, Math.min(1, (s.time - h.founded - 3) / 5));
@@ -300,12 +306,13 @@ export class Renderer {
           if (d < nearest[i] || (d === nearest[i] && growth > strength[i])) {
             nearest[i] = d;
             owners[i] = h.team;
+            sources[i] = h.id;
             strength[i] = growth;
           }
         }
     }
     for (let i = 0; i < owners.length; i++)
-      if (owners[i] >= 0) {
+      if (owners[i] >= 0 && s.clearedTurf[i] !== sources[i]) {
         const x = (i % s.size) * CELL,
           y = Math.floor(i / s.size) * CELL;
         c.globalAlpha = strength[i] * 0.38;
@@ -353,6 +360,7 @@ export class Renderer {
     y: number,
     team: number,
     hp: number,
+    fortification = 2000,
   ) {
     const px = (x - 1) * CELL,
       py = (y - 1) * CELL;
@@ -387,6 +395,8 @@ export class Renderer {
     c.fillRect(px + 3, py + 48, 42, 3);
     c.fillStyle = COLORS[team];
     c.fillRect(px + 3, py + 48, (42 * hp) / (hp + 200), 3);
+    c.fillStyle = "#e7d4a3";
+    c.fillRect(px + 3, py + 52, (42 * fortification) / 2000, 2);
   }
   sprite(
     c: CanvasRenderingContext2D,
@@ -465,6 +475,63 @@ export class Renderer {
     }
     c.restore();
   }
+  monsterSprite(
+    c: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    heading: { x: number; y: number },
+    hp: number,
+    frame = 0,
+  ) {
+    const d = direction({ heading }),
+      rank = tier(hp),
+      scale = rank === 2 ? 1.55 : rank === 1 ? 1.2 : 1;
+    c.save();
+    c.translate(Math.round(x), Math.round(y));
+    c.scale(scale, scale);
+    c.fillStyle = "#28312b66";
+    c.fillRect(-5, 5, 11, 3);
+    c.fillStyle = "#45364e";
+    c.fillRect(-5, -5, 11, 10);
+    c.fillStyle = "#a28aaf";
+    c.fillRect(-4, -4, 9, 8);
+    c.fillStyle = "#cfb8ce";
+    c.fillRect(-3, -6, 7, 3);
+    c.fillStyle = "#e5d7ba";
+    c.fillRect(-5, -9, 2, 5);
+    c.fillRect(4, -9, 2, 5);
+    c.fillStyle = "#5c475e";
+    c.fillRect(-4, 4 + (frame % 2), 3, 4);
+    c.fillRect(2, 5 - (frame % 2), 3, 4);
+    c.fillStyle = "#8c7396";
+    c.fillRect(-7, -1, 3, 6);
+    c.fillRect(5, 0, 3, 5);
+    if (d !== "back") {
+      c.fillStyle = "#f6e294";
+      if (d !== "right") c.fillRect(-2, -3, 2, 2);
+      if (d !== "left") c.fillRect(2, -3, 2, 2);
+      c.fillStyle = "#453441";
+      c.fillRect(-1, 1, 4, 2);
+      c.fillStyle = "#f4e4c9";
+      c.fillRect(0, 1, 1, 2);
+      c.fillRect(2, 1, 1, 2);
+    } else {
+      c.fillStyle = "#796181";
+      c.fillRect(-2, -4, 5, 6);
+    }
+    if (rank) {
+      c.fillStyle = "#d0b8d3";
+      c.fillRect(-7, -4, 3, 3);
+      c.fillRect(6, -4, 3, 3);
+    }
+    c.restore();
+  }
+  visible(p: { x: number; y: number }, padding = 48) {
+    const x = this.ox + (p.x + 0.5) * CELL * this.zoom,
+      y = this.oy + (p.y + 0.5) * CELL * this.zoom,
+      m = padding * this.zoom;
+    return x >= -m && y >= -m && x <= this.width + m && y <= this.height + m;
+  }
   draw(
     s: State,
     selected: Set<number>,
@@ -497,7 +564,7 @@ export class Renderer {
         y = mid.y * CELL - 6;
       c.fillStyle = "#142b2b";
       c.fillRect(x - 12, y, 24, 3);
-      c.fillStyle = COLORS[b.team];
+      c.fillStyle = factionColor(b.team);
       c.fillRect(x - 12, y, (24 * b.hp) / b.maxHp, 3);
       if (hover && b.cells.some((p) => p.x === hover.x && p.y === hover.y)) {
         c.font = "8px monospace";
@@ -506,7 +573,39 @@ export class Renderer {
         c.fillText(`${Math.ceil(b.hp)} PV`, x, y - 3);
       }
     }
-    for (const h of s.houses) this.house(c, h.x, h.y, h.team);
+    for (const cave of s.caves) {
+      if (!this.visible(cave)) continue;
+      const x = cave.x * CELL,
+        y = cave.y * CELL;
+      c.fillStyle = "#30362f88";
+      c.fillRect(x - 3, y + 7, 24, 12);
+      c.fillStyle = "#72766a";
+      c.beginPath();
+      c.moveTo(x - 4, y + 15);
+      c.lineTo(x - 1, y + 1);
+      c.lineTo(x + 8, y - 5);
+      c.lineTo(x + 18, y + 1);
+      c.lineTo(x + 22, y + 15);
+      c.fill();
+      c.fillStyle = "#a0a18d";
+      c.beginPath();
+      c.moveTo(x - 1, y + 1);
+      c.lineTo(x + 8, y - 5);
+      c.lineTo(x + 6, y + 5);
+      c.lineTo(x - 2, y + 10);
+      c.fill();
+      c.fillStyle = "#182523";
+      c.fillRect(x + 3, y + 5, 12, 12);
+      c.fillStyle = "#bea0cb";
+      c.fillRect(x + 5, y + 10, 2, 2);
+      c.fillRect(x + 11, y + 10, 2, 2);
+      c.fillStyle = "#1c302c";
+      c.fillRect(x - 3, y + 19, 24, 3);
+      c.fillStyle = "#c3a1db";
+      c.fillRect(x - 3, y + 19, (24 * cave.hp) / cave.maxHp, 3);
+    }
+    for (const h of s.houses)
+      if (this.visible(h)) this.house(c, h.x, h.y, h.team);
     for (const ruin of s.ruins) {
       const key = `${s.seed}-${ruin.team}-${ruin.time}`;
       if (!this.collapseTimes.has(key))
@@ -551,14 +650,22 @@ export class Renderer {
       }
     }
     for (const k of s.kingdoms)
-      if (k.alive) this.castle(c, k.castle.x, k.castle.y, k.id, k.hp);
-    const units = [...s.units].sort((a, b) => a.y - b.y);
+      if (k.alive)
+        this.castle(c, k.castle.x, k.castle.y, k.id, k.hp, k.fortification);
+    const units = s.units
+      .filter((u) => this.visible(u))
+      .sort((a, b) => a.y - b.y);
     for (const u of units) {
       const x =
-          (u.x + 0.5) * CELL + (u.order === "rest" ? ((u.id % 3) - 1) * 3 : 0),
+          (u.x + 0.5) * CELL +
+          (u.order === "rest" || u.order === "shelter"
+            ? ((u.id % 3) - 1) * 3
+            : 0),
         y =
           (u.y + 0.5) * CELL +
-          (u.order === "rest" ? ((Math.floor(u.id / 3) % 3) - 1) * 2 : 0);
+          (u.order === "rest" || u.order === "shelter"
+            ? ((Math.floor(u.id / 3) % 3) - 1) * 2
+            : 0);
       if (selected.has(u.id)) {
         c.strokeStyle = "#fff4bc";
         c.lineWidth = 1.5 / this.zoom;
@@ -596,6 +703,27 @@ export class Renderer {
         c.fillRect(x - 12, y - 23 - tier(u.hp) * 3, 24, 9);
         c.fillStyle = "#fff0c1";
         c.fillText(text, x, y - 16 - tier(u.hp) * 3);
+      }
+    }
+    for (const m of s.monsters) {
+      if (!this.visible(m)) continue;
+      const x = (m.x + 0.5) * CELL,
+        y = (m.y + 0.5) * CELL;
+      this.monsterSprite(
+        c,
+        x,
+        y,
+        m.heading,
+        m.hp,
+        Math.floor(s.time * 4 + m.id),
+      );
+      if (m.hp >= 1000 || (hover && hover.x === m.x && hover.y === m.y)) {
+        c.font = "bold 8px monospace";
+        c.textAlign = "center";
+        c.fillStyle = "#242d2b";
+        c.fillRect(x - 16, y - 25 - tier(m.hp) * 3, 32, 9);
+        c.fillStyle = "#f4c8e5";
+        c.fillText(`${Math.ceil(m.hp)}`, x, y - 18 - tier(m.hp) * 3);
       }
     }
     if (hover && tile(s, hover.x, hover.y)) {

@@ -813,3 +813,55 @@ body,
     font-size: 15px;
   }
 }
+
+.top-resources {
+  gap: 38px;
+}
+.resource b {
+  font-size: 22px;
+}
+.resource i {
+  font-size: 23px;
+}
+.resource:last-child b {
+  color: #a5d9b6;
+}
+@media (max-width: 650px) {
+  .top-resources {
+    justify-content: flex-start;
+    gap: 28px;
+  }
+  .resource b {
+    font-size: 18px;
+  }
+  .resource i {
+    font-size: 18px;
+  }
+}
+
+.context-caption {
+  width: 100%;
+  text-align: center;
+  font-size: 10px;
+  color: #d6c393;
+  padding: 2px 8px 5px;
+}
+.selection-menu {
+  max-width: min(620px, 94%);
+  bottom: 67px;
+}
+.selection-menu button {
+  min-width: 110px;
+}
+.selection-menu button:disabled {
+  opacity: 0.55;
+}
+.selection-menu button:disabled::after {
+  content: " · or insuffisant";
+  font-size: 9px;
+}
+@media (max-width: 650px) {
+  .selection-menu {
+    max-width: 310px;
+  }
+}
