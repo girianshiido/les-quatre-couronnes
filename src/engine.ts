@@ -1,4 +1,11 @@
-import { DEFAULT_PRIORITIES, validPriorities, type Priority } from "./doctrine";
+import {
+  DEFAULT_PRIORITIES,
+  validPriorities,
+  type Priority,
+  DOCTRINES,
+  validDoctrine,
+  type DoctrineId,
+} from "./doctrine";
 import { seedCaves, tickMonsters, attackMonster, attackCave } from "./monsters";
 export type Terrain =
   "grass" | "tree" | "rock" | "water" | "bridge" | "dam" | "barricade";
@@ -96,6 +103,7 @@ export interface State {
   version: 2;
   campaignVersion: 2;
   priorities: Priority[];
+  doctrine: DoctrineId;
   clearedTurf: Record<string, number>;
   turfRevision: number;
   size: number;
@@ -203,6 +211,7 @@ export function createGame(level = 0, seed = 14243): State {
     version: 2,
     campaignVersion: 2,
     priorities: [...DEFAULT_PRIORITIES],
+    doctrine: "builder",
     clearedTurf: {},
     turfRevision: 0,
     size,
@@ -1156,6 +1165,7 @@ function updateRest(s: State, u: Unit, noAvailableJob = false) {
 export function setPriorities(s: State, priorities: Priority[]) {
   if (!validPriorities(priorities)) return false;
   s.priorities = [...priorities];
+  s.doctrine = "custom";
   for (const u of s.units) {
     if (u.team === 0 && !u.royal && ["auto", "rest"].includes(u.order)) {
       u.order = "auto";
@@ -1165,15 +1175,75 @@ export function setPriorities(s: State, priorities: Priority[]) {
   }
   return true;
 }
+export function setDoctrine(s: State, doctrine: DoctrineId) {
+  if (!validDoctrine(doctrine)) return false;
+  const priorities = [...s.priorities];
+  setPriorities(s, priorities);
+  s.doctrine = doctrine;
+  return true;
+}
+function guardPost(s: State, u: Unit) {
+  const bridges = s.structures
+    .filter((b) => b.kind === "bridge")
+    .flatMap((b) => b.cells);
+  const enemies = s.kingdoms
+    .filter((k) => k.id !== 0 && k.alive)
+    .map((k) => k.castle);
+  const approaches = bridges.length ? bridges : enemies;
+  return s.houses
+    .filter((h) => h.team === 0)
+    .map((h) => ({
+      h,
+      score:
+        Math.min(...approaches.map((p) => distance(h, p))) +
+        distance(u, h) * 0.15 +
+        s.units.filter(
+          (v) =>
+            v.id !== u.id &&
+            v.team === 0 &&
+            v.hp >= 500 &&
+            v.target?.x === h.x &&
+            v.target?.y === h.y,
+        ).length *
+          4,
+    }))
+    .sort((a, b) => a.score - b.score)
+    .find(({ h }) => distance(u, h) === 0 || nextStep(s, u, h, 0, true))?.h;
+}
+function savingForHouse(s: State, u: Unit) {
+  if (
+    u.team !== 0 ||
+    u.order !== "auto" ||
+    s.doctrine === "conqueror" ||
+    (s.doctrine === "custom" &&
+      s.priorities.indexOf("house") > s.priorities.indexOf("clear")) ||
+    s.kingdoms[0].gold >= 150 + buildingReserve(s, 0)
+  )
+    return false;
+  const plan = shelterPlan(s);
+  return (
+    canHouse(s, u.x, u.y) ||
+    !!plan.work.get(plan.regions[idx(s, u.x, u.y)])?.land
+  );
+}
 function playerExpansionTarget(s: State, u: Unit) {
   if (u.team !== 0 || u.royal || !["auto", "rest"].includes(u.order)) return;
-  if (u.hp < 42) {
+  const profile = s.doctrine === "custom" ? undefined : DOCTRINES[s.doctrine];
+  if (u.hp < (profile?.restBelow ?? 42)) {
     updateRest(s, u, true);
     return;
   }
   const k = s.kingdoms[0];
+  if (s.doctrine === "guardian" && u.hp >= 500 && u.id % 3 !== 0) {
+    const post = guardPost(s, u);
+    if (post) {
+      u.order = "rest";
+      u.target = { x: post.x, y: post.y };
+      return;
+    }
+  }
   const canFound = k.gold >= 150 + buildingReserve(s, 0);
-  const canClear = k.gold >= 30;
+  const canClear = k.gold >= 30 && !savingForHouse(s, u);
   const canRaid = s.priorities.includes("raid");
   const houseTeams = new Map(s.houses.map((h) => [h.id, h.team]));
   const reserved = new Set(
@@ -1218,7 +1288,28 @@ function playerExpansionTarget(s: State, u: Unit) {
   let head = 0,
     depth = 0;
   const choose = () => {
-    const priority = s.priorities.find((p) => candidates.has(p));
+    let priority: Priority | undefined;
+    if (profile) {
+      const options = [...candidates.keys()].map((p) => ({
+        p,
+        weight:
+          profile.weights[p] *
+          (p === "house"
+            ? u.hp >= 1000
+              ? 0.15
+              : 1.4
+            : p === "raid"
+              ? u.hp >= 1000
+                ? 3
+                : u.hp < 250
+                  ? 0.3
+                  : 1
+              : 1),
+      }));
+      let roll = random(s) * options.reduce((sum, o) => sum + o.weight, 0);
+      priority =
+        options.find((o) => (roll -= o.weight) < 0)?.p ?? options.at(-1)?.p;
+    } else priority = s.priorities.find((p) => candidates.has(p));
     if (!priority) return false;
     u.order = "auto";
     u.target = candidates.get(priority);
@@ -1231,10 +1322,11 @@ function playerExpansionTarget(s: State, u: Unit) {
         kind = task(p);
       if (kind && !candidates.has(kind)) candidates.set(kind, p);
     }
-    if (candidates.has(s.priorities[0]) || (depth % 8 === 7 && choose())) {
+    if (s.doctrine === "custom" && candidates.has(s.priorities[0])) {
       choose();
       return;
     }
+    if (depth % 8 === 7 && choose()) return;
     while (head < end) {
       const p = queue[head++];
       for (const [dx, dy] of [
@@ -1317,7 +1409,11 @@ function landConnected(s: State, team: number) {
   return connected;
 }
 function buildingReserve(s: State, team: number) {
-  if (team === 0) return s.kingdoms[0].bridgeSaving ? 1000 : 0;
+  if (team === 0)
+    return Math.max(
+      s.kingdoms[0].bridgeSaving ? 1000 : 0,
+      s.doctrine === "custom" ? 0 : DOCTRINES[s.doctrine].reserve,
+    );
   return s.time > 60 &&
     s.houses.filter((h) => h.team === team).length >= 6 &&
     !landConnected(s, team)
@@ -1375,23 +1471,34 @@ function aiSettlementTarget(s: State, u: Unit) {
   }
 }
 function updateDefence(s: State, u: Unit) {
-  if (u.team !== 0 || u.royal || !["auto", "rest", "defend"].includes(u.order))
-    return;
+  if (u.royal || !["auto", "rest", "defend"].includes(u.order)) return;
   const houses = s.houses.filter((h) => h.team === u.team);
   const threats = [...s.units, ...s.monsters.map((m) => ({ ...m, team: 4 }))]
     .filter(
       (v) =>
         v.team !== u.team &&
         v.hp > 0 &&
-        distance(u, v) <= 10 &&
-        (distance(v, s.kingdoms[u.team].castle) <= 5 ||
+        !("royal" in v && v.royal && sheltered(s, v as Unit)) &&
+        distance(u, v) <= (u.hp >= 1000 ? s.size * 2 : 10) &&
+        u.hp > ("royal" in v && v.royal ? combatPower(s, v as Unit) : v.hp) &&
+        (distance(v, s.kingdoms[u.team].castle) <= 8 ||
           houses.some((h) => distance(v, h) <= 5)),
     )
-    .sort((a, b) => distance(u, a) - distance(u, b));
+    .sort((a, b) => {
+      const castle = s.kingdoms[u.team].castle;
+      return (
+        Number(distance(a, castle) > 8) - Number(distance(b, castle) > 8) ||
+        distance(a, castle) * 0.5 +
+          distance(u, a) * 0.5 -
+          distance(b, castle) * 0.5 -
+          distance(u, b) * 0.5
+      );
+    });
   const current = threats.find((v) => v.id === u.defending);
-  const candidates = current
-    ? [current, ...threats.filter((v) => v.id !== current.id)]
-    : threats;
+  const candidates =
+    current && distance(current, s.kingdoms[u.team].castle) <= 8
+      ? [current, ...threats.filter((v) => v.id !== current.id)]
+      : threats;
   const target = candidates.find(
     (v) => distance(u, v) > 0 && nextStep(s, u, v, u.team),
   );
@@ -1615,6 +1722,9 @@ function act(s: State, u: Unit) {
   if (t.terrain === "barricade") return;
   if (t.terrain === "tree" || t.terrain === "rock") {
     const cost = t.terrain === "tree" ? 30 : 3;
+    // A lower-priority clearing task must not repeatedly consume the savings
+    // needed for an already available foundation.
+    if (t.terrain === "tree" && savingForHouse(s, u)) return;
     if (
       k.gold <
       cost +
@@ -1847,6 +1957,12 @@ export function loadGame(data: string): State | undefined {
     if (s.monsters === undefined) s.monsters = [];
     if (s.priorities === undefined) s.priorities = [...DEFAULT_PRIORITIES];
     if (!validPriorities(s.priorities)) return;
+    if (s.doctrine === undefined)
+      s.doctrine =
+        s.priorities.join() === DEFAULT_PRIORITIES.join()
+          ? "builder"
+          : "custom";
+    if (!validDoctrine(s.doctrine)) return;
     if (Array.isArray(s.houses))
       for (const h of s.houses)
         if (h && h.interval === undefined)

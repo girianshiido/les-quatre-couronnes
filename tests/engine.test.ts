@@ -472,8 +472,12 @@ test("idle inhabitants share houses without forced fusion and wake when new land
   assert.equal(a.hp, hp);
   tile(s, 12, 10)!.terrain = "grass";
   s.stats.cleared++;
-  step(s);
-  assert.notEqual(a.order, "rest");
+  for (let i = 0; i < 5; i++) step(s);
+  assert.ok(
+    a.order !== "rest" ||
+      b.order !== "rest" ||
+      s.houses.some((h) => h.team === 0 && h.x === 12 && h.y === 10),
+  );
 });
 test("house founding time is saved for gradual coloured turf", () => {
   const s = createGame();

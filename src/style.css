@@ -929,3 +929,23 @@ body,
   margin-left: 3px;
   font-size: 12px;
 }
+.doctrine-profile {
+  width: 100%;
+  margin: 12px 0 8px;
+  color: var(--gold);
+  background: #253a39;
+  padding: 9px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

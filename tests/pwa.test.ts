@@ -16,7 +16,11 @@ const clientSource = ts.transpileModule(
     },
   },
 ).outputText;
-async function client(installed = false, waiting = false, allowSave = true) {
+async function client(
+  installed = false,
+  waiting = false,
+  allowSave: boolean | Promise<boolean> = true,
+) {
   const calls: string[] = [];
   const window = Object.assign(new EventTarget(), {
     matchMedia: () => Object.assign(new EventTarget(), { matches: installed }),
@@ -211,4 +215,17 @@ test("an update already applied by another tab does not leave a misleading updat
   assert.ok(c.calls.includes("check"));
   assert.ok(!c.calls.includes("help"));
   assert.match(c.buttons[0].title, /Installer/);
+});
+
+test("applying a waiting update waits for the user's save decision", async () => {
+  let choose!: (value: boolean) => void;
+  const choice = new Promise<boolean>((resolve) => (choose = resolve));
+  const c = await client(true, true, choice);
+  const click = c.buttons[0].onclick!();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.ok(c.calls.includes("save"));
+  assert.ok(!c.calls.includes("APPLY_UPDATE"));
+  choose(true);
+  await click;
+  assert.ok(c.calls.includes("APPLY_UPDATE"));
 });

@@ -12,11 +12,13 @@ import {
   saveGame,
   loadGame,
   setPriorities,
+  setDoctrine,
   type Unit,
 } from "../src/engine.ts";
 
 function corridor() {
   const s = createGame();
+  setPriorities(s, ["house", "raid", "clear"]);
   for (const t of s.tiles) t.terrain = "water";
   for (let x = 10; x <= 26; x++) tile(s, x, 20)!.terrain = "grass";
   for (const h of s.houses) h.timer = 0;
@@ -265,4 +267,175 @@ test("automatic occupation takes a detour rather than clearing a rock or assault
   step(s);
   assert.equal(tile(s, 21, 20)!.terrain, "rock");
   assert.equal(u.y, 21);
+});
+
+test("house-first doctrine saves 150 gold instead of spending every 30 on trees", () => {
+  const s = corridor();
+  assert.ok(addHouse(s, 0, 10, 20, false));
+  s.kingdoms[0].gold = 120;
+  s.kingdoms[0].tax = 30;
+  const u = troop(s, 11);
+  tile(s, 11, 21)!.terrain = "tree";
+  step(s);
+  assert.equal(tile(s, 11, 21)!.terrain, "tree");
+  assert.ok(s.kingdoms[0].gold >= 120);
+  advance(s, 65);
+  assert.ok(s.houses.some((h) => h.team === 0 && h.x === 12 && h.y === 20));
+});
+test("clearing-first doctrine may spend before founding, while an explicit tree order still works", () => {
+  const s = corridor();
+  assert.ok(addHouse(s, 0, 10, 20, false));
+  const u = troop(s, 11);
+  tile(s, 11, 21)!.terrain = "tree";
+  s.kingdoms[0].gold = 120;
+  setPriorities(s, ["clear", "house", "raid"]);
+  step(s);
+  assert.equal(tile(s, 11, 21)!.terrain, "grass");
+  assert.ok(s.kingdoms[0].gold < 100);
+  tile(s, 11, 21)!.terrain = "tree";
+  setPriorities(s, ["house", "raid", "clear"]);
+  command(s, [u.id], "move", { x: 11, y: 21 });
+  step(s);
+  assert.equal(tile(s, 11, 21)!.terrain, "grass");
+});
+
+test("preset doctrines change actual choices without turning every inhabitant into the same role", () => {
+  const totals: Record<string, { raids: number; houses: number }> = {};
+  for (const doctrine of ["builder", "conqueror"] as const) {
+    const count = { raids: 0, houses: 0 };
+    for (let seed = 1; seed <= 80; seed++) {
+      const s = corridor();
+      assert.ok(addHouse(s, 1, 22, 20, false));
+      tile(s, 21, 21)!.terrain = "tree";
+      const u = troop(s, 21, 1200);
+      setDoctrine(s, doctrine);
+      s.rng = (seed * 2654435761) >>> 0;
+      step(s);
+      if (!tile(s, 22, 20)!.house) count.raids++;
+      if (u.target?.x === 20 && u.target.y === 20) count.houses++;
+    }
+    totals[doctrine] = count;
+  }
+  assert.ok(totals.conqueror.raids > totals.builder.raids * 1.5);
+  assert.ok(totals.builder.houses > totals.conqueror.houses);
+  assert.ok(totals.builder.raids > 0);
+});
+test("guardian stations a strong troop on a house by an open bridge", () => {
+  const s = corridor();
+  for (const x of [10, 16]) assert.ok(addHouse(s, 0, x, 20, false));
+  tile(s, 17, 20)!.terrain = "water";
+  const worker = troop(s, 16);
+  assert.ok(buildCrossing(s, worker, { x: 17, y: 20 }));
+  worker.order = "hold";
+  const u = troop(s, 22, 7000);
+  while (u.id % 3 === 0) u.id = s.nextId++;
+  setDoctrine(s, "guardian");
+  step(s);
+  assert.equal(u.order, "rest");
+  assert.deepEqual(u.target, { x: 16, y: 20 });
+  command(s, [u.id], "move", { x: 24, y: 20 });
+  step(s);
+  assert.equal(u.order, "move");
+});
+test("prudent preserves its reserve, shelters weak troops and permits a manual foundation", () => {
+  const s = corridor();
+  assert.ok(addHouse(s, 0, 10, 20, false));
+  const u = troop(s, 20);
+  s.kingdoms[0].gold = 500;
+  setDoctrine(s, "prudent");
+  step(s);
+  assert.equal(tile(s, 20, 20)!.house, undefined);
+  assert.ok(s.kingdoms[0].gold >= 500);
+  command(s, [u.id], "house", { x: 20, y: 20 });
+  advance(s, 2);
+  assert.ok(tile(s, 20, 20)!.house);
+  const weak = troop(s, 10, 60);
+  step(s);
+  assert.equal(weak.order, "rest");
+  assert.deepEqual(weak.target, { x: 10, y: 20 });
+});
+test("preset choice persists and invalid profiles are rejected", () => {
+  const s = corridor();
+  for (const id of ["builder", "conqueror", "guardian", "prudent"] as const) {
+    assert.ok(setDoctrine(s, id));
+    assert.equal(loadGame(saveGame(s))!.doctrine, id);
+  }
+  const bad = JSON.parse(saveGame(s));
+  bad.doctrine = "unknown";
+  assert.equal(loadGame(JSON.stringify(bad)), undefined);
+});
+
+for (const team of [1, 2, 3])
+  test(`kingdom ${team} sends its distant 60000 HP army to defend the castle rather than chasing a border decoy`, () => {
+    const s = createGame();
+    for (const t of s.tiles) t.terrain = "grass";
+    for (const h of s.houses) h.timer = 0;
+    const c = s.kingdoms[team].castle;
+    const x = c.x + (c.x < 32 ? 15 : -15),
+      y = c.y + (c.y < 32 ? 5 : -5);
+    assert.ok(addHouse(s, team, x, y, false));
+    const army: Unit = {
+      id: s.nextId++,
+      team,
+      hp: 60000,
+      x,
+      y,
+      age: 10,
+      wait: 0,
+      order: "auto",
+      heading: { x: 0, y: 1 },
+    };
+    const blue: Unit = {
+      ...army,
+      id: s.nextId++,
+      team: (team + 1) % 4,
+      hp: 2609,
+      x: c.x + 2,
+      y: c.y + 2,
+      order: "hold",
+      wait: 999,
+    };
+    const decoy: Unit = {
+      ...army,
+      id: s.nextId++,
+      team: (team + 2) % 4,
+      hp: 100,
+      x: x + 1,
+      order: "hold",
+      wait: 999,
+    };
+    army.defending = decoy.id;
+    s.units.push(army, blue, decoy);
+    step(s);
+    assert.equal(army.order, "defend");
+    assert.equal(army.defending, blue.id);
+    assert.deepEqual(army.target, { x: blue.x, y: blue.y });
+  });
+test("automatic defenders avoid charging a stronger invader and still respect a manual hold", () => {
+  const s = corridor();
+  assert.ok(addHouse(s, 1, 20, 20, false));
+  const red = troop(s, 20, 100);
+  red.team = 1;
+  const blue = troop(s, 21, 7000);
+  blue.order = "hold";
+  step(s);
+  assert.notEqual(red.order, "defend");
+  const held = troop(s, 22, 60000);
+  held.team = 1;
+  held.order = "hold";
+  step(s);
+  assert.equal(held.order, "hold");
+  assert.equal(held.x, 22);
+});
+
+test("a protected enemy king is not treated as an invader merely because friendly houses are nearby", () => {
+  const s = createGame();
+  for (const t of s.tiles) t.terrain = "grass";
+  const king = s.units.find((u) => u.team === 1 && u.royal)!;
+  assert.ok(addHouse(s, 0, king.x + 2, king.y + 2, false));
+  const army = troop(s, king.x + 5, 60000);
+  army.y = king.y + 2;
+  step(s);
+  assert.notEqual(army.order, "defend");
+  assert.equal(king.hp, 100);
 });

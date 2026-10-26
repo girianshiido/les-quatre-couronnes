@@ -1,6 +1,11 @@
 import "./style.css";
-import { PRIORITY_LABELS, type Priority } from "./doctrine";
-import { setPriorities } from "./engine";
+import {
+  DOCTRINES,
+  type DoctrineId,
+  PRIORITY_LABELS,
+  type Priority,
+} from "./doctrine";
+import { setDoctrine, setPriorities } from "./engine";
 import { setupPwa } from "./pwa";
 import { destinationActions } from "./orders";
 import { rectangleSelection, clickSelection } from "./selection";
@@ -63,7 +68,7 @@ lastStored = saved ? loadGame(saved) : undefined;
 const app = $("app");
 app.innerHTML = `<header><button id="brand-title" class="brand" aria-label="Revenir à l’écran titre"><span class="crown">♛</span><div><h1>Les Quatre Couronnes</h1><p class="eyebrow">Des royaumes qui prennent vie</p></div></button><div class="top-resources"><div class="resource"><i>◈</i><div><b id="gold">5 000</b><small>Or</small></div></div><div class="resource"><i>⚑</i><div><b id="population">100</b><small>PV totaux</small></div></div></div><div class="header-actions"><button data-pwa class="pwa-button" title="Installer le jeu" aria-label="Installer le jeu">⇩</button><button id="help" title="Règles et commandes">?</button><button id="save" title="Sauvegarder">↓<span class="wide-label"> Sauver</span></button><button id="menu" title="Écran titre">☰</button></div><button class="mobile-tab" id="sidebar-toggle">Conseil</button></header>
 <main class="layout"><section class="battlefield" aria-label="Carte du jeu"><canvas id="map" tabindex="0" aria-label="Carte. Cliquez une unité verte ou tracez un rectangle pour sélectionner. Les ordres sont dans le conseil à droite."></canvas><div class="map-head"><span class="eyebrow" id="chapter">Chapitre I · Forêt & montagne</span><h2 id="level-name">La vallée des premiers jours</h2><p id="map-sub">64 × 64 · Quatre royaumes · Aucune frontière</p></div><span class="time" id="time">☀ 00:00</span><div class="map-help">Clic : sélectionner · Glisser : sélection multiple<br>Molette : zoom · Clic droit glissé : déplacer la carte</div><div class="map-controls"><button id="pause" title="Pause (Espace)">Ⅱ</button><button id="speed" title="Vitesse : ×1, ×2, ×4, ×8, ×16">×1</button><button id="zoom-out" title="Dézoomer">−</button><button id="zoom-in" title="Zoomer">+</button><button id="fit" title="Voir toute la carte">⊡</button></div><div id="selection-menu" class="selection-menu hidden" aria-label="Actions pour la destination"></div><div id="target-banner" class="status-banner hidden"></div><div id="paused-label" class="paused-label hidden">Ⅱ Partie en pause</div></section>
-<aside class="sidebar" id="sidebar"><span class="eyebrow">Votre royaume</span><h2>La couronne Émeraude</h2><p class="subtitle">Laissez vivre. Choisissez quand agir.</p><div class="section"><div class="label-row"><h3>Les quatre couronnes</h3><span class="badge" id="alive">4 en lice</span></div><div id="kingdoms"></div></div><div class="section"><div class="label-row"><h3>Votre roi</h3><span class="badge" id="king-hp">100 PV</span></div><p class="selection-info" id="king-info">À l’abri du château</p><button id="select-king" class="small">♛ Voir le roi</button></div><div class="section"><div class="label-row"><h3>Impôts du royaume</h3><span class="tax-number" id="tax-value">12<span>%</span></span></div><input id="tax" type="range" min="0" max="30" value="12" aria-label="Taux des impôts de 0 à 30 pour cent"><div class="range-labels"><span>0 % · Plus de naissances</span><span>30 % · Plus d’or</span></div><label class="check"><input id="auto-tax" type="checkbox" checked> Ajustement automatique</label><label class="check"><input id="save-gold" type="checkbox"> Épargner 1 000 pièces pour un chantier</label><p class="tax-hint" id="tax-hint"></p></div><div class="section"><div class="label-row"><h3>Vos ordres</h3><span class="badge" id="selection-count">0 unité</span></div><p class="selection-info" id="selection-info">Sélectionnez vos habitants verts, puis cliquez une destination. Le jeu attend votre ordre.</p><p id="command-help" class="selection-info">Sélectionnez, puis cliquez une destination.</p><button id="cancel-selection" class="small hidden">Annuler la sélection</button><div id="inspect" class="inspect"></div></div><div class="section"><h3>Ordres par défaut</h3><p class="tax-hint">Le premier travail possible à proximité prime. Réordonnez votre doctrine avec les flèches. Les ordres manuels passent devant.</p><ol id="doctrine" class="doctrine"></ol><p class="tax-hint">Sans travail : abri sur une maison. Moins de 42 PV : repos prioritaire. Ponts et barricades restent sur ordre.</p></div><div class="section"><div class="label-row"><h3>Échos de la vallée</h3><span style="color:var(--gold)">✧</span></div><p id="monster-status" class="tax-hint hidden"></p><div id="events"></div></div><p class="save-status" id="save-status">Sauvegarde automatique toutes les 10 s</p></aside></main>
+<aside class="sidebar" id="sidebar"><span class="eyebrow">Votre royaume</span><h2>La couronne Émeraude</h2><p class="subtitle">Laissez vivre. Choisissez quand agir.</p><div class="section"><div class="label-row"><h3>Les quatre couronnes</h3><span class="badge" id="alive">4 en lice</span></div><div id="kingdoms"></div></div><div class="section"><div class="label-row"><h3>Votre roi</h3><span class="badge" id="king-hp">100 PV</span></div><p class="selection-info" id="king-info">À l’abri du château</p><button id="select-king" class="small">♛ Voir le roi</button></div><div class="section"><div class="label-row"><h3>Impôts du royaume</h3><span class="tax-number" id="tax-value">12<span>%</span></span></div><input id="tax" type="range" min="0" max="30" value="12" aria-label="Taux des impôts de 0 à 30 pour cent"><div class="range-labels"><span>0 % · Plus de naissances</span><span>30 % · Plus d’or</span></div><label class="check"><input id="auto-tax" type="checkbox" checked> Ajustement automatique</label><label class="check"><input id="save-gold" type="checkbox"> Épargner 1 000 pièces pour un chantier</label><p class="tax-hint" id="tax-hint"></p></div><div class="section"><div class="label-row"><h3>Vos ordres</h3><span class="badge" id="selection-count">0 unité</span></div><p class="selection-info" id="selection-info">Sélectionnez vos habitants verts, puis cliquez une destination. Le jeu attend votre ordre.</p><p id="command-help" class="selection-info">Sélectionnez, puis cliquez une destination.</p><button id="cancel-selection" class="small hidden">Annuler la sélection</button><div id="inspect" class="inspect"></div></div><div class="section"><h3>Doctrine du royaume</h3><label class="sr-only" for="doctrine-profile">Doctrine du royaume</label><select id="doctrine-profile" class="doctrine-profile"></select><p id="doctrine-description" class="tax-hint"></p><ol id="doctrine" class="doctrine"></ol><p class="tax-hint">Sans travail : abri sur une maison. Les unités affaiblies cherchent un abri. Ponts et barricades restent sur ordre.</p></div><div class="section"><div class="label-row"><h3>Échos de la vallée</h3><span style="color:var(--gold)">✧</span></div><p id="monster-status" class="tax-hint hidden"></p><div id="events"></div></div><p class="save-status" id="save-status">Sauvegarde automatique toutes les 10 s</p></aside></main>
 <div class="overlay" id="title"><div class="title-panel"><p class="eyebrow">Un jeu de stratégie vivant</p><div class="crest">♛</div><h1>Les Quatre<br>Couronnes</h1><div class="title-colors">${COLORS.map((c) => `<span style="background:${c}"></span>`).join("")}</div><p class="intro">Dans la vallée, chaque habitant suit son chemin.<br>Les royaumes grandissent, se croisent et s’affrontent.<br>Votre couronne. Leur histoire.</p><div class="title-buttons"><button class="primary" id="new-game">New game</button><button id="load-game" ${lastStored ? "" : "disabled"}>Load game</button></div><p class="load-note" id="load-note"></p><div class="title-detail"><span>4 royaumes</span><span>64 × 64 cases</span><span>25 vallées</span></div><div class="title-utilities"><button data-pwa class="pwa-button small">Installer le jeu</button><button class="small" id="title-help">Découvrir les règles</button></div><p class="title-foot">Observez la vie. Prenez le commandement.</p></div></div>
 <div class="overlay hidden" id="modal"><div class="dialog" id="dialog" role="dialog" aria-modal="true" aria-label="Conseil des couronnes"></div></div><div class="toast hidden" id="toast" role="status"></div>`;
 const renderer = new Renderer($<HTMLCanvasElement>("map"));
@@ -121,7 +126,10 @@ function persist(manual = false) {
   }
 }
 function start(s: State, loading = false) {
-  if (!loading) s.priorities = [...state.priorities];
+  if (!loading) {
+    s.priorities = [...state.priorities];
+    s.doctrine = state.doctrine;
+  }
   state = s;
   inGame = true;
   paused = loading;
@@ -731,10 +739,26 @@ requestAnimationFrame(frame);
 setupPwa({
   notify: toast,
   beforeUpdate: () => {
-    if (inGame && !persist(true)) return false;
+    if (!inGame) return true;
+    const wasPaused = paused;
     paused = true;
     updateUI();
-    return true;
+    return new Promise<boolean>((resolve) => {
+      showModal(
+        `<span class="eyebrow">Une nouvelle version vous attend</span><h2>Sauvegarder avant la mise à jour ?</h2><p>Votre partie en cours sera sauvegardée avant le rechargement. Vous pourrez la reprendre avec Load game.</p><div class="close-row"><button id="cancel-update">Annuler</button><button id="confirm-update" class="primary">Sauvegarder et mettre à jour</button></div>`,
+      );
+      $("cancel-update").onclick = () => {
+        closeModal();
+        paused = wasPaused;
+        updateUI();
+        resolve(false);
+      };
+      $("confirm-update").onclick = () => {
+        if (!persist(true)) return;
+        closeModal();
+        resolve(true);
+      };
+    });
   },
   showInstallHelp: (message) => {
     const wasPaused = paused;
@@ -752,9 +776,23 @@ setupPwa({
 });
 
 function renderDoctrine() {
-  const key = state.priorities.join("/");
+  const key = state.doctrine + state.priorities.join("/");
   if (key === shownDoctrine) return;
   shownDoctrine = key;
+  $("doctrine-profile").innerHTML =
+    Object.entries(DOCTRINES)
+      .map(
+        ([id, d]) =>
+          `<option value="${id}" ${state.doctrine === id ? "selected" : ""}>${d.name}</option>`,
+      )
+      .join("") +
+    `<option value="custom" ${state.doctrine === "custom" ? "selected" : ""}>Personnalisée</option>`;
+  $("doctrine-description").textContent =
+    state.doctrine === "custom"
+      ? "Le premier travail réalisable à proximité prime. Réordonnez avec les flèches. Les ordres manuels passent devant."
+      : DOCTRINES[state.doctrine].description +
+        " Les ordres manuels restent prioritaires.";
+  $("doctrine").classList.toggle("hidden", state.doctrine !== "custom");
   $("doctrine").innerHTML = state.priorities
     .map(
       (p, i) =>
@@ -778,3 +816,10 @@ $("doctrine").onclick = (event) => {
   toast("Doctrine modifiée. Vos unités autonomes adaptent leurs priorités.");
 };
 renderDoctrine();
+
+$("doctrine-profile").onchange = (event) => {
+  setDoctrine(state, (event.target as HTMLSelectElement).value as DoctrineId);
+  renderDoctrine();
+  persist();
+  toast("Doctrine adoptée. Vos habitants adaptent leurs décisions.");
+};

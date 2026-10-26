@@ -3,7 +3,7 @@ interface InstallPrompt extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 interface PwaOptions {
-  beforeUpdate(): boolean;
+  beforeUpdate(): boolean | Promise<boolean>;
   notify(message: string): void;
   showInstallHelp(message: string): void;
 }
@@ -82,7 +82,7 @@ export function setupPwa(options: PwaOptions) {
           });
         });
       if (registration.waiting) {
-        if (!options.beforeUpdate()) return;
+        if (!(await options.beforeUpdate())) return;
         applying = true;
         options.notify("Partie sauvegardée. Installation de la mise à jour…");
         registration.waiting.postMessage({ type: "APPLY_UPDATE" });
