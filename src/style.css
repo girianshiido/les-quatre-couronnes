@@ -990,3 +990,34 @@ body,
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* Keep map annotations compact so they do not cover the play surface. */
+.map-head {
+  top: 10px;
+  left: 12px;
+  max-width: min(250px, calc(100% - 110px));
+  padding: 6px 9px;
+  box-shadow: none;
+}
+.map-head .eyebrow {
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+.map-head h2 {
+  font-size: 14px;
+  margin-top: 2px;
+  line-height: 1.1;
+}
+.map-head p {
+  display: none;
+}
+.paused-label {
+  top: 61px;
+  left: 12px;
+  max-width: calc(100% - 24px);
+  padding: 4px 8px;
+  font:
+    500 11px "DM Sans",
+    sans-serif;
+  line-height: 1.3;
+}

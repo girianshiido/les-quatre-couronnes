@@ -1325,7 +1325,17 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
           (k) => k.alive && k.id !== u.team && distance(k.castle, target) <= 10,
         ));
     u.formation =
-      us.length >= 8 && ["move", "attack", "merge", "shelter"].includes(order);
+      us.length >= 8 &&
+      [
+        "move",
+        "attack",
+        "merge",
+        "shelter",
+        "house",
+        "bridge",
+        "dam",
+        "barricade",
+      ].includes(order);
     delete u.defending;
     delete u.pursue;
     delete u.pursueTeam;
@@ -2064,7 +2074,12 @@ function act(s: State, u: Unit) {
       if (entity) u.pursue = entity.id;
     }
     if (entity) u.target = { x: entity.x, y: entity.y };
-    else {
+    else if (u.order === "attack") {
+      // The target may die before the rest of the selected group arrives.
+      // Keep their last destination rather than abandoning the march.
+      delete u.pursue;
+      delete u.pursueTeam;
+    } else {
       finishTravel(u);
     }
   }
@@ -2082,28 +2097,30 @@ function act(s: State, u: Unit) {
   if ((u.order === "bridge" || u.order === "barricade") && target) {
     const kind = u.order;
     const existing = structureAt(s, target);
-    if (
+    const finished =
       existing &&
-      (!existing.construction ||
-        existing.team !== u.team ||
-        existing.kind !== kind)
-    ) {
+      !existing.construction &&
+      existing.team === u.team &&
+      existing.kind === kind;
+    if (existing && (existing.team !== u.team || existing.kind !== kind)) {
       finishTravel(u);
       return;
     }
     const valid =
+      finished ||
       existing?.construction ||
       (kind === "bridge" ? crossing(s, target) : canBarricade(s, target));
     if (!valid) {
       finishTravel(u);
       return;
     }
-    if (distance(u, target) === 1) {
-      fundConstruction(s, u, target, kind);
+    if (distance(u, target) <= 1) {
+      if (finished) finishTravel(u);
+      else fundConstruction(s, u, target, kind);
       return;
     }
     const banks =
-      kind === "bridge"
+      kind === "bridge" && !finished
         ? crossing(s, target)!.banks
         : [
             { x: target.x - 1, y: target.y },
@@ -2141,8 +2158,9 @@ function act(s: State, u: Unit) {
   if (u.order === "dam" && target) {
     if (buildCrossing(s, u, target, u.order === "dam")) return;
     const existing = structureAt(s, target);
+    const completed = tile(s, target.x, target.y)?.terrain === "dam";
     const cr =
-      u.order === "dam" && existing?.kind === "bridge"
+      u.order === "dam" && (existing?.kind === "bridge" || completed)
         ? {
             cells: [target],
             banks: [
@@ -2158,7 +2176,10 @@ function act(s: State, u: Unit) {
       u.target = undefined;
       return;
     }
-    if (cr.banks.some((b) => distance(u, b) === 0)) return;
+    if (cr.banks.some((b) => distance(u, b) === 0)) {
+      if (completed) finishTravel(u);
+      return;
+    }
     const reachable = cr.banks
       .map((b) => ({ b, step: nextStep(s, u, b, u.team) }))
       .filter((v) => v.step || distance(u, v.b) === 0)
@@ -2370,7 +2391,7 @@ function act(s: State, u: Unit) {
       !u.royal &&
       !other.royal &&
       t.house !== undefined &&
-      u.order !== "merge"
+      !["merge", "house", "bridge", "dam", "barricade"].includes(u.order)
     )
       continue;
     const winner = resolveEncounter(s, u, other);

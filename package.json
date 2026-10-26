@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build && node scripts/build-sw.mjs",
     "test": "node --import tsx --test tests/*.test.ts",
-    "sprites": "node --import tsx scripts/build-art.ts",
+    "sprites": "node --import tsx scripts/pack-imagegen.ts",
     "simulate": "node --import tsx scripts/simulate.ts",
     "biomes": "node --import tsx scripts/biome-preview.ts",
     "benchmark": "node --import tsx scripts/benchmark.ts"

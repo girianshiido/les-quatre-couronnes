@@ -1,6 +1,8 @@
-import { createCanvas } from "@napi-rs/canvas";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { writeFileSync } from "node:fs";
 import { Renderer } from "../src/render.ts";
+const [actors,world,buildings]=await Promise.all(['actors','world','buildings'].map(n=>loadImage(`public/art/${n}.png`)));
+const atlases={actors,world,buildings} as unknown as import('../src/atlas.ts').Atlases;
 
 const c = createCanvas(768, 640),
   ctx = c.getContext("2d");
@@ -15,7 +17,7 @@ for (let team = 0; team < 4; team++)
         ctx.translate((d * 2 + frame) * 96 + 48, team * 160 + rank * 50 + 35);
         ctx.scale(2, 2);
         Renderer.prototype.sprite.call(
-          {} as Renderer,
+          {atlases} as Renderer,
           ctx,
           0,
           0,
@@ -38,7 +40,7 @@ for (let t = 0; t < 4; t++)
       kc.translate((d * 2 + f) * 96 + 48, t * 50 + 27);
       kc.scale(2, 2);
       Renderer.prototype.sprite.call(
-        {} as Renderer,
+        {atlases} as Renderer,
         kc,
         0,
         0,

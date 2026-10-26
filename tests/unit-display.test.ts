@@ -93,3 +93,23 @@ test("a stationary cursor follows changing HP and loses the tooltip when the uni
   draw();
   assert.deepEqual(text, []);
 });
+
+test("selected units retain their aura without drawing destination lines", () => {
+  const { s, r, draw } = scene();
+  for (const u of s.units) u.target = { x: 35, y: 35 };
+  let ellipses = 0,
+    dashed = 0;
+  const ellipse = r.ctx.ellipse.bind(r.ctx),
+    dash = r.ctx.setLineDash.bind(r.ctx);
+  r.ctx.ellipse = ((...args: Parameters<typeof ellipse>) => {
+    ellipses++;
+    ellipse(...args);
+  }) as typeof r.ctx.ellipse;
+  r.ctx.setLineDash = (segments: number[]) => {
+    if (segments.length) dashed++;
+    dash(segments);
+  };
+  draw();
+  assert.equal(ellipses, 2);
+  assert.equal(dashed, 0);
+});

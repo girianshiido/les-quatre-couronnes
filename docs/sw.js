@@ -1,6 +1,6 @@
 // Generated from the complete production build. Do not edit by hand.
-const CACHE = 'quatre-couronnes-3b6a2e3efbe83b28';
-const FILES = ["art/actors.png","art/buildings.png","art/world.png","assets/index-Ce9cDW6z.js","assets/index-YjbYRd6i.css","biomes.png","crown.svg","icons/crown-192.png","icons/crown-512.png","index.html","kings-atlas.png","manifest.webmanifest","sprites-atlas.png"];
+const CACHE = 'quatre-couronnes-f74f276270e0c90f';
+const FILES = ["art/actors.png","art/buildings.png","art/world.png","assets/index-CNvQXU-S.css","assets/index-Q_Kw7El2.js","biomes.png","crown.svg","icons/crown-192.png","icons/crown-512.png","index.html","kings-atlas.png","manifest.webmanifest","sprites-atlas.png"];
 const INDEX = new URL('index.html', self.registration.scope).href;
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES.map(p => new Request(new URL(p, self.registration.scope).href, {cache: "reload"})))));

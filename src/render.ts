@@ -866,15 +866,6 @@ export class Renderer {
         c.beginPath();
         c.ellipse(x, y + 5, 8 + tier(u.hp) * 2, 4, 0, 0, Math.PI * 2);
         c.stroke();
-        if (u.target) {
-          c.strokeStyle = "#f4dc8b80";
-          c.setLineDash([4, 5]);
-          c.beginPath();
-          c.moveTo(x, y);
-          c.lineTo((u.target.x + 0.5) * CELL, (u.target.y + 0.5) * CELL);
-          c.stroke();
-          c.setLineDash([]);
-        }
       }
       this.sprite(
         c,

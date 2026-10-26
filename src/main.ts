@@ -639,7 +639,7 @@ function updateUI() {
       !$("modal").classList.contains("hidden"),
   );
   $("paused-label").textContent = planning
-    ? "Planification · choisissez une destination"
+    ? "Choisissez une destination"
     : "Ⅱ Partie en pause";
   $("target-banner").classList.add("hidden");
 }
@@ -664,10 +664,10 @@ function chooseOrder(order: Order) {
     return;
   }
   targetOrder = order;
-  issue(contextPoint, action.workerId);
+  issue(contextPoint);
 }
 
-function issue(p: Point, workerId?: number) {
+function issue(p: Point) {
   if (!targetOrder) return;
   const order = targetOrder;
   if (!tile(state, p.x, p.y)) return;
@@ -701,7 +701,7 @@ function issue(p: Point, workerId?: number) {
       );
   }
   const construction = ["house", "bridge", "dam", "barricade"].includes(order);
-  let ids = [...selection].filter(
+  const ids = [...selection].filter(
     (id) => !construction || !state.units.find((u) => u.id === id)?.royal,
   );
   if (!ids.length)
@@ -715,10 +715,9 @@ function issue(p: Point, workerId?: number) {
       if (king) p = { x: king.x, y: king.y };
     }
   }
-  if (workerId) ids = [workerId];
   if (order === "bridge" || order === "barricade")
     state.kingdoms[0].bridgeSaving = true;
-  command(state, construction ? ids.slice(0, 1) : ids, order, p);
+  command(state, ids, order, p);
   planning = false;
   contextPoint = undefined;
   selection.clear();

@@ -1,7 +1,9 @@
-import { createCanvas } from "@napi-rs/canvas";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { writeFileSync } from "node:fs";
 import { createGame, step, LEVELS } from "../src/engine.ts";
 import { Renderer } from "../src/render.ts";
+const [actors,world,buildings]=await Promise.all(['actors','world','buildings'].map(n=>loadImage(`public/art/${n}.png`)));
+const atlases={actors,world,buildings} as unknown as import('../src/atlas.ts').Atlases;
 const out = createCanvas(1200, 800),
   c = out.getContext("2d");
 c.fillStyle = "#14282a";
@@ -25,6 +27,7 @@ for (let biome = 0; biome < 5; biome++) {
     influence = createCanvas(s.size * 16, s.size * 16);
   const r = {
     terrain,
+    atlases,
     tctx: terrain.getContext("2d"),
     influence,
     influenceKey: "",
