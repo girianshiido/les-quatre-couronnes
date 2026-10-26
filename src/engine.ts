@@ -21,7 +21,8 @@ export type Order =
   | "hold"
   | "rest"
   | "shelter"
-  | "defend";
+  | "defend"
+  | "raid";
 export interface Point {
   x: number;
   y: number;
@@ -526,6 +527,8 @@ function hasDestinationOrder(u: Unit) {
       "attack",
       "merge",
       "shelter",
+      "raid",
+      "defend",
       "house",
       "bridge",
       "dam",
@@ -724,6 +727,10 @@ function findStep(
   clearObstacles: boolean,
   civilian: boolean,
 ): Point | undefined {
+  const raidBlocked =
+    (start as Unit).order === "raid"
+      ? raidBlockers(s, start as Unit)
+      : undefined;
   const total = s.size * s.size,
     prev = new Int32Array(total).fill(-1),
     queue = new Int32Array(total);
@@ -766,6 +773,12 @@ function findStep(
           tile(s, nx, ny)!.cave !== undefined ||
           (tile(s, nx, ny)!.castle !== undefined &&
             tile(s, nx, ny)!.castle !== team))
+      )
+        continue;
+      if (
+        raidBlocked &&
+        (raidBlocked.has(idx(s, nx, ny)) ||
+          (tile(s, nx, ny)?.terrain === "tree" && s.kingdoms[team].gold < 30))
       )
         continue;
       if (peaceful && !peacefulTile(s, nx, ny, team)) continue;
@@ -887,7 +900,14 @@ export function attackStructure(s: State, u: Unit, b: Structure) {
 }
 function autonomousDestination(s: State, u: Unit, p: Point) {
   if (!walkable(s, p.x, p.y, u.team)) return false;
-  if (u.team !== 0) return true;
+  if (u.team !== 0) {
+    const castle = tile(s, p.x, p.y)?.castle;
+    const king =
+      castle !== undefined &&
+      castle !== u.team &&
+      s.units.find((v) => v.royal && v.team === castle && v.hp > 0);
+    return !king || u.hp > combatPower(s, king) * 1.25;
+  }
   const t = tile(s, p.x, p.y)!;
   if (t.terrain === "rock" || t.terrain === "barricade" || t.cave !== undefined)
     return false;
@@ -1499,8 +1519,160 @@ function aiSettlementTarget(s: State, u: Unit) {
     }
   }
 }
+function raidBlockers(s: State, u: Unit) {
+  return new Set(
+    [
+      ...s.units.filter(
+        (v) =>
+          v.hp > 0 &&
+          v.id !== u.id &&
+          (v.royal || (v.team !== u.team && v.hp >= u.hp)),
+      ),
+      ...s.monsters.filter((m) => m.hp >= u.hp),
+    ].map((v) => idx(s, v.x, v.y)),
+  );
+}
+function aiRaidTarget(s: State, u: Unit) {
+  if (u.team === 0 || u.royal || !["auto", "raid"].includes(u.order)) return;
+  const homes = s.houses.filter((h) => h.team === u.team).length;
+  if (
+    u.hp < 42 ||
+    (u.order !== "raid" && u.hp < 1000 && (homes < 8 || u.id % 3 !== 0))
+  )
+    return;
+  const canFound = s.kingdoms[u.team].gold >= 150 + buildingReserve(s, u.team);
+  const exposedKing = s.units.find((v) => {
+    if (
+      !v.royal ||
+      v.team === u.team ||
+      v.hp <= 0 ||
+      distance(u, v) > 2 ||
+      u.hp <= combatPower(s, v) * 1.5
+    )
+      return false;
+    const first = nextStep(s, u, v, u.team);
+    return (
+      first &&
+      distance(first, v) < distance(u, v) &&
+      !["tree", "rock"].includes(tile(s, first.x, first.y)!.terrain) &&
+      !s.units.some(
+        (other) =>
+          other.id !== v.id &&
+          other.hp > 0 &&
+          other.x === first.x &&
+          other.y === first.y &&
+          (other.royal ||
+            (other.team !== u.team &&
+              u.hp - other.hp * 0.7 <= combatPower(s, v) * 1.5)),
+      )
+    );
+  });
+  if (exposedKing) {
+    u.order = "attack";
+    u.target = { x: exposedKing.x, y: exposedKing.y };
+    u.pursue = exposedKing.id;
+    u.pursueTeam = exposedKing.team;
+    return;
+  }
+  const previous =
+    u.target &&
+    (s.houses.some(
+      (h) => h.x === u.target!.x && h.y === u.target!.y && h.team !== u.team,
+    ) ||
+      (canFound && canHouse(s, u.target.x, u.target.y)));
+  if (u.order === "raid" && (previous || u.pursue !== undefined)) return;
+  delete u.target;
+  delete u.pursue;
+  delete u.pursueTeam;
+  u.order = "auto";
+  const blocked = raidBlockers(s, u);
+  const enemyHomes = new Map(
+    s.houses
+      .filter((h) => h.team !== u.team && s.kingdoms[h.team].alive)
+      .map((h) => [idx(s, h.x, h.y), h]),
+  );
+  const targets = new Map(
+    s.units
+      .filter((v) => v.hp > 0 && !v.royal && v.team !== u.team && v.hp < u.hp)
+      .map((v) => [idx(s, v.x, v.y), v]),
+  );
+  const reserved = new Set(
+    s.units
+      .filter(
+        (v) =>
+          v.id !== u.id && v.team === u.team && v.order === "raid" && v.target,
+      )
+      .map((v) => idx(s, v.target!.x, v.target!.y)),
+  );
+  const seen = new Uint8Array(s.tiles.length),
+    queue: Point[] = [{ x: u.x, y: u.y }];
+  seen[idx(s, u.x, u.y)] = 1;
+  let shared: Point | undefined,
+    prey: Unit | undefined,
+    plot: Point | undefined,
+    house: Point | undefined;
+  const choose = (p: Point, enemy?: Unit) => {
+    u.order = "raid";
+    u.target = { x: p.x, y: p.y };
+    if (enemy) {
+      u.pursue = enemy.id;
+      u.pursueTeam = enemy.team;
+    }
+  };
+  for (let head = 0; head < queue.length; head++) {
+    const p = queue[head],
+      i = idx(s, p.x, p.y);
+    if (canFound && !reserved.has(i) && canHouse(s, p.x, p.y)) {
+      plot ??= p;
+      if (distance(u, p) === 0) {
+        choose(p);
+        return;
+      }
+    }
+    if (enemyHomes.has(i)) {
+      if (!reserved.has(i)) house ??= p;
+      else shared ??= p;
+    }
+    // Finish surveying the local neighbourhood before marching farther away.
+    if (distance(u, p) >= 8 && (plot || house)) {
+      choose(plot ?? house!);
+      return;
+    }
+    if (!canFound && house) {
+      choose(house);
+      return;
+    }
+    prey ??= targets.get(i);
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const x = p.x + dx,
+        y = p.y + dy;
+      if (!inside(s, x, y)) continue;
+      const n = idx(s, x, y),
+        t = tile(s, x, y)!;
+      if (
+        seen[n] ||
+        blocked.has(n) ||
+        !walkable(s, x, y, u.team) ||
+        ["rock", "barricade"].includes(t.terrain) ||
+        t.cave !== undefined ||
+        (t.castle !== undefined && t.castle !== u.team) ||
+        (t.terrain === "tree" && s.kingdoms[u.team].gold < 30)
+      )
+        continue;
+      seen[n] = 1;
+      queue.push({ x, y });
+    }
+  }
+  if (plot || house || shared) choose((plot ?? house ?? shared)!);
+  else if (prey) choose(prey, prey);
+}
 function updateDefence(s: State, u: Unit) {
-  if (u.royal || !["auto", "rest", "defend"].includes(u.order)) return;
+  if (u.royal || !["auto", "rest", "defend", "raid"].includes(u.order)) return;
   const houses = s.houses.filter((h) => h.team === u.team);
   const threats = [...s.units, ...s.monsters.map((m) => ({ ...m, team: 4 }))]
     .filter(
@@ -1508,7 +1680,8 @@ function updateDefence(s: State, u: Unit) {
         v.team !== u.team &&
         v.hp > 0 &&
         !("royal" in v && v.royal && sheltered(s, v as Unit)) &&
-        distance(u, v) <= (u.hp >= 1000 ? s.size * 2 : 10) &&
+        (distance(u, v) <= 10 ||
+          (u.hp >= 1000 && distance(v, s.kingdoms[u.team].castle) <= 8)) &&
         u.hp > ("royal" in v && v.royal ? combatPower(s, v as Unit) : v.hp) &&
         (distance(v, s.kingdoms[u.team].castle) <= 8 ||
           houses.some((h) => distance(v, h) <= 5)),
@@ -1552,7 +1725,7 @@ function act(s: State, u: Unit) {
   const k = s.kingdoms[u.team];
   if (!k.alive || u.hp <= 0) return;
   if (u.order === "hold" || (u.royal && u.order === "auto")) return;
-  if (u.pursue !== undefined && ["attack", "merge"].includes(u.order)) {
+  if (u.pursue !== undefined && ["attack", "merge", "raid"].includes(u.order)) {
     let entity =
       s.units.find((v) => v.id === u.pursue && v.hp > 0) ??
       s.monsters.find((m) => m.id === u.pursue && m.hp > 0);
@@ -1577,6 +1750,7 @@ function act(s: State, u: Unit) {
   }
   aiSettlementTarget(s, u);
   updateDefence(s, u);
+  aiRaidTarget(s, u);
   playerExpansionTarget(s, u);
   let target = u.target;
   if (
@@ -1624,9 +1798,18 @@ function act(s: State, u: Unit) {
       return;
     }
   }
-  if (u.order === "house" && target && distance(u, target) === 0) {
+  if (
+    (u.order === "house" ||
+      (u.order === "raid" &&
+        canHouse(s, u.x, u.y) &&
+        k.gold >= 150 + buildingReserve(s, u.team))) &&
+    target &&
+    distance(u, target) === 0
+  ) {
     if (addHouse(s, u.team, u.x, u.y)) {
-      u.hp = 0;
+      injure(u, Math.min(100, u.hp));
+      u.order = "auto";
+      delete u.target;
       log(s, "Une nouvelle maison rejoint le royaume.", u.team);
     } else {
       u.order = "auto";
@@ -1649,11 +1832,13 @@ function act(s: State, u: Unit) {
     (!u.target || distance(u, u.target) === 0) &&
     u.age > 1.2 &&
     u.hp >= 42 &&
+    (u.team === 0 || u.hp < 1000) &&
     k.gold >= 150 + buildingReserve(s, u.team) &&
     (u.team !== 0 || random(s) < 0.72) &&
     addHouse(s, u.team, u.x, u.y)
   ) {
-    u.hp = 0;
+    injure(u, Math.min(100, u.hp));
+    delete u.target;
     return;
   }
   // Independent wandering with a growing outward bias. Every inhabitant still makes local random choices.
@@ -1669,7 +1854,7 @@ function act(s: State, u: Unit) {
             u.order === "auto" &&
             !u.occupying &&
             !s.priorities.includes("raid")),
-        u.team === 0 && u.order === "auto",
+        (u.team === 0 && u.order === "auto") || u.order === "raid",
       )
     : undefined;
   if (!target) {
@@ -1716,6 +1901,13 @@ function act(s: State, u: Unit) {
     }
   }
   if (!dest) {
+    if (u.order === "raid") {
+      u.order = "auto";
+      delete u.target;
+      delete u.pursue;
+      delete u.pursueTeam;
+      return;
+    }
     if (target && !hasDestinationOrder(u) && u.order !== "rest") {
       u.target = undefined;
       u.order = "auto";
@@ -2014,6 +2206,7 @@ export function loadGame(data: string): State | undefined {
       "rest",
       "shelter",
       "defend",
+      "raid",
     ];
     if (
       s.version !== 2 ||

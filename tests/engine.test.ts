@@ -576,3 +576,29 @@ test("legacy multi-cell bridges load as independent single-cell segments without
   assert.ok(loaded.structures.every((b) => b.cells.length === 1));
   assert.equal(loaded.kingdoms[0].gold, s.kingdoms[0].gold);
 });
+
+test("manual foundations consume at most 100 HP, allowing a large unit to continue", () => {
+  const s = createGame();
+  tile(s, 20, 20)!.terrain = "grass";
+  const u = unit(0, 60000, 20, 20);
+  u.id = s.nextId++;
+  s.units.push(u);
+  command(s, [u.id], "house", { x: 20, y: 20 });
+  step(s);
+  assert.ok(tile(s, 20, 20)!.house);
+  assert.ok(u.hp > 59800 && u.hp < 59901);
+  assert.ok(s.units.includes(u));
+  assert.equal(u.order, "auto");
+});
+test("a small founder still spends its remaining HP to establish a house", () => {
+  const s = createGame();
+  tile(s, 20, 20)!.terrain = "grass";
+  const u = unit(0, 100, 20, 20);
+  u.id = s.nextId++;
+  s.units.push(u);
+  command(s, [u.id], "house", { x: 20, y: 20 });
+  step(s);
+  assert.ok(tile(s, 20, 20)!.house);
+  assert.equal(u.hp, 0);
+  assert.ok(!s.units.includes(u));
+});

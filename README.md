@@ -26,15 +26,15 @@ Les habitants naissent à **100 PV**. Ils cherchent des tâches accessibles suiv
 
 ## L’or et les constructions
 
-| Action                                     |          Prix |
-| ------------------------------------------ | ------------: |
-| Maison                                     |        150 or |
-| Couper un arbre                            | 30 or et 3 PV |
-| Dégager un rocher                          |  3 or et 3 PV |
-| Une case de pont                           |      1 000 or |
-| Reconstruire cette même case de pont       |        500 or |
-| Barricade                                  |        750 or |
-| Transformer un pont allié libre en barrage |         32 or |
+| Action                                     |                     Prix |
+| ------------------------------------------ | -----------------------: |
+| Maison                                     | 150 or et jusqu’à 100 PV |
+| Couper un arbre                            |            30 or et 3 PV |
+| Dégager un rocher                          |             3 or et 3 PV |
+| Une case de pont                           |                 1 000 or |
+| Reconstruire cette même case de pont       |                   500 or |
+| Barricade                                  |                   750 or |
+| Transformer un pont allié libre en barrage |                    32 or |
 
 **Un ordre de pont construit exactement une case**, avec 1 000 PV. Une rivière plus large exige plusieurs ordres. Tous les camps peuvent traverser un pont ouvert ; l’ordre Attaquer permet de le détruire. Sa destruction rétablit l’eau et fait tomber les habitants qui s’y trouvent. Les anciens ponts de sauvegardes sont conservés sous forme de tronçons indépendants.
 
@@ -115,3 +115,11 @@ Une mise à jour disponible ouvre maintenant une confirmation en cours de partie
 Le bouton **↶ Recommencer le niveau** est accessible en cours de partie dans l’en-tête, ainsi que depuis le menu. La confirmation remet la même carte à zéro avec les conditions initiales, sans attendre une défaite. La doctrine et les niveaux débloqués sont conservés ; la sauvegarde de la partie en cours est remplacée.
 
 Quand une unité élimine un roi adverse, **toutes les maisons de ce roi passent immédiatement au vainqueur**. Leur production, leur position et leur cycle de naissance sont conservés ; les maisons et leur gazon prennent la nouvelle couleur. Cela fonctionne entre les quatre royaumes, y compris lorsqu’un roi meurt dans un assaut raté. Le château vaincu s’effondre et les unités du camp éliminé disparaissent. Les monstres, les morts naturelles et les combats sans survivant ne donnent pas de royaume bénéficiaire.
+
+### Expansion des armées adverses
+
+Les grosses unités adverses choisissent des objectifs accessibles : elles construisent sur les terrains libres proches si leur trésor le permet, puis rasent les maisons adverses qui bloquent leur développement. Elles poursuivent cette expansion de parcelle en parcelle au lieu de tourner autour du château ennemi. Les petites unités continuent de développer leur camp. Une menace proche de leur propre château interrompt l’expansion ; une escarmouche éloignée ne détourne plus automatiquement toute une armée.
+
+Une fondation coûte **150 or et jusqu’à 100 PV du bâtisseur**. Un habitant à 100 PV ou moins y consacre ses vies restantes ; une unité fusionnée garde le surplus et peut construire plusieurs maisons. La règle vaut pour le joueur, les adversaires et les ordres manuels. Les naissances restent à 100 PV.
+
+Un adversaire peut saisir une occasion locale de prendre le roi : il doit être tout proche, disposer d’une grande marge face à sa défense complète et avoir un trajet immédiat dégagé. Un roi trop fort, un cours d’eau fermé ou une garnison dangereuse ne sont pas des cibles de raid ordinaires. Les ponts traversés restent intacts ; les maisons et le gazon détruits coûtent des PV, sans dépense d’or.

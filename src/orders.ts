@@ -133,7 +133,12 @@ export function destinationActions(
   const worker = workers.find((u) => reachable(u, p));
   if (worker && canHouse(s, p.x, p.y))
     list.push(
-      action("house", "Construire une maison · 150 or", 150, worker.id),
+      action(
+        "house",
+        "Construire une maison · 150 or · 100 PV max.",
+        150,
+        worker.id,
+      ),
     );
   if (worker && canBarricade(s, p))
     list.push(
