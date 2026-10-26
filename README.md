@@ -139,3 +139,11 @@ Les règles de soutien, de destruction, d’entretien et d’effondrement sont i
 En mode Bâtisseur, les grandes unités continuent les fondations. Une fondation choisie est exécutée à l’arrivée sans nouveau tirage au sort. Si l’argent manque, les bâtisseurs restent sur leur maison ou rejoignent un abri proche, plutôt que de partir pour un raid lointain ou de changer continuellement d’abri ; ils repartent lorsque le budget permet un chantier. Les autres doctrines conservent leurs choix et les ordres manuels restent prioritaires.
 
 Un ordre **Fusionner** attend tous les participants encore vivants et affectés à cet ordre, puis rend la main à la doctrine, au point de rassemblement. Le groupe est conservé dans la sauvegarde ; les anciennes sauvegardes restent compatibles. Les unités déjà réunies sur une maison fusionnent aussi. Les morts et les participants ayant reçu un autre ordre ne bloquent pas la reprise.
+
+## Affichage des unités et chantiers progressifs
+
+Les chiffres au-dessus des habitants, rois et monstres sont masqués par défaut, même en sélection. Le survol affiche leurs PV exacts dans une infobulle dont la taille reste lisible au dézoom. Dans le menu, **Toujours afficher les PV des unités** active les nombres permanents ; le choix est mémorisé dans le navigateur et peut être désactivé.
+
+Un pont ou une barricade peut être commandé sans disposer de 1 000 ou 750 or. L’ouvrier rejoint une berge ou une case voisine et verse l’or disponible, puis les rentrées suivantes. Le chantier conserve sa progression et les dépenses si l’ouvrier meurt ou change d’ordre ; un autre habitant du même royaume peut le terminer en payant seulement le reste. À 0 % d’impôts et sans réserve, le chantier attend. L’usure et l’entretien habituels continuent ; une maison protège de l’usure normale.
+
+Les échafaudages montrent les chantiers et leur progression. Le pont reste une case d’eau infranchissable jusqu’à son achèvement ; la barricade ne bloque le passage qu’une fois achevée. Les chantiers peuvent être détruits et les dégâts reçus ne sont pas effacés par l’achèvement. Un chantier de pont abandonné avant son premier achèvement ne crée pas de réduction : la reconstruction à 500 or reste réservée aux ponts déjà achevés puis détruits. Sauvegarde, reprise et export conservent les paiements.

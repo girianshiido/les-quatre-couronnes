@@ -86,6 +86,7 @@ export interface Structure {
   hp: number;
   maxHp: number;
   cells: Point[];
+  construction?: { paid: number; total: number };
 }
 export interface Cave extends Point {
   id: number;
@@ -423,7 +424,8 @@ export function canHouse(s: State, x: number, y: number) {
     t.terrain !== "grass" ||
     t.house !== undefined ||
     t.cave !== undefined ||
-    t.castle !== undefined
+    t.castle !== undefined ||
+    structureAt(s, { x, y }) !== undefined
   )
     return false;
   for (let dy = -1; dy <= 1; dy++)
@@ -762,7 +764,7 @@ function formationStep(
     flowCaches.set(s, caches);
   }
   const cache = peaceful ? caches.peaceful : caches.normal;
-  const key = `${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}${peaceful ? `-${s.stats.cleared}-${s.turfRevision}-${Math.floor(s.time * 2)}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}` : ""}`;
+  const key = `${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => `${b.id}${b.construction ? "p" : "b"}`).join(".")}${peaceful ? `-${s.stats.cleared}-${s.turfRevision}-${Math.floor(s.time * 2)}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}` : ""}`;
   if (cache.key !== key) {
     cache.key = key;
     cache.fields.clear();
@@ -962,8 +964,82 @@ export function canBarricade(s: State, p: Point) {
     t.house === undefined &&
     t.cave === undefined &&
     t.castle === undefined &&
+    !structureAt(s, p) &&
     !s.units.some((u) => u.hp > 0 && u.x === p.x && u.y === p.y)
   );
+}
+export function fundConstruction(
+  s: State,
+  u: Unit,
+  p: Point,
+  kind: "bridge" | "barricade",
+) {
+  if (u.royal || u.hp <= 0 || distance(u, p) !== 1) return false;
+  const k = s.kingdoms[u.team];
+  if (!k.alive) return false;
+  let b = structureAt(s, p);
+  if (b && (b.team !== u.team || b.kind !== kind || !b.construction))
+    return false;
+  if (!b && !(kind === "bridge" ? crossing(s, p) : canBarricade(s, p)))
+    return false;
+  if (
+    kind === "barricade" &&
+    s.units.some((v) => v.hp > 0 && v.x === p.x && v.y === p.y)
+  )
+    return true;
+  if (kind === "bridge" && !crossing(s, p)) return false;
+  // Zero gold keeps the worker waiting. A saved structure is created as soon
+  // as the first funds are actually invested, without tying it to that worker.
+  if (!b && k.gold <= 0) return true;
+  if (!b) {
+    b = {
+      id: s.nextId++,
+      kind,
+      team: u.team,
+      hp: 0,
+      maxHp: kind === "bridge" ? 1000 : 1500,
+      cells: [{ ...p }],
+      construction: {
+        paid: 0,
+        total: kind === "bridge" ? bridgeCost(s, p) : 750,
+      },
+    };
+    s.structures.push(b);
+  }
+  const progress = b.construction!;
+  const amount = Math.min(k.gold, progress.total - progress.paid);
+  k.gold -= amount;
+  progress.paid += amount;
+  b.hp = Math.min(
+    b.maxHp,
+    Math.max(1, b.hp + (b.maxHp * amount) / progress.total),
+  );
+  injure(u, ((kind === "bridge" ? 8 : 5) * amount) / progress.total);
+  if (progress.paid < progress.total - 1e-8) return true;
+  delete b.construction;
+  const t = tile(s, p.x, p.y)!;
+  t.terrain = kind;
+  t.owner = u.team;
+  supplyFields.delete(s);
+  if (kind === "bridge") {
+    s.stats.bridges++;
+    if (
+      !s.bridgeSites.some((site) =>
+        site.some((v) => v.x === p.x && v.y === p.y),
+      )
+    )
+      s.bridgeSites.push([{ ...p }]);
+  }
+  k.bridgeSaving = false;
+  finishTravel(u);
+  log(
+    s,
+    kind === "bridge"
+      ? "Le chantier du pont est terminé."
+      : "Le chantier de la barricade est terminé.",
+    u.team,
+  );
+  return true;
 }
 export function buildBarricade(s: State, u: Unit, p: Point) {
   const k = s.kingdoms[u.team];
@@ -1003,9 +1079,11 @@ export function destroyStructure(s: State, b: Structure) {
   }
   log(
     s,
-    b.kind === "bridge"
-      ? "Un pont s’écroule. Il pourra être reconstruit pour 500 pièces."
-      : "Une barricade est détruite.",
+    b.construction
+      ? "Un chantier est détruit."
+      : b.kind === "bridge"
+        ? "Un pont s’écroule. Il pourra être reconstruit pour 500 pièces."
+        : "Une barricade est détruite.",
     b.team,
   );
 }
@@ -1042,7 +1120,12 @@ function autonomousDestination(s: State, u: Unit, p: Point) {
   const turf = territoryAt(s, p);
   if (turf && turf.team !== u.team) return false;
   const building = structureAt(s, p);
-  if (building?.kind === "barricade" && building.team !== u.team) return false;
+  if (
+    building?.kind === "barricade" &&
+    !building.construction &&
+    building.team !== u.team
+  )
+    return false;
   if (t.castle !== undefined && t.castle !== u.team) return false;
   if (
     t.house !== undefined &&
@@ -1057,6 +1140,7 @@ function autonomousDestination(s: State, u: Unit, p: Point) {
 }
 export function buildCrossing(s: State, u: Unit, p: Point, dam = false) {
   const existing = structureAt(s, p);
+  if (existing?.construction) return false;
   const conversion =
     dam &&
     existing?.kind === "bridge" &&
@@ -1237,7 +1321,7 @@ const shelterPlans = new WeakMap<
   }
 >();
 function shelterPlan(s: State) {
-  const key = `${s.turfRevision}-${Math.floor(s.time / 5)}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}-${s.ruins.length}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}`;
+  const key = `${s.turfRevision}-${Math.floor(s.time / 5)}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => `${b.id}${b.construction ? "p" : "b"}`).join(".")}-${s.ruins.length}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}`;
   const previous = shelterPlans.get(s);
   if (previous?.key === key) return previous;
   const regions = new Int32Array(s.tiles.length).fill(-1),
@@ -1371,7 +1455,7 @@ export function setDoctrine(s: State, doctrine: DoctrineId) {
 }
 function guardPost(s: State, u: Unit) {
   const bridges = s.structures
-    .filter((b) => b.kind === "bridge")
+    .filter((b) => b.kind === "bridge" && !b.construction)
     .flatMap((b) => b.cells);
   const enemies = s.kingdoms
     .filter((k) => k.id !== 0 && k.alive)
@@ -1562,7 +1646,7 @@ const landLinks = new WeakMap<
   { key: string; links: Map<number, boolean> }
 >();
 function landConnected(s: State, team: number) {
-  const key = `${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}-${s.ruins.length}`;
+  const key = `${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => `${b.id}${b.construction ? "p" : "b"}`).join(".")}-${s.ruins.length}`;
   let cache = landLinks.get(s);
   if (cache?.key !== key) {
     cache = { key, links: new Map() };
@@ -1915,14 +1999,66 @@ function act(s: State, u: Unit) {
     distance(u, target) === 0
   )
     return;
-  if (u.order === "barricade" && target && distance(u, target) <= 1) {
-    if (!buildBarricade(s, u, target) && !canBarricade(s, target)) {
-      u.order = "auto";
-      delete u.target;
+  if ((u.order === "bridge" || u.order === "barricade") && target) {
+    const kind = u.order;
+    const existing = structureAt(s, target);
+    if (
+      existing &&
+      (!existing.construction ||
+        existing.team !== u.team ||
+        existing.kind !== kind)
+    ) {
+      finishTravel(u);
+      return;
     }
-    return;
+    const valid =
+      existing?.construction ||
+      (kind === "bridge" ? crossing(s, target) : canBarricade(s, target));
+    if (!valid) {
+      finishTravel(u);
+      return;
+    }
+    if (distance(u, target) === 1) {
+      fundConstruction(s, u, target, kind);
+      return;
+    }
+    const banks =
+      kind === "bridge"
+        ? crossing(s, target)!.banks
+        : [
+            { x: target.x - 1, y: target.y },
+            { x: target.x + 1, y: target.y },
+            { x: target.x, y: target.y - 1 },
+            { x: target.x, y: target.y + 1 },
+          ].filter((p) => walkable(s, p.x, p.y, u.team));
+    target = banks
+      .map((p) => ({ p, step: nextStep(s, u, p, u.team) }))
+      .filter((v) => v.step || distance(u, v.p) === 0)
+      .sort((a, b) => distance(u, a.p) - distance(u, b.p))[0]?.p;
+    if (!target) return; // Keep a blocked manual order for a future opening.
   }
-  if ((u.order === "bridge" || u.order === "dam") && target) {
+  if (u.order === "attack" && target) {
+    const project = structureAt(s, target);
+    if (project?.construction) {
+      if (distance(u, target) === 1) {
+        attackStructure(s, u, project);
+        if (project.hp <= 0) finishTravel(u);
+        return;
+      }
+      const banks = [
+        { x: target.x - 1, y: target.y },
+        { x: target.x + 1, y: target.y },
+        { x: target.x, y: target.y - 1 },
+        { x: target.x, y: target.y + 1 },
+      ].filter((p) => walkable(s, p.x, p.y, u.team));
+      target = banks
+        .map((p) => ({ p, step: nextStep(s, u, p, u.team) }))
+        .filter((v) => v.step)
+        .sort((a, b) => distance(u, a.p) - distance(u, b.p))[0]?.p;
+      if (!target) return;
+    }
+  }
+  if (u.order === "dam" && target) {
     if (buildCrossing(s, u, target, u.order === "dam")) return;
     const existing = structureAt(s, target);
     const cr =
@@ -2108,7 +2244,9 @@ function act(s: State, u: Unit) {
     ((u.order === "attack" &&
       (structure.kind === "barricade" ||
         (target?.x === dest.x && target?.y === dest.y))) ||
-      (structure.kind === "barricade" && structure.team !== u.team))
+      (structure.kind === "barricade" &&
+        !structure.construction &&
+        structure.team !== u.team))
   ) {
     attackStructure(s, u, structure);
     if (
@@ -2532,10 +2670,25 @@ export function loadGame(data: string): State | undefined {
           num(b.maxHp) &&
           b.maxHp > 0 &&
           b.hp <= b.maxHp &&
+          (b.construction === undefined ||
+            (b.construction &&
+              num(b.construction.paid) &&
+              num(b.construction.total) &&
+              b.construction.paid < b.construction.total &&
+              (b.kind === "bridge"
+                ? [500, 1000].includes(b.construction.total)
+                : b.construction.total === 750))) &&
           Array.isArray(b.cells) &&
           b.cells.length === 1 &&
           b.cells.every(
-            (p) => point(p) && tile(s, p.x, p.y)?.terrain === b.kind,
+            (p) =>
+              point(p) &&
+              tile(s, p.x, p.y)?.terrain ===
+                (b.construction
+                  ? b.kind === "bridge"
+                    ? "water"
+                    : "grass"
+                  : b.kind),
           ),
       )
     )

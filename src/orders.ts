@@ -38,6 +38,39 @@ export function destinationActions(
     cost = 0,
     workerId?: number,
   ): DestinationAction => ({ order, label, disabled: gold < cost, workerId });
+  const site = structureAt(s, p);
+  if (site?.construction) {
+    if (site.team !== 0) return [action("attack", "Détruire le chantier")];
+    const banks =
+      site.kind === "bridge"
+        ? (crossing(s, p)?.banks ?? [])
+        : [
+            { x: p.x - 1, y: p.y },
+            { x: p.x + 1, y: p.y },
+            { x: p.x, y: p.y - 1 },
+            { x: p.x, y: p.y + 1 },
+          ].filter(
+            (q) =>
+              tile(s, q.x, q.y) &&
+              !["water", "dam", "barricade"].includes(
+                tile(s, q.x, q.y)!.terrain,
+              ),
+          );
+    const worker = workers.find((u) => banks.some((q) => reachable(u, q)));
+    return [
+      ...(worker
+        ? [
+            action(
+              site.kind,
+              `Terminer ${site.kind === "bridge" ? "le pont" : "la barricade"} · ${Math.ceil(site.construction.total - site.construction.paid)} or restants`,
+              0,
+              worker.id,
+            ),
+          ]
+        : []),
+      action("attack", "Détruire le chantier"),
+    ];
+  }
   if (t.terrain === "water") {
     const c = crossing(s, p),
       worker = c && workers.find((u) => c.banks.some((b) => reachable(u, b)));
@@ -45,8 +78,8 @@ export function destinationActions(
       ? [
           action(
             "bridge",
-            `Construire un pont · ${bridgeCost(s, p)} or`,
-            bridgeCost(s, p),
+            `Construire un pont · ${bridgeCost(s, p)} or · progressif`,
+            0,
             worker.id,
           ),
         ]
@@ -142,7 +175,12 @@ export function destinationActions(
     );
   if (worker && canBarricade(s, p))
     list.push(
-      action("barricade", "Construire une barricade · 750 or", 750, worker.id),
+      action(
+        "barricade",
+        "Construire une barricade · 750 or · progressif",
+        0,
+        worker.id,
+      ),
     );
   if (units.length > 1 || ally) list.push(action("merge", "Fusionner ici"));
   if (units.every((u) => u.x === p.x && u.y === p.y)) {

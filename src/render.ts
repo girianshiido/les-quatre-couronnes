@@ -1,4 +1,11 @@
-import { type State, type Unit, COLORS, tile, LEVELS } from "./engine";
+import {
+  type State,
+  type Unit,
+  COLORS,
+  TEAM_NAMES,
+  tile,
+  LEVELS,
+} from "./engine";
 export const CELL = 16;
 const factionColor = (team: number) => COLORS[team] ?? "#c3a1db";
 export function tier(hp: number) {
@@ -29,6 +36,8 @@ export class Renderer {
   height = 0;
   dpr = 1;
   state!: State;
+  showUnitHP = false;
+  pointer?: { x: number; y: number };
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -276,7 +285,7 @@ export class Renderer {
           c.fillRect(px, py + 1, 2, 14);
         }
       }
-    this.cached = `${s.level}-${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}`;
+    this.cached = `${s.level}-${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => `${b.id}${b.construction ? "p" : "b"}`).join(".")}`;
   }
   paintInfluence(s: State) {
     const growthClock = s.houses.some((h) => s.time - h.founded < 8)
@@ -544,7 +553,7 @@ export class Renderer {
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.fillStyle = "#14282a";
     c.fillRect(0, 0, this.width, this.height);
-    const key = `${s.level}-${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => b.id).join(".")}`;
+    const key = `${s.level}-${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => `${b.id}${b.construction ? "p" : "b"}`).join(".")}`;
     if (this.cached !== key) this.paintTerrain(s);
     c.save();
     c.translate(this.ox, this.oy);
@@ -554,6 +563,23 @@ export class Renderer {
     this.paintInfluence(s);
     c.drawImage(this.influence, 0, 0);
     for (const b of s.structures) {
+      if (b.construction) {
+        const p = b.cells[0],
+          x = p.x * CELL,
+          y = p.y * CELL;
+        c.fillStyle = "#c3a77e";
+        c.fillRect(x + 1, y + 2, 2, 12);
+        c.fillRect(x + 13, y + 2, 2, 12);
+        c.fillRect(x + 1, y + 5, 14, 2);
+        c.fillRect(x + 1, y + 11, 14, 2);
+        c.fillStyle = factionColor(b.team);
+        c.fillRect(
+          x + 1,
+          y + 15,
+          (14 * b.construction.paid) / b.construction.total,
+          2,
+        );
+      }
       if (
         this.zoom < 0.65 &&
         !(hover && b.cells.some((p) => p.x === hover.x && p.y === hover.y))
@@ -570,7 +596,13 @@ export class Renderer {
         c.font = "8px monospace";
         c.fillStyle = "#f3e4b4";
         c.textAlign = "center";
-        c.fillText(`${Math.ceil(b.hp)} PV`, x, y - 3);
+        c.fillText(
+          b.construction
+            ? `Chantier ${Math.floor((100 * b.construction.paid) / b.construction.total)} %`
+            : `${Math.ceil(b.hp)} PV`,
+          x,
+          y - 3,
+        );
       }
     }
     for (const cave of s.caves) {
@@ -692,7 +724,7 @@ export class Renderer {
         Math.floor(u.age * 4),
         !!u.royal,
       );
-      if (u.royal || u.hp >= 1000 || selected.has(u.id)) {
+      if (this.showUnitHP) {
         c.font = "bold 8px monospace";
         c.textAlign = "center";
         c.fillStyle = "#102629";
@@ -700,7 +732,8 @@ export class Renderer {
           u.hp >= 10000
             ? `${(u.hp / 1000).toFixed(1)}k`
             : Math.ceil(u.hp).toString();
-        c.fillRect(x - 12, y - 23 - tier(u.hp) * 3, 24, 9);
+        const width = Math.max(24, c.measureText(text).width + 6);
+        c.fillRect(x - width / 2, y - 23 - tier(u.hp) * 3, width, 9);
         c.fillStyle = "#fff0c1";
         c.fillText(text, x, y - 16 - tier(u.hp) * 3);
       }
@@ -717,11 +750,15 @@ export class Renderer {
         m.hp,
         Math.floor(s.time * 4 + m.id),
       );
-      if (m.hp >= 1000 || (hover && hover.x === m.x && hover.y === m.y)) {
+      if (this.showUnitHP) {
         c.font = "bold 8px monospace";
         c.textAlign = "center";
         c.fillStyle = "#242d2b";
-        c.fillRect(x - 16, y - 25 - tier(m.hp) * 3, 32, 9);
+        const width = Math.max(
+          32,
+          c.measureText(`${Math.ceil(m.hp)}`).width + 6,
+        );
+        c.fillRect(x - width / 2, y - 25 - tier(m.hp) * 3, width, 9);
         c.fillStyle = "#f4c8e5";
         c.fillText(`${Math.ceil(m.hp)}`, x, y - 18 - tier(m.hp) * 3);
       }
@@ -739,6 +776,48 @@ export class Renderer {
       c.strokeStyle = "#f5deb0";
       c.fillRect(drag.x, drag.y, drag.w, drag.h);
       c.strokeRect(drag.x, drag.y, drag.w, drag.h);
+    }
+    if (this.pointer && !drag) {
+      const p = this.pointer;
+      const candidates = [
+        ...s.units.map((u) => ({
+          ...u,
+          name: `${u.royal ? "Roi " : ""}${TEAM_NAMES[u.team]}`,
+        })),
+        ...s.monsters.map((m) => ({ ...m, name: "Monstre", order: "auto" })),
+      ];
+      const hovered = candidates
+        .filter((u) => u.hp > 0)
+        .map((u) => {
+          const q = this.screen(u.x, u.y);
+          if (u.order === "rest" || u.order === "shelter") {
+            q.x += ((u.id % 3) - 1) * 3 * this.zoom;
+            q.y += ((Math.floor(u.id / 3) % 3) - 1) * 2 * this.zoom;
+          }
+          return { u, q, d: Math.hypot(p.x - q.x, p.y - q.y + 4 * this.zoom) };
+        })
+        .filter(
+          ({ u, q }) =>
+            Math.abs(p.x - q.x) <=
+              Math.max(4, (8 + tier(u.hp) * 2) * this.zoom) &&
+            p.y >= q.y - (15 + tier(u.hp) * 3) * this.zoom &&
+            p.y <= q.y + 8 * this.zoom,
+        )
+        .sort((a, b) => a.d - b.d)[0]?.u;
+      if (hovered) {
+        const text = `${hovered.name} · ${Math.ceil(hovered.hp).toLocaleString("fr-FR")} PV`;
+        c.font = "12px sans-serif";
+        c.textAlign = "left";
+        const width = c.measureText(text).width + 18,
+          x = Math.max(4, Math.min(this.width - width - 4, p.x + 14)),
+          y = Math.max(4, Math.min(this.height - 28, p.y - 34));
+        c.fillStyle = "#102629f2";
+        c.fillRect(x, y, width, 24);
+        c.strokeStyle = "#ddc18a";
+        c.strokeRect(x, y, width, 24);
+        c.fillStyle = "#fff0c1";
+        c.fillText(text, x + 9, y + 16);
+      }
     }
   }
 }
