@@ -533,6 +533,20 @@ function hasDestinationOrder(u: Unit) {
     ].includes(u.order)
   );
 }
+function finishEncounter(s: State, a: Unit, b: Unit, winner: Unit | null) {
+  for (const fallen of [a, b]) {
+    if (!fallen.royal || fallen.hp > 0) continue;
+    const captor =
+      winner &&
+      winner.hp > 0 &&
+      winner.team !== fallen.team &&
+      s.kingdoms[winner.team]?.alive
+        ? winner.team
+        : undefined;
+    destroyKingdom(s, fallen.team, captor ?? fallen.team, captor !== undefined);
+  }
+  return winner;
+}
 export function resolveEncounter(s: State, a: Unit, b: Unit) {
   if (a.team === b.team) {
     const win = b.royal || (!a.royal && b.order === "hold") ? b : a,
@@ -567,14 +581,14 @@ export function resolveEncounter(s: State, a: Unit, b: Unit) {
     injure(a, a.hp);
     injure(b, b.hp);
     if (fort) fort.fortification = 0;
-    return null;
+    return finishEncounter(s, a, b, null);
   }
   if (ap > bp) {
     injure(a, Math.min(a.hp - 1, bp * 0.7));
     injure(b, b.hp);
     if (fort) fort.fortification = 0;
     if (s.kingdoms[a.team]) s.kingdoms[a.team].kills++;
-    return a;
+    return finishEncounter(s, a, b, a);
   }
   let damage = ap * 0.7;
   if (fort) {
@@ -585,7 +599,7 @@ export function resolveEncounter(s: State, a: Unit, b: Unit) {
   injure(b, Math.min(b.hp - 1, damage));
   injure(a, a.hp);
   if (s.kingdoms[b.team]) s.kingdoms[b.team].kills++;
-  return b;
+  return finishEncounter(s, a, b, b);
 }
 export function unitUpkeep(u: Unit) {
   return !u.royal && u.hp > 500 ? u.hp * 0.0004 : 0;
@@ -1006,16 +1020,31 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
     u.target = order === "auto" || order === "hold" ? undefined : rally;
   }
 }
-function destroyKingdom(s: State, team: number, attacker: number) {
+function destroyKingdom(
+  s: State,
+  team: number,
+  attacker: number,
+  captureHouses = false,
+) {
   const k = s.kingdoms[team];
   if (!k.alive) return;
   k.alive = false;
   k.hp = 0;
   s.ruins.push({ team, ...k.castle, time: s.time });
   for (const t of s.tiles) if (t.castle === team) t.castle = undefined;
-  for (const h of s.houses.filter((h) => h.team === team))
-    tile(s, h.x, h.y)!.house = undefined;
-  s.houses = s.houses.filter((h) => h.team !== team);
+  const inherited = s.houses.filter((h) => h.team === team);
+  if (captureHouses && attacker !== team && s.kingdoms[attacker]?.alive) {
+    for (const h of inherited) h.team = attacker;
+    s.turfRevision++;
+    log(
+      s,
+      `${inherited.length} maison${inherited.length > 1 ? "s" : ""} de la couronne ${TEAM_NAMES[team]} passe${inherited.length > 1 ? "nt" : ""} sous la couronne ${TEAM_NAMES[attacker]}.`,
+      attacker,
+    );
+  } else {
+    for (const h of inherited) delete tile(s, h.x, h.y)!.house;
+    s.houses = s.houses.filter((h) => h.team !== team);
+  }
   s.units.forEach((u) => {
     if (u.team === team) u.hp = 0;
   });
@@ -1752,8 +1781,6 @@ function act(s: State, u: Unit) {
     )
       continue;
     const winner = resolveEncounter(s, u, other);
-    if (u.royal && u.hp <= 0) destroyKingdom(s, u.team, other.team);
-    if (other.royal && other.hp <= 0) destroyKingdom(s, other.team, u.team);
     if (winner !== u || u.hp <= 0) return;
   }
   injure(u, destroyTurf(s, dest, u.team));

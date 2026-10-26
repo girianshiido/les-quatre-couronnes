@@ -109,3 +109,9 @@ Construire en priorité implique aussi d’épargner : si une parcelle libre est
 Les quatre royaumes défendent désormais leurs maisons et leur château. Les unités d’au moins 1 000 PV peuvent réagir à une invasion distante ; une menace près du château prime sur un petit ennemi en bordure. Elles cherchent une cible accessible qu’elles peuvent vaincre. Un roi protégé dans son propre château n’est pas considéré comme un envahisseur. Les ordres manuels, dont Tenir, ne sont pas annulés.
 
 Une mise à jour disponible ouvre maintenant une confirmation en cours de partie : « Sauvegarder et mettre à jour » ou « Annuler ». Sans validation, le jeu ne recharge pas.
+
+### Recommencer et capturer un royaume
+
+Le bouton **↶ Recommencer le niveau** est accessible en cours de partie dans l’en-tête, ainsi que depuis le menu. La confirmation remet la même carte à zéro avec les conditions initiales, sans attendre une défaite. La doctrine et les niveaux débloqués sont conservés ; la sauvegarde de la partie en cours est remplacée.
+
+Quand une unité élimine un roi adverse, **toutes les maisons de ce roi passent immédiatement au vainqueur**. Leur production, leur position et leur cycle de naissance sont conservés ; les maisons et leur gazon prennent la nouvelle couleur. Cela fonctionne entre les quatre royaumes, y compris lorsqu’un roi meurt dans un assaut raté. Le château vaincu s’effondre et les unités du camp éliminé disparaissent. Les monstres, les morts naturelles et les combats sans survivant ne donnent pas de royaume bénéficiaire.
