@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/build-sw.mjs",
     "test": "node --import tsx --test tests/*.test.ts",
     "sprites": "node --import tsx scripts/sprite-atlas.ts",
     "simulate": "node --import tsx scripts/simulate.ts",

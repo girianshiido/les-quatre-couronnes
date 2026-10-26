@@ -865,3 +865,67 @@ body,
     max-width: 310px;
   }
 }
+
+.pwa-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+}
+.pwa-button svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+.header-actions .pwa-button span {
+  display: none;
+}
+.pwa-button.update-ready {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+.pwa-button.update-ready::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: var(--gold);
+  border-radius: 50%;
+  position: absolute;
+  right: 4px;
+  top: 4px;
+}
+.title-utilities {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.doctrine {
+  list-style: decimal;
+  padding-left: 20px;
+  margin: 12px 0;
+}
+.doctrine li {
+  padding: 5px 0;
+  font-size: 12px;
+}
+.doctrine li::marker {
+  color: var(--gold);
+}
+.doctrine li span {
+  display: inline-block;
+  width: calc(100% - 64px);
+  vertical-align: middle;
+}
+.doctrine button {
+  padding: 4px 7px;
+  margin-left: 3px;
+  font-size: 12px;
+}

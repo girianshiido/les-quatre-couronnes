@@ -1,3 +1,4 @@
+import { DEFAULT_PRIORITIES, validPriorities, type Priority } from "./doctrine";
 import { seedCaves, tickMonsters, attackMonster, attackCave } from "./monsters";
 export type Terrain =
   "grass" | "tree" | "rock" | "water" | "bridge" | "dam" | "barricade";
@@ -39,6 +40,7 @@ export interface Unit extends Point {
   reserve?: number;
   defending?: number;
   formation?: boolean;
+  occupying?: boolean;
   pursue?: number;
   pursueTeam?: number;
 }
@@ -93,6 +95,7 @@ export interface Monster extends Point {
 export interface State {
   version: 2;
   campaignVersion: 2;
+  priorities: Priority[];
   clearedTurf: Record<string, number>;
   turfRevision: number;
   size: number;
@@ -199,6 +202,7 @@ export function createGame(level = 0, seed = 14243): State {
   const s: State = {
     version: 2,
     campaignVersion: 2,
+    priorities: [...DEFAULT_PRIORITIES],
     clearedTurf: {},
     turfRevision: 0,
     size,
@@ -538,6 +542,7 @@ export function resolveEncounter(s: State, a: Unit, b: Unit) {
       win.formation = mission.formation;
       win.pursue = mission.pursue;
       win.pursueTeam = mission.pursueTeam;
+      win.occupying = mission.occupying;
       delete win.defending;
     }
     win.hp += lose.hp;
@@ -672,6 +677,7 @@ export function nextStep(
   goal: Point,
   team: number,
   peaceful = false,
+  civilian = false,
 ): Point | undefined {
   if (
     (start as Unit).formation &&
@@ -682,8 +688,8 @@ export function nextStep(
       formationStep(s, start, goal, team, peaceful, true)
     );
   return (
-    findStep(s, start, goal, team, peaceful, false) ??
-    findStep(s, start, goal, team, peaceful, true)
+    findStep(s, start, goal, team, peaceful, false, civilian) ??
+    findStep(s, start, goal, team, peaceful, true, civilian)
   );
 }
 function findStep(
@@ -693,6 +699,7 @@ function findStep(
   team: number,
   peaceful: boolean,
   clearObstacles: boolean,
+  civilian: boolean,
 ): Point | undefined {
   const total = s.size * s.size,
     prev = new Int32Array(total).fill(-1),
@@ -728,6 +735,14 @@ function findStep(
       if (
         !clearObstacles &&
         ["tree", "rock"].includes(tile(s, nx, ny)!.terrain)
+      )
+        continue;
+      if (
+        civilian &&
+        (["rock", "barricade"].includes(tile(s, nx, ny)!.terrain) ||
+          tile(s, nx, ny)!.cave !== undefined ||
+          (tile(s, nx, ny)!.castle !== undefined &&
+            tile(s, nx, ny)!.castle !== team))
       )
         continue;
       if (peaceful && !peacefulTile(s, nx, ny, team)) continue;
@@ -961,6 +976,15 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
   for (const u of us) {
     u.order = order;
     u.wait = 0;
+    u.occupying =
+      !u.royal &&
+      !!target &&
+      ["move", "attack"].includes(order) &&
+      (!!territoryAt(s, target)?.team ||
+        s.houses.some((h) => h.team !== u.team && distance(h, target) <= 10) ||
+        s.kingdoms.some(
+          (k) => k.alive && k.id !== u.team && distance(k.castle, target) <= 10,
+        ));
     u.formation =
       us.length >= 8 && ["move", "attack", "merge", "shelter"].includes(order);
     delete u.defending;
@@ -1079,6 +1103,7 @@ function shelterPlan(s: State) {
   return plan;
 }
 function updateRest(s: State, u: Unit, noAvailableJob = false) {
+  if (u.occupying && u.hp >= 42 && !noAvailableJob) return;
   if (u.team !== 0 || u.royal || !["auto", "rest"].includes(u.order)) return;
   const plan = shelterPlan(s),
     region = plan.regions[idx(s, u.x, u.y)],
@@ -1126,13 +1151,31 @@ function updateRest(s: State, u: Unit, noAvailableJob = false) {
     u.target = { x: chosen.x, y: chosen.y };
   }
 }
-// Civilian expansion seeks a real reachable task instead of wandering around
-// the old castle. Keep a chosen plot until it is occupied or an order overrides it.
+// The doctrine chooses the first feasible task within successive eight-cell
+// neighbourhoods. A distant job does not prevent nearby development.
+export function setPriorities(s: State, priorities: Priority[]) {
+  if (!validPriorities(priorities)) return false;
+  s.priorities = [...priorities];
+  for (const u of s.units) {
+    if (u.team === 0 && !u.royal && ["auto", "rest"].includes(u.order)) {
+      u.order = "auto";
+      delete u.target;
+      u.wait = 0;
+    }
+  }
+  return true;
+}
 function playerExpansionTarget(s: State, u: Unit) {
-  if (u.team !== 0 || u.royal || u.order !== "auto") return;
+  if (u.team !== 0 || u.royal || !["auto", "rest"].includes(u.order)) return;
+  if (u.hp < 42) {
+    updateRest(s, u, true);
+    return;
+  }
   const k = s.kingdoms[0];
-  const canFound = u.hp >= 42 && k.gold >= 150 + buildingReserve(s, 0);
-  const canClear = u.hp >= 42 && k.gold >= 30;
+  const canFound = k.gold >= 150 + buildingReserve(s, 0);
+  const canClear = k.gold >= 30;
+  const canRaid = s.priorities.includes("raid");
+  const houseTeams = new Map(s.houses.map((h) => [h.id, h.team]));
   const reserved = new Set(
     s.units
       .filter(
@@ -1145,30 +1188,51 @@ function playerExpansionTarget(s: State, u: Unit) {
       )
       .map((v) => idx(s, v.target!.x, v.target!.y)),
   );
+  const permitted = (p: Point) =>
+    canRaid || u.occupying
+      ? walkable(s, p.x, p.y, 0) &&
+        !["rock", "barricade"].includes(tile(s, p.x, p.y)!.terrain) &&
+        tile(s, p.x, p.y)!.cave === undefined &&
+        (tile(s, p.x, p.y)!.castle === undefined ||
+          tile(s, p.x, p.y)!.castle === 0)
+      : peacefulTile(s, p.x, p.y, 0) && autonomousDestination(s, u, p);
   const available = (p: Point) =>
-    !reserved.has(idx(s, p.x, p.y)) && autonomousDestination(s, u, p);
-  const job = (p: Point) =>
-    available(p) &&
-    ((canFound && canHouse(s, p.x, p.y)) ||
-      (canClear && tile(s, p.x, p.y)?.terrain === "tree"));
-  if (u.target && job(u.target)) return;
-  delete u.target;
-  if (!canFound && !canClear) return;
+    !reserved.has(idx(s, p.x, p.y)) && permitted(p);
+  const task = (p: Point): Priority | undefined => {
+    if (!available(p)) return;
+    const house = tile(s, p.x, p.y)?.house;
+    if (house !== undefined && houseTeams.get(house) !== 0) return "raid";
+    if (canFound && canHouse(s, p.x, p.y)) return "house";
+    if (canClear && tile(s, p.x, p.y)?.terrain === "tree") return "clear";
+  };
+  // Keep a real task until completion; reordering the doctrine explicitly cancels it.
+  if (u.order === "auto" && u.target && task(u.target)) return;
+  if (!canFound && !canClear && !canRaid) {
+    updateRest(s, u, true);
+    return;
+  }
   const queue: Point[] = [{ x: u.x, y: u.y }];
   const seen = new Uint8Array(s.tiles.length);
   seen[idx(s, u.x, u.y)] = 1;
-  // Layered search: the nearest open plot wins over clearing an equally near tree.
-  let head = 0;
+  const candidates = new Map<Priority, Point>();
+  let head = 0,
+    depth = 0;
+  const choose = () => {
+    const priority = s.priorities.find((p) => candidates.has(p));
+    if (!priority) return false;
+    u.order = "auto";
+    u.target = candidates.get(priority);
+    return true;
+  };
   while (head < queue.length) {
     const end = queue.length;
-    const layer = queue.slice(head, end);
-    const plot =
-      canFound && layer.find((p) => available(p) && canHouse(s, p.x, p.y));
-    const tree =
-      canClear &&
-      layer.find((p) => available(p) && tile(s, p.x, p.y)?.terrain === "tree");
-    if (plot || tree) {
-      u.target = plot || tree || undefined;
+    for (let i = head; i < end; i++) {
+      const p = queue[i],
+        kind = task(p);
+      if (kind && !candidates.has(kind)) candidates.set(kind, p);
+    }
+    if (candidates.has(s.priorities[0]) || (depth % 8 === 7 && choose())) {
+      choose();
       return;
     }
     while (head < end) {
@@ -1185,7 +1249,7 @@ function playerExpansionTarget(s: State, u: Unit) {
         const n = idx(s, x, y);
         if (
           seen[n] ||
-          !peacefulTile(s, x, y, 0) ||
+          !permitted({ x, y }) ||
           (!canClear && tile(s, x, y)?.terrain === "tree")
         )
           continue;
@@ -1193,8 +1257,9 @@ function playerExpansionTarget(s: State, u: Unit) {
         queue.push({ x, y });
       }
     }
+    depth++;
   }
-  updateRest(s, u, true);
+  if (!choose()) updateRest(s, u, true);
 }
 const landLinks = new WeakMap<
   State,
@@ -1340,6 +1405,13 @@ function updateDefence(s: State, u: Unit) {
     delete u.defending;
   }
 }
+function finishTravel(u: Unit) {
+  u.order = u.royal ? "hold" : "auto";
+  delete u.target;
+  delete u.pursue;
+  delete u.pursueTeam;
+  u.formation = false;
+}
 function act(s: State, u: Unit) {
   const k = s.kingdoms[u.team];
   if (!k.alive || u.hp <= 0) return;
@@ -1364,15 +1436,11 @@ function act(s: State, u: Unit) {
     }
     if (entity) u.target = { x: entity.x, y: entity.y };
     else {
-      u.order = "hold";
-      delete u.target;
-      delete u.pursue;
-      delete u.pursueTeam;
+      finishTravel(u);
     }
   }
   aiSettlementTarget(s, u);
   updateDefence(s, u);
-  updateRest(s, u);
   playerExpansionTarget(s, u);
   let target = u.target;
   if (
@@ -1436,8 +1504,7 @@ function act(s: State, u: Unit) {
     target &&
     distance(u, target) === 0
   ) {
-    u.order = "hold";
-    u.target = undefined;
+    finishTravel(u);
     return;
   }
   if (
@@ -1462,7 +1529,11 @@ function act(s: State, u: Unit) {
         u.team,
         u.order === "rest" ||
           u.order === "shelter" ||
-          (u.team === 0 && u.order === "auto"),
+          (u.team === 0 &&
+            u.order === "auto" &&
+            !u.occupying &&
+            !s.priorities.includes("raid")),
+        u.team === 0 && u.order === "auto",
       )
     : undefined;
   if (!target) {
@@ -1537,8 +1608,7 @@ function act(s: State, u: Unit) {
       target?.x === dest.x &&
       target?.y === dest.y
     ) {
-      u.order = "hold";
-      delete u.target;
+      finishTravel(u);
     }
     return;
   }
@@ -1601,8 +1671,7 @@ function act(s: State, u: Unit) {
     u.target &&
     distance(u, u.target) === 0
   ) {
-    u.order = "hold";
-    delete u.target;
+    finishTravel(u);
   }
 }
 export function step(s: State, dt = 0.2) {
@@ -1776,6 +1845,8 @@ export function loadGame(data: string): State | undefined {
     if (s.turfRevision === undefined) s.turfRevision = 0;
     if (s.caves === undefined) s.caves = [];
     if (s.monsters === undefined) s.monsters = [];
+    if (s.priorities === undefined) s.priorities = [...DEFAULT_PRIORITIES];
+    if (!validPriorities(s.priorities)) return;
     if (Array.isArray(s.houses))
       for (const h of s.houses)
         if (h && h.interval === undefined)
@@ -1878,6 +1949,7 @@ export function loadGame(data: string): State | undefined {
           Number.isFinite(u.wait) &&
           (u.defending === undefined || int(u.defending)) &&
           (u.formation === undefined || typeof u.formation === "boolean") &&
+          (u.occupying === undefined || typeof u.occupying === "boolean") &&
           (u.pursue === undefined || int(u.pursue)) &&
           (u.pursueTeam === undefined || faction(u.pursueTeam)) &&
           (!u.royal ||

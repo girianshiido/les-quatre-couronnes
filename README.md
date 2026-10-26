@@ -14,7 +14,7 @@ Les nouvelles cartes vont de **64 × 64 à 80 × 80**, sans quadrillage visible.
 
 ## Habitants, vie et territoire
 
-Les habitants naissent à **100 PV**. Ils errent, fondent rapidement des maisons sur les terres libres et coupent les arbres. Une maison ne peut jamais toucher une autre maison, même en diagonale. Les autres travaux et les offensives du joueur demandent un ordre. En cas d’invasion, les habitants proches des maisons ou du château défendent leur territoire ; un ordre manuel reste prioritaire.
+Les habitants naissent à **100 PV**. Ils cherchent des tâches accessibles suivant votre doctrine : maisons, destruction des maisons adverses ou coupe d’arbres. Une maison ne peut jamais toucher une autre maison, même en diagonale. Les autres travaux et les assauts directs contre les rois demandent un ordre. En cas d’invasion, les habitants proches des maisons ou du château défendent leur territoire ; un ordre manuel reste prioritaire.
 
 - **Fusion :** deux alliés qui se rencontrent additionnent leurs PV. Sur une maison, les habitants peuvent cohabiter sans fusion forcée ; l’ordre Fusionner permet de les rassembler. Les unités qui rejoignent leur roi fusionnent avec lui.
 - **Combat :** entre unités ordinaires, la plus forte gagne et perd 70 % des PV du vaincu. À égalité, les deux meurent. Les combats et destructions ne coûtent pas d’or.
@@ -90,6 +90,12 @@ pnpm simulate
 
 ### Expansion et ordres de groupe
 
-Sans ordre explicite, chaque habitant cherche une parcelle libre accessible à proximité, puis au-delà des passages ouverts, pour y construire une maison. Les arbres peuvent être défrichés ; les zones adverses exigent toujours un ordre d’attaque, hors défense locale. Les habitants de moins de 42 PV préfèrent attendre sur une maison. Les parcelles visées sont réparties entre les habitants pour limiter les regroupements inutiles.
+Sans ordre explicite, chaque habitant cherche une parcelle libre accessible à proximité, puis au-delà des passages ouverts, pour y construire une maison. Les arbres peuvent être défrichés ; la destruction des maisons adverses suit désormais votre doctrine réordonnable. Les habitants de moins de 42 PV préfèrent attendre sur une maison. Les parcelles visées sont réparties entre les habitants pour limiter les regroupements inutiles.
 
 Une fusion conserve la mission de déplacement ou d’attaque en cours, sans entraîner le roi. Les attaques traversent les ponts du trajet ; elles ne détruisent un pont que lorsqu’il est lui-même la cible de l’ordre. Un ordre temporairement inaccessible reste en attente et reprend dès qu’un passage s’ouvre. Les chemins dégagés sont privilégiés avant ceux qui nécessitent un défrichage.
+
+### Doctrine et installation
+
+Le conseil contient trois priorités réordonnables avec les boutons ↑ et ↓ : construire sur terrain libre, détruire les maisons adverses, couper les arbres. Le premier travail réalisable dans le voisinage est privilégié ; à défaut, la recherche s’élargit. L’abri sur une maison reste le recours lorsqu’il n’y a pas de travail ; sous 42 PV, le repos prime. Un changement de doctrine réoriente les unités autonomes immédiatement, sans interrompre les ordres manuels. La doctrine est conservée avec la sauvegarde et lors du passage à une autre vallée. Après un déplacement, les habitants reprennent leur activité ; seuls le roi et l’ordre explicite Tenir restent immobiles.
+
+Le bouton Installer le jeu figure sur l’écran titre et dans l’en-tête. Dans un navigateur compatible, il déclenche l’installation ; sinon, il indique comment installer depuis le navigateur. Une fois installé, il devient ↻ et recherche les mises à jour. Une pastille dorée annonce une version prête. Le jeu sauvegarde la partie avant d’activer cette version et de recharger. Le manifeste et le service worker gardent les fichiers du jeu disponibles hors connexion après un premier chargement réussi. Les sauvegardes restent locales au navigateur utilisé.
