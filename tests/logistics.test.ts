@@ -252,7 +252,7 @@ for (const team of [0, 1, 2, 3])
     assert.ok(supported.razed >= 9);
     assert.ok(poor.s.kingdoms[team].gold >= 0);
   });
-test("raising taxes only finances a limited army; ten houses earn less than remote 3000 HP upkeep", () => {
+test("doubled tax revenue can fund a remote 3000 HP army but does not remove the housing support penalty", () => {
   const s = createGame();
   for (let y = 22; y <= 24; y++)
     for (let x = 4; x <= 24; x++) tile(s, x, y)!.terrain = "grass";
@@ -262,7 +262,8 @@ test("raising taxes only finances a limited army; ten houses earn less than remo
   const homes = s.houses.filter((h) => h.team === 0).length;
   assert.equal(homes, 10);
   assert.equal(armyCapacity(s, 0), 2000);
-  assert.ok(maintenanceCost(s, 0) > goldIncome(s, 0));
+  assert.ok(Math.abs(goldIncome(s, 0) - 21) < 1e-8);
+  assert.ok(maintenanceCost(s, 0) < goldIncome(s, 0));
   assert.ok(supportDrain(s, u) >= 220);
   assert.equal(houseDestructionCost(3000), 350);
 });

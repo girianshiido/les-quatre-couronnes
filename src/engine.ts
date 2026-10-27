@@ -33,6 +33,7 @@ export const CONTINUOUS_ORDERS: readonly Order[] = [
 ];
 export const isContinuousOrder = (order: Order) =>
   CONTINUOUS_ORDERS.includes(order);
+export const CLEARING_COSTS = { tree: 30, rock: 15 } as const;
 export interface Point {
   x: number;
   y: number;
@@ -830,7 +831,7 @@ export function goldIncome(s: State, team: number) {
   const k = s.kingdoms[team];
   if (!k.alive || k.tax === 0) return 0;
   return (
-    s.houses.filter((h) => h.team === team).length * k.tax * 0.035 +
+    s.houses.filter((h) => h.team === team).length * k.tax * 0.07 +
     s.tiles.filter((t) => t.terrain === "dam" && t.owner === team).length * 0.2
   );
 }
@@ -2095,7 +2096,7 @@ function continuousJob(s: State, u: Unit, p: Point) {
   if (u.order === "clear-many")
     return (
       (t.terrain === "tree" && s.kingdoms[u.team].gold >= 30) ||
-      (t.terrain === "rock" && s.kingdoms[u.team].gold >= 3)
+      (t.terrain === "rock" && s.kingdoms[u.team].gold >= CLEARING_COSTS.rock)
     );
   return u.order === "demolish-many" && structureAt(s, p)?.kind === "barricade";
 }
@@ -2157,7 +2158,7 @@ function updateContinuousWork(s: State, u: Unit) {
   const gold = s.kingdoms[u.team].gold;
   if (
     (u.order === "build-many" && gold < 150) ||
-    (u.order === "clear-many" && gold < 3)
+    (u.order === "clear-many" && gold < CLEARING_COSTS.rock)
   ) {
     stopContinuousWork(s, u);
     return;
@@ -2497,7 +2498,7 @@ function act(s: State, u: Unit) {
   }
   if (t.terrain === "barricade") return;
   if (t.terrain === "tree" || t.terrain === "rock") {
-    const cost = t.terrain === "tree" ? 30 : 3;
+    const cost = CLEARING_COSTS[t.terrain];
     // A lower-priority clearing task must not repeatedly consume the savings
     // needed for an already available foundation.
     if (t.terrain === "tree" && savingForHouse(s, u)) return;

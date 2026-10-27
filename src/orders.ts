@@ -13,6 +13,7 @@ import {
   territoryAt,
   combatPower,
   distance,
+  CLEARING_COSTS,
 } from "./engine";
 export interface DestinationAction {
   order: Order;
@@ -127,11 +128,17 @@ export function destinationActions(
             "move",
             t.terrain === "tree"
               ? "Couper cet arbre · 30 or"
-              : "Dégager ce rocher · 3 or",
-            t.terrain === "tree" ? 30 : 3,
+              : `Dégager ce rocher · ${CLEARING_COSTS.rock} or`,
+            CLEARING_COSTS[t.terrain],
           ),
           ...(workers.length
-            ? [action("clear-many", "Déblayer les obstacles en continu", 3)]
+            ? [
+                action(
+                  "clear-many",
+                  "Déblayer les obstacles en continu",
+                  CLEARING_COSTS.rock,
+                ),
+              ]
             : []),
         ]
       : [];
@@ -168,7 +175,11 @@ export function destinationActions(
       ...(workers.length
         ? [
             action("build-many", "Construire des maisons en continu", 150),
-            action("clear-many", "Déblayer les obstacles en continu", 3),
+            action(
+              "clear-many",
+              "Déblayer les obstacles en continu",
+              CLEARING_COSTS.rock,
+            ),
           ]
         : []),
     ];
@@ -199,7 +210,11 @@ export function destinationActions(
   if (worker && t.terrain === "grass")
     list.push(
       action("build-many", "Construire des maisons en continu", 150),
-      action("clear-many", "Déblayer les obstacles en continu", 3),
+      action(
+        "clear-many",
+        "Déblayer les obstacles en continu",
+        CLEARING_COSTS.rock,
+      ),
       action("demolish-many", "Détruire les barricades en continu"),
     );
   if (worker && canBarricade(s, p))

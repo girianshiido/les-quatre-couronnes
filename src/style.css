@@ -1021,3 +1021,51 @@ body,
     sans-serif;
   line-height: 1.3;
 }
+
+.map-controls {
+  align-items: center;
+  max-width: calc(100% - 24px);
+}
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+  background: #152a2bea;
+  font-size: 11px;
+}
+.speed-control input {
+  width: 100px;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--gold);
+}
+.speed-control output {
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 650px) {
+  .map-controls {
+    gap: 3px;
+  }
+  .map-controls button {
+    min-width: 30px;
+    padding: 7px 5px;
+  }
+  .speed-control {
+    gap: 4px;
+    padding: 6px;
+  }
+  .speed-caption {
+    display: none;
+  }
+  .speed-control input {
+    width: 70px;
+  }
+  .speed-control output {
+    min-width: 28px;
+  }
+}

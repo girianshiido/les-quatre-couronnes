@@ -68,17 +68,17 @@ function troop(s: State, x: number, y = 30, hp = 500): Unit {
 function advance(s: State, seconds: number) {
   for (let i = 0; i < seconds * 5; i++) step(s);
 }
-test("50 houses earn 42 gold/s at 24% without accelerating births", () => {
+test("50 houses earn 84 gold/s at 24% without accelerating births", () => {
   const s = setup(50);
-  assert.ok(Math.abs(goldIncome(s, 0) - 42) < 1e-8);
+  assert.ok(Math.abs(goldIncome(s, 0) - 84) < 1e-8);
   assert.ok(birthInterval(24) > 117);
   s.kingdoms[0].tax = 0;
   assert.ok(Math.abs(goldIncome(s, 0) - 0) < 1e-8);
   assert.equal(birthInterval(0), 6);
   s.kingdoms[0].tax = 30;
-  assert.ok(Math.abs(goldIncome(s, 0) - 52.5) < 1e-8);
+  assert.ok(Math.abs(goldIncome(s, 0) - 105) < 1e-8);
 });
-test("at automatic 24% taxes, a 3000 HP builder keeps founding after exhausting the starting treasury", () => {
+test("starting at automatic 24% taxes, doubled income keeps a 3000 HP builder founding and lets taxes ease", () => {
   const s = setup(50),
     u = troop(s, 20, 30, 3000);
   s.kingdoms[0].gold = 0;
@@ -87,7 +87,7 @@ test("at automatic 24% taxes, a 3000 HP builder keeps founding after exhausting 
   advance(s, 30);
   assert.ok(s.houses.filter((h) => h.team === 0).length >= before + 5);
   assert.ok(u.hp > 1000 && u.order !== "merge");
-  assert.equal(s.kingdoms[0].tax, 24);
+  assert.ok(s.kingdoms[0].tax > 0 && s.kingdoms[0].tax < 24);
   assert.equal(s.kingdoms[0].births, 0);
   assert.ok(s.kingdoms[0].gold >= 0);
 });
@@ -209,7 +209,7 @@ test("gold rises and births slow continuously across every tax rate for every ki
       k.tax = tax;
       const income = goldIncome(s, k.id),
         interval = birthInterval(tax);
-      assert.ok(Math.abs(income - homes * tax * 0.035) < 1e-8);
+      assert.ok(Math.abs(income - homes * tax * 0.07) < 1e-8);
       assert.ok(income > previousGold && interval > previousInterval);
       previousGold = income;
       previousInterval = interval;
