@@ -189,18 +189,6 @@ canvas {
   min-width: 33px;
   padding: 7px 10px;
 }
-.map-help {
-  position: absolute;
-  bottom: 19px;
-  left: 21px;
-  color: #c0cbbb;
-  background: #14282ae0;
-  border: 1px solid var(--edge);
-  border-radius: 5px;
-  padding: 8px 12px;
-  font-size: 10px;
-  pointer-events: none;
-}
 .time {
   position: absolute;
   top: 20px;
@@ -614,12 +602,6 @@ kbd {
   .map-head p {
     font-size: 9px;
   }
-  .map-help {
-    max-width: 230px;
-    left: 12px;
-    bottom: 14px;
-    font-size: 9px;
-  }
   .time {
     top: 90px;
     right: 12px;
@@ -704,10 +686,6 @@ kbd {
   .time {
     top: 100px;
   }
-  .map-help {
-    bottom: 64px;
-    max-width: 220px;
-  }
   .map-controls {
     bottom: 15px;
     right: 12px;
@@ -768,9 +746,6 @@ kbd {
 }
 .selection-menu button.active {
   border-color: #ddc18a;
-}
-.selection-menu:not(.hidden) ~ .map-help {
-  display: none;
 }
 @media (max-width: 650px) {
   .selection-menu {
