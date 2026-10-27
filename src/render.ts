@@ -850,16 +850,8 @@ export class Renderer {
       .filter((u) => this.visible(u))
       .sort((a, b) => a.y - b.y);
     for (const u of units) {
-      const x =
-          (u.x + 0.5) * CELL +
-          (u.order === "rest" || u.order === "shelter"
-            ? ((u.id % 3) - 1) * 3
-            : 0),
-        y =
-          (u.y + 0.5) * CELL +
-          (u.order === "rest" || u.order === "shelter"
-            ? ((Math.floor(u.id / 3) % 3) - 1) * 2
-            : 0);
+      const x = (u.x + 0.5) * CELL,
+        y = (u.y + 0.5) * CELL;
       if (selected.has(u.id)) {
         c.strokeStyle = "#fff4bc";
         c.lineWidth = 1.5 / this.zoom;
@@ -943,10 +935,6 @@ export class Renderer {
         .filter((u) => u.hp > 0)
         .map((u) => {
           const q = this.screen(u.x, u.y);
-          if (u.order === "rest" || u.order === "shelter") {
-            q.x += ((u.id % 3) - 1) * 3 * this.zoom;
-            q.y += ((Math.floor(u.id / 3) % 3) - 1) * 2 * this.zoom;
-          }
           return { u, q, d: Math.hypot(p.x - q.x, p.y - q.y + 4 * this.zoom) };
         })
         .filter(

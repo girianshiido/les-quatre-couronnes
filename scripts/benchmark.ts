@@ -6,7 +6,7 @@ import {
   maintenanceCost,
 } from "../src/engine.ts";
 import { performance } from "node:perf_hooks";
-for (const size of [80, 64]) {
+for (const size of [48, 64, 80]) {
   const previous = LEVELS[0].size;
   LEVELS[0].size = size;
   const s = createGame(0, 14243);

@@ -40,7 +40,13 @@ export function destinationActions(
   ): DestinationAction => ({ order, label, disabled: gold < cost, workerId });
   const site = structureAt(s, p);
   if (site?.construction) {
-    if (site.team !== 0) return [action("attack", "Détruire le chantier")];
+    if (site.team !== 0)
+      return [
+        action("attack", "Détruire le chantier"),
+        ...(site.kind === "barricade" && workers.length
+          ? [action("demolish-many", "Détruire les barricades en continu")]
+          : []),
+      ];
     const banks =
       site.kind === "bridge"
         ? (crossing(s, p)?.banks ?? [])
@@ -69,6 +75,9 @@ export function destinationActions(
           ]
         : []),
       action("attack", "Détruire le chantier"),
+      ...(site.kind === "barricade" && workers.length
+        ? [action("demolish-many", "Détruire les barricades en continu")]
+        : []),
     ];
   }
   if (t.terrain === "water") {
@@ -93,6 +102,9 @@ export function destinationActions(
           "attack",
           `Détruire la barricade · ${Math.ceil(structure.hp)} PV`,
         ),
+        ...(workers.length
+          ? [action("demolish-many", "Détruire les barricades en continu")]
+          : []),
       ];
     const list = [
       action("move", "Traverser le pont"),
@@ -118,6 +130,9 @@ export function destinationActions(
               : "Dégager ce rocher · 3 or",
             t.terrain === "tree" ? 30 : 3,
           ),
+          ...(workers.length
+            ? [action("clear-many", "Déblayer les obstacles en continu", 3)]
+            : []),
         ]
       : [];
   if (t.castle !== undefined && t.castle !== 0) {
@@ -148,7 +163,15 @@ export function destinationActions(
   );
   if (ally?.royal) return [action("merge", "Fusionner avec le roi")];
   if (house) {
-    const a = [action("shelter", "S’abriter sur cette maison")];
+    const a = [
+      action("shelter", "S’abriter sur cette maison"),
+      ...(workers.length
+        ? [
+            action("build-many", "Construire des maisons en continu", 150),
+            action("clear-many", "Déblayer les obstacles en continu", 3),
+          ]
+        : []),
+    ];
     if (units.length > 1 || ally) a.push(action("merge", "Fusionner ici"));
     if (units.every((u) => u.x === p.x && u.y === p.y))
       a.push(action("auto", "Reprendre l’autonomie"));
@@ -172,6 +195,12 @@ export function destinationActions(
         150,
         worker.id,
       ),
+    );
+  if (worker && t.terrain === "grass")
+    list.push(
+      action("build-many", "Construire des maisons en continu", 150),
+      action("clear-many", "Déblayer les obstacles en continu", 3),
+      action("demolish-many", "Détruire les barricades en continu"),
     );
   if (worker && canBarricade(s, p))
     list.push(

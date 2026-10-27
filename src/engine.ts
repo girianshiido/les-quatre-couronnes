@@ -15,6 +15,9 @@ export type Order =
   | "attack"
   | "merge"
   | "house"
+  | "build-many"
+  | "clear-many"
+  | "demolish-many"
   | "bridge"
   | "dam"
   | "barricade"
@@ -23,6 +26,13 @@ export type Order =
   | "shelter"
   | "defend"
   | "raid";
+export const CONTINUOUS_ORDERS: readonly Order[] = [
+  "build-many",
+  "clear-many",
+  "demolish-many",
+];
+export const isContinuousOrder = (order: Order) =>
+  CONTINUOUS_ORDERS.includes(order);
 export interface Point {
   x: number;
   y: number;
@@ -181,7 +191,7 @@ export const LEVELS = VALLEYS.flatMap((names, biomeId) =>
     biome: BIOME_NAMES[biomeId],
     biomeId,
     stage,
-    size: 64 + biomeId * 2 + Math.floor(stage / 2) * 4,
+    size: 48,
     scenario: ["valley", "ridge", "islands", "gorge", "arena"][stage],
     enemyHouses: biomeId === 0 ? 4 : biomeId < 2 ? 4 : biomeId < 4 ? 5 : 6,
     caves: stage === 3 || (stage === 4 && biomeId >= 2),
@@ -301,7 +311,7 @@ export function createGame(level = 0, seed = 14243): State {
         variant: Math.floor(hash * 8),
       });
     }
-  const m = 13;
+  const m = Math.round(size * 0.2);
   const bases = [
     { x: m, y: m },
     { x: size - 1 - m, y: m },
@@ -342,8 +352,10 @@ export function createGame(level = 0, seed = 14243): State {
       level === 0 ? (team === 0 ? 9 : 6) : 5 + Math.floor(random(s) * 3);
     for (let dy = -radius; dy <= radius; dy++)
       for (let dx = -radius; dx <= radius; dx++)
-        if (dx * dx + dy * dy <= radius * radius)
-          tile(s, c.x + dx, c.y + dy)!.terrain = "grass";
+        if (dx * dx + dy * dy <= radius * radius) {
+          const t = tile(s, c.x + dx, c.y + dy)!;
+          if (level !== 0 || t.terrain !== "water") t.terrain = "grass";
+        }
     if (level >= 2 && (team === seed % 4 || random(s) < 0.3)) {
       const side = random(s) < 0.5 ? -1 : 1;
       for (let n = -6; n <= 6; n++)
@@ -394,10 +406,10 @@ export function createGame(level = 0, seed = 14243): State {
   return s;
 }
 function tutorialRiverX(size: number, y: number, phase: number) {
-  return Math.floor(size * 0.56 + Math.sin(y * 0.11 + phase) * 1.5);
+  return Math.floor(size * 0.58 + Math.sin(y * 0.11 + phase) * 1.5);
 }
 function tutorialRiverY(size: number, x: number, phase: number) {
-  return Math.floor(size * 0.56 + Math.sin(x * 0.1 - phase) * 1.5);
+  return Math.floor(size * 0.58 + Math.sin(x * 0.1 - phase) * 1.5);
 }
 function connectTutorialOpponents(s: State, phase: number) {
   const blue = s.kingdoms[1].castle,
@@ -560,6 +572,7 @@ export function spawn(s: State, h: House) {
     heading: { x: 0, y: 0 },
   });
   s.kingdoms[h.team].births++;
+  mergeStackedAllies(s);
 }
 export function walkable(s: State, x: number, y: number, team: number) {
   const t = tile(s, x, y);
@@ -706,19 +719,20 @@ export function combatPower(s: State, u: Unit) {
 }
 function hasDestinationOrder(u: Unit) {
   return (
-    !!u.target &&
-    [
-      "move",
-      "attack",
-      "merge",
-      "shelter",
-      "raid",
-      "defend",
-      "house",
-      "bridge",
-      "dam",
-      "barricade",
-    ].includes(u.order)
+    isContinuousOrder(u.order) ||
+    (!!u.target &&
+      [
+        "move",
+        "attack",
+        "merge",
+        "shelter",
+        "raid",
+        "defend",
+        "house",
+        "bridge",
+        "dam",
+        "barricade",
+      ].includes(u.order))
   );
 }
 function finishEncounter(s: State, a: Unit, b: Unit, winner: Unit | null) {
@@ -968,6 +982,19 @@ function findStep(
           ny === goal.y &&
           tile(s, nx, ny)?.terrain === "barricade"
         )
+      )
+        continue;
+      if (
+        isContinuousOrder((start as Unit).order) &&
+        ["tree", "rock", "barricade"].includes(tile(s, nx, ny)!.terrain) &&
+        (nx !== goal.x || ny !== goal.y)
+      )
+        continue;
+      if (
+        isContinuousOrder((start as Unit).order) &&
+        (tile(s, nx, ny)!.cave !== undefined ||
+          (tile(s, nx, ny)!.castle !== undefined &&
+            tile(s, nx, ny)!.castle !== team))
       )
         continue;
       if (
@@ -1289,7 +1316,9 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
       ids.includes(u.id) &&
       u.team === 0 &&
       u.hp > 0 &&
-      (!u.royal || !["house", "bridge", "dam", "barricade"].includes(order)),
+      (!u.royal ||
+        (!isContinuousOrder(order) &&
+          !["house", "bridge", "dam", "barricade"].includes(order))),
   );
   if (!us.length) return;
   const mergeGroup = order === "merge" ? s.nextId++ : undefined;
@@ -1343,7 +1372,10 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
       u.pursue = entity.id;
       u.pursueTeam = "team" in entity ? entity.team : 4;
     }
-    u.target = order === "auto" || order === "hold" ? undefined : rally;
+    u.target =
+      order === "auto" || order === "hold" || isContinuousOrder(order)
+        ? undefined
+        : rally;
   }
 }
 function destroyKingdom(
@@ -2043,6 +2075,97 @@ function updateDefence(s: State, u: Unit) {
     delete u.defending;
   }
 }
+// Persistent manual work searches the whole reachable map in shortest-path order.
+// An obstacle is an endpoint, never a passage to work on the other side of it.
+function continuousJob(s: State, u: Unit, p: Point) {
+  const t = tile(s, p.x, p.y);
+  if (
+    !t ||
+    t.cave !== undefined ||
+    (t.castle !== undefined && t.castle !== u.team)
+  )
+    return false;
+  if (u.order === "build-many") {
+    const house =
+      t.house === undefined
+        ? undefined
+        : s.houses.find((h) => h.id === t.house);
+    return canHouse(s, p.x, p.y) || (!!house && house.team !== u.team);
+  }
+  if (u.order === "clear-many")
+    return (
+      (t.terrain === "tree" && s.kingdoms[u.team].gold >= 30) ||
+      (t.terrain === "rock" && s.kingdoms[u.team].gold >= 3)
+    );
+  return u.order === "demolish-many" && structureAt(s, p)?.kind === "barricade";
+}
+function nearestWork(s: State, u: Unit, shelter = false): Point | undefined {
+  const houses = new Set(
+    s.houses.filter((h) => h.team === u.team).map((h) => idx(s, h.x, h.y)),
+  );
+  const seen = new Uint8Array(s.tiles.length),
+    queue = new Int32Array(s.tiles.length);
+  let head = 0,
+    tail = 1;
+  queue[0] = idx(s, u.x, u.y);
+  seen[queue[0]] = 1;
+  while (head < tail) {
+    const n = queue[head++],
+      p = { x: n % s.size, y: Math.floor(n / s.size) },
+      t = tile(s, p.x, p.y)!;
+    if (shelter ? houses.has(n) : continuousJob(s, u, p)) return p;
+    if (n !== queue[0] && ["tree", "rock", "barricade"].includes(t.terrain))
+      continue;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const x = p.x + dx,
+        y = p.y + dy;
+      if (!inside(s, x, y)) continue;
+      const i = idx(s, x, y),
+        v = tile(s, x, y)!;
+      if (
+        seen[i] ||
+        v.cave !== undefined ||
+        (v.castle !== undefined && v.castle !== u.team)
+      )
+        continue;
+      const job = !shelter && continuousJob(s, u, { x, y });
+      if (!walkable(s, x, y, u.team) && !job) continue;
+      if (["tree", "rock", "barricade"].includes(v.terrain) && !job) continue;
+      seen[i] = 1;
+      queue[tail++] = i;
+    }
+  }
+}
+function stopContinuousWork(s: State, u: Unit) {
+  const home = nearestWork(s, u, true);
+  finishTravel(u);
+  u.order = home ? "shelter" : "hold";
+  u.target = home;
+  log(
+    s,
+    "Le travail en continu est terminé : fonds insuffisants ou plus de tâche accessible.",
+    u.team,
+  );
+}
+function updateContinuousWork(s: State, u: Unit) {
+  if (!isContinuousOrder(u.order)) return;
+  const gold = s.kingdoms[u.team].gold;
+  if (
+    (u.order === "build-many" && gold < 150) ||
+    (u.order === "clear-many" && gold < 3)
+  ) {
+    stopContinuousWork(s, u);
+    return;
+  }
+  if (u.target && continuousJob(s, u, u.target)) return;
+  u.target = nearestWork(s, u);
+  if (!u.target) stopContinuousWork(s, u);
+}
 function finishTravel(u: Unit) {
   u.order = u.royal ? "hold" : "auto";
   delete u.target;
@@ -2087,6 +2210,8 @@ function act(s: State, u: Unit) {
   updateDefence(s, u);
   aiRaidTarget(s, u);
   playerExpansionTarget(s, u);
+  updateContinuousWork(s, u);
+  if (["hold"].includes(u.order)) return;
   let target = u.target;
   if (
     (u.order === "rest" || u.order === "shelter") &&
@@ -2134,12 +2259,15 @@ function act(s: State, u: Unit) {
       .sort((a, b) => distance(u, a.p) - distance(u, b.p))[0]?.p;
     if (!target) return; // Keep a blocked manual order for a future opening.
   }
-  if (u.order === "attack" && target) {
+  if ((u.order === "attack" || u.order === "demolish-many") && target) {
     const project = structureAt(s, target);
     if (project?.construction) {
       if (distance(u, target) === 1) {
         attackStructure(s, u, project);
-        if (project.hp <= 0) finishTravel(u);
+        if (project.hp <= 0) {
+          if (u.order === "demolish-many") delete u.target;
+          else finishTravel(u);
+        }
         return;
       }
       const banks = [
@@ -2193,6 +2321,7 @@ function act(s: State, u: Unit) {
   }
   if (
     (u.order === "house" ||
+      (u.order === "build-many" && canHouse(s, u.x, u.y)) ||
       (["raid", "auto"].includes(u.order) &&
         canHouse(s, u.x, u.y) &&
         k.gold >= 150 + buildingReserve(s, u.team))) &&
@@ -2201,11 +2330,11 @@ function act(s: State, u: Unit) {
   ) {
     if (addHouse(s, u.team, u.x, u.y)) {
       injure(u, Math.min(100, u.hp));
-      u.order = "auto";
+      if (u.order !== "build-many") u.order = "auto";
       delete u.target;
       log(s, "Une nouvelle maison rejoint le royaume.", u.team);
     } else {
-      u.order = "auto";
+      if (u.order !== "build-many") u.order = "auto";
       u.target = undefined;
     }
     return;
@@ -2320,6 +2449,10 @@ function act(s: State, u: Unit) {
     }
   }
   if (!dest) {
+    if (isContinuousOrder(u.order)) {
+      delete u.target;
+      return;
+    }
     if (u.order === "raid") {
       u.order = "auto";
       delete u.target;
@@ -2343,7 +2476,7 @@ function act(s: State, u: Unit) {
   const structure = structureAt(s, dest);
   if (
     structure &&
-    ((u.order === "attack" &&
+    (((u.order === "attack" || u.order === "demolish-many") &&
       (structure.kind === "barricade" ||
         (target?.x === dest.x && target?.y === dest.y))) ||
       (structure.kind === "barricade" &&
@@ -2352,12 +2485,13 @@ function act(s: State, u: Unit) {
   ) {
     attackStructure(s, u, structure);
     if (
-      u.order === "attack" &&
+      (u.order === "attack" || u.order === "demolish-many") &&
       structure.hp <= 0 &&
       target?.x === dest.x &&
       target?.y === dest.y
     ) {
-      finishTravel(u);
+      if (u.order === "demolish-many") delete u.target;
+      else finishTravel(u);
     }
     return;
   }
@@ -2386,14 +2520,6 @@ function act(s: State, u: Unit) {
   for (const other of occupants) {
     if (other.hp <= 0) continue;
     if (u.order === "rest" && other.team !== u.team) return;
-    if (
-      other.team === u.team &&
-      !u.royal &&
-      !other.royal &&
-      t.house !== undefined &&
-      !["merge", "house", "bridge", "dam", "barricade"].includes(u.order)
-    )
-      continue;
     const winner = resolveEncounter(s, u, other);
     if (winner !== u || u.hp <= 0) return;
   }
@@ -2424,8 +2550,23 @@ function act(s: State, u: Unit) {
     finishTravel(u);
   }
 }
+function mergeStackedAllies(s: State) {
+  const occupied = new Map<number, Unit>();
+  let merged = false;
+  for (const u of s.units) {
+    if (u.hp <= 0 || !s.kingdoms[u.team].alive) continue;
+    const key = u.team * s.tiles.length + idx(s, u.x, u.y),
+      other = occupied.get(key);
+    if (other && other.hp > 0) {
+      occupied.set(key, resolveEncounter(s, u, other)!);
+      merged = true;
+    } else occupied.set(key, u);
+  }
+  if (merged) s.units = s.units.filter((u) => u.hp > 0);
+}
 export function step(s: State, dt = 0.2) {
   if (s.result !== "playing") return;
+  mergeStackedAllies(s);
   supplyFields.delete(s);
   s.time += dt;
   refreshKings(s);
@@ -2613,6 +2754,9 @@ export function loadGame(data: string): State | undefined {
       "attack",
       "merge",
       "house",
+      "build-many",
+      "clear-many",
+      "demolish-many",
       "bridge",
       "dam",
       "barricade",
@@ -2865,6 +3009,7 @@ export function loadGame(data: string): State | undefined {
       )
     )
       return;
+    mergeStackedAllies(s);
     return s;
   } catch {
     return;

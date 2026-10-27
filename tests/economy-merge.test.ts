@@ -98,11 +98,12 @@ test("builders waiting for 150 gold stay on their current house instead of commu
   const us = Array.from({ length: 3 }, () => troop(s, h.x, h.y, 100));
   s.kingdoms[0].gold = 0;
   advance(s, 10);
-  assert.ok(
-    us.every(
-      (u) => u.x === h.x && u.y === h.y && u.order === "rest" && u.hp === 100,
-    ),
-  );
+  const residents = s.units.filter((u) => us.some((v) => v.id === u.id));
+  assert.equal(residents.length, 1);
+  assert.equal(residents[0].x, h.x);
+  assert.equal(residents[0].y, h.y);
+  assert.equal(residents[0].order, "rest");
+  assert.equal(residents[0].hp, 300);
   assert.equal(tile(s, h.x + 1, h.y)!.terrain, "tree");
   assert.ok(s.kingdoms[0].gold > 40 && s.kingdoms[0].gold < 150);
   advance(s, 35);

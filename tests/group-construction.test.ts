@@ -60,7 +60,10 @@ for (const kind of ["bridge", "barricade"] as const) {
       assert.equal(us[i].order, kind);
       assert.ok(distance(us[i], target) < before[i]);
     }
-    for (let i = 0; i < 70; i++) step(s);
+    for (let i = 0; i < 70; i++) {
+      for (const h of s.houses) h.timer = 0;
+      step(s);
+    }
     const workers = s.units.filter(
       (u) => us.some((v) => u.id === v.id) && u.hp > 0,
     );

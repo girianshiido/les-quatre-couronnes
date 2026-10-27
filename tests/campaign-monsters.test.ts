@@ -23,15 +23,15 @@ const fighter = (x: number, y: number): Unit => ({
   order: "move",
   heading: { x: 1, y: 0 },
 });
-test("campaign contains five distinct series of five progressively larger maps", () => {
+test("campaign contains five distinct series of five maps of 48 × 48", () => {
   assert.equal(LEVELS.length, 25);
   for (let b = 0; b < 5; b++) {
     const levels = LEVELS.filter((l) => l.biomeId === b);
     assert.equal(levels.length, 5);
     assert.equal(new Set(levels.map((l) => l.scenario)).size, 5);
-    assert.ok(levels[4].size >= levels[0].size);
+    assert.ok(levels.every((l) => l.size === 48));
   }
-  assert.ok(LEVELS[24].size > LEVELS[0].size);
+  assert.equal(LEVELS[24].size, 48);
 });
 test("terrain is asymmetric and confined starts occur; all houses and castles remain valid", () => {
   for (const level of [0, 2, 4, 5, 8, 12, 19, 24]) {

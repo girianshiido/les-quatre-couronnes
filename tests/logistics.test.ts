@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   createGame,
+  LEVELS,
   tile,
   addHouse,
   step,
@@ -193,7 +194,10 @@ test("adding houses expands support; losing a supply house immediately weakens a
   assert.equal(supportDrain(s, u), before);
 });
 function expedition(team: number, supported: boolean, funded: boolean) {
+  const currentSize = LEVELS[0].size;
+  LEVELS[0].size = 64;
   const s = createGame();
+  LEVELS[0].size = currentSize;
   for (const t of s.tiles) t.terrain = "rock";
   for (let y = 28; y <= 34; y++)
     for (let x = 2; x <= 60; x++) tile(s, x, y)!.terrain = "grass";
@@ -254,7 +258,7 @@ test("raising taxes only finances a limited army; ten houses earn less than remo
     for (let x = 4; x <= 24; x++) tile(s, x, y)!.terrain = "grass";
   for (let x = 4; x <= 12; x += 2) assert.ok(addHouse(s, 0, x, 24, false));
   freeze(s);
-  const u = soldier(s, 0, 3000, 50, 40);
+  const u = soldier(s, 0, 3000, 45, 40);
   const homes = s.houses.filter((h) => h.team === 0).length;
   assert.equal(homes, 10);
   assert.equal(armyCapacity(s, 0), 2000);

@@ -44,10 +44,10 @@ const unit = (team = 0, hp = 100, x = 20, y = 20): Unit => ({
   order: "auto",
   heading: { x: 0, y: 1 },
 });
-test("64 × 64, four castles of nine cells; tutorial grants five houses versus two", () => {
+test("48 × 48, four castles of nine cells; tutorial grants five houses versus two", () => {
   const s = createGame();
-  assert.equal(s.size, 64);
-  assert.equal(s.tiles.length, 4096);
+  assert.equal(s.size, 48);
+  assert.equal(s.tiles.length, 2304);
   assert.equal(s.kingdoms.length, 4);
   for (let team = 0; team < 4; team++) {
     assert.equal(s.tiles.filter((t) => t.castle === team).length, 9);
@@ -284,8 +284,9 @@ test("holding on an allied house stops ageing for inhabitants and king", () => {
   s.units.push(u);
   assert.ok(resting(s, u));
   const king = s.units.find((v) => v.team === 0 && v.royal)!;
-  king.x = h.x;
-  king.y = h.y;
+  const royalHouse = s.houses.filter((h) => h.team === 0)[1];
+  king.x = royalHouse.x;
+  king.y = royalHouse.y;
   king.order = "hold";
   for (let i = 0; i < 15; i++) step(s);
   assert.equal(u.hp, 100);
@@ -449,8 +450,13 @@ test("player autonomy never builds bridges, barricades or dams and never clears 
     0,
   );
 });
-test("idle inhabitants share houses without forced fusion and wake when new land opens", () => {
+test("resting inhabitants on the same house fuse and wake when new land opens", () => {
   const s = createGame();
+  const king = s.units.find((u) => u.royal && u.team === 0)!;
+  king.x = 16;
+  king.y = 16;
+  king.order = "hold";
+  king.wait = 9999;
   for (const h of s.houses.filter((h) => h.team === 0))
     tile(s, h.x, h.y)!.house = undefined;
   s.houses = s.houses.filter((h) => h.team !== 0);
@@ -471,19 +477,19 @@ test("idle inhabitants share houses without forced fusion and wake when new land
   b.id = 200;
   s.units.push(a, b);
   for (let i = 0; i < 10; i++) step(s);
-  assert.ok(s.units.includes(a) && s.units.includes(b));
-  assert.equal(a.order, "rest");
-  assert.equal(b.order, "rest");
-  assert.ok(resting(s, a) && resting(s, b));
-  const hp = a.hp;
+  const resident = s.units.find((u) => u.id === a.id || u.id === b.id)!;
+  assert.equal(s.units.filter((u) => u.id === a.id || u.id === b.id).length, 1);
+  assert.equal(resident.order, "rest");
+  assert.ok(resting(s, resident));
+  assert.ok(resident.hp > 190);
+  const hp = resident.hp;
   for (let i = 0; i < 10; i++) step(s);
-  assert.equal(a.hp, hp);
+  assert.equal(resident.hp, hp);
   tile(s, 12, 10)!.terrain = "grass";
   s.stats.cleared++;
   for (let i = 0; i < 5; i++) step(s);
   assert.ok(
-    a.order !== "rest" ||
-      b.order !== "rest" ||
+    resident.order !== "rest" ||
       s.houses.some((h) => h.team === 0 && h.x === 12 && h.y === 10),
   );
 });

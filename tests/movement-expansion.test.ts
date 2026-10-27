@@ -151,7 +151,8 @@ for (const hp of [100, 7000])
     assert.equal(u.order, "rest");
     const worker = troop(s, 16);
     assert.ok(buildCrossing(s, worker, { x: 17, y: 20 }));
-    worker.order = "hold";
+    // The test isolates the explorer: a stationed ally would now absorb it.
+    s.units = s.units.filter((v) => v.id !== worker.id);
     advance(s, 8);
     assert.ok(s.houses.some((h) => h.team === 0 && h.x === 18 && h.y === 20));
   });

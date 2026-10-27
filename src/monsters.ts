@@ -49,18 +49,63 @@ export function seedCaves(s: State) {
   if (!LEVELS[s.level].caves) return;
   const count = LEVELS[s.level].stage === 4 ? 2 : 1;
   for (let i = 0; i < count; i++) {
-    const x = Math.floor(s.size * (i ? 0.73 : 0.25)),
-      y = Math.floor(s.size * (i ? 0.47 : 0.52));
-    for (let dy = -6; dy <= 6; dy++)
-      for (let dx = -6; dx <= 6; dx++) {
+    const preferred = {
+      x: Math.floor(s.size * (i ? 0.73 : 0.25)),
+      y: s.size === 48 ? (i ? 24 : 23) : Math.floor(s.size * (i ? 0.47 : 0.52)),
+    };
+    // Compact maps still need enclosed monster areas, without erasing a kingdom's buildings.
+    const extent = s.size <= 48 ? 5 : 6;
+    const candidates: Point[] = [];
+    for (let y = 6; y < s.size - 6; y++)
+      for (let x = 6; x < s.size - 6; x++) candidates.push({ x, y });
+    candidates.sort((a, b) => distance(a, preferred) - distance(b, preferred));
+    const center = candidates.find((p) => {
+      if (
+        s.caves.some(
+          (c) =>
+            Math.abs(c.x - p.x) <= extent * 2 + 1 &&
+            Math.abs(c.y - p.y) <= extent * 2 + 1,
+        )
+      )
+        return false;
+      for (let dy = -extent; dy <= extent; dy++)
+        for (let dx = -extent; dx <= extent; dx++) {
+          const t = tile(s, p.x + dx, p.y + dy);
+          if (
+            !t ||
+            t.house !== undefined ||
+            t.castle !== undefined ||
+            t.cave !== undefined
+          )
+            return false;
+        }
+      return true;
+    });
+    if (!center) continue;
+    const { x, y } = center;
+    for (let dy = -extent; dy <= extent; dy++)
+      for (let dx = -extent; dx <= extent; dx++) {
         const t = tile(s, x + dx, y + dy);
         if (!t) continue;
         t.terrain =
           Math.max(Math.abs(dx), Math.abs(dy)) === 5 ? "water" : "grass";
-        delete t.house;
-        delete t.castle;
         delete t.owner;
       }
+    for (const [dx, dy] of [
+      [6, 0],
+      [-6, 0],
+      [0, 6],
+      [0, -6],
+    ]) {
+      const t = tile(s, x + dx, y + dy);
+      if (
+        t &&
+        t.house === undefined &&
+        t.castle === undefined &&
+        t.cave === undefined
+      )
+        t.terrain = "grass";
+    }
     const c: Cave = {
       id: s.nextId++,
       x,

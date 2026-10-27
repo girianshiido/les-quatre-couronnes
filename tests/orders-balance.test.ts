@@ -79,7 +79,7 @@ test("ordinary upkeep grows with the actual king distance and stops on any frien
   const s = createGame(),
     king = s.units.find((u) => u.royal && u.team === 0)!;
   const near = unit(100, king.x + 2, king.y),
-    far = unit(101, king.x + 25, king.y);
+    far = unit(101, king.x + 25, king.y + 10);
   s.units.push(near, far);
   assert.equal(lifeDrain(s, near), 0.12);
   assert.ok(lifeDrain(s, far) > lifeDrain(s, near) * 2);
@@ -88,6 +88,7 @@ test("ordinary upkeep grows with the actual king distance and stops on any frien
   far.order = "auto";
   assert.equal(lifeDrain(s, far), 0);
   king.x = far.x - 1;
+  king.y = far.y;
   far.x -= 3;
   assert.equal(lifeDrain(s, far), 0.12);
 });

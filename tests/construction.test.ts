@@ -189,7 +189,10 @@ test("a worker on a house can keep a construction order while waiting without no
   command(s, [u.id], "bridge", p);
   step(s);
   const hp = u.hp;
-  for (let i = 0; i < 50; i++) step(s);
+  for (let i = 0; i < 50; i++) {
+    for (const h of s.houses) h.timer = 0;
+    step(s);
+  }
   assert.equal(u.hp, hp);
   assert.equal(u.order, "bridge");
   assert.equal(structureAt(s, p)!.construction!.paid, 100);
