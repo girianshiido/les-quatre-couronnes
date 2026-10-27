@@ -103,6 +103,7 @@ void loadAtlases()
   .then((atlases) => {
     renderer.atlases = atlases;
     renderer.cached = "";
+    sceneRevision++;
   })
   .catch(() =>
     toast(
@@ -385,6 +386,10 @@ function start(s: State, loading = false, autosaveId?: string) {
   $("title").classList.add("hidden");
   closeModal();
   renderer.cached = "";
+  renderer.influenceKey = "";
+  renderer.influenceCells = [];
+  renderer.influence.width = 0;
+  sceneRevision++;
   renderer.fit(state);
   updateUI();
   persist();
@@ -410,13 +415,13 @@ function newGame() {
     start(
       createGame(
         Number($<HTMLSelectElement>("level-select").value),
-        Date.now() >>> 0,
+        14243 + Number($<HTMLSelectElement>("level-select").value) * 7919,
       ),
     );
 }
 function help() {
   showModal(
-    `<span class="eyebrow">Le livre des couronnes</span><h2>Le monde n’attend pas vos ordres.</h2><p>Chacun des quatre royaumes commence avec <strong>un château de neuf cases et un roi. Le premier chapitre donne cinq maisons au joueur et deux à chaque adversaire ; les suivants, quatre au joueur et quatre à six par adversaire selon la série</strong>. Dans la première vallée, le vert possède un bassin plus vaste, protégé par des rivières fermées. Les trois adversaires disposent de deux ponts et de chemins dégagés entre leurs territoires ; ils privilégient leurs ennemis déjà accessibles. Chaque camp reçoit 5 000 pièces. Les graphismes sont identiques ; seule la couleur change.</p><p>Les maisons produisent chacune des habitants de <strong>100 PV</strong>. Ils cherchent le terrain libre le plus proche, suivent votre doctrine et fondent rapidement de nouvelles maisons dès qu’une case libre respecte l’espacement. Se déplacer, travailler et combattre use leurs vies. Sur le sol, les habitants perdent au moins 0,12 PV par seconde. Au-delà de dix cases de leur roi, cette usure augmente progressivement, jusqu’à cinq fois le rythme de base. L’usure normale s’arrête sur une maison alliée. Un manque de soutien ou d’or peut toutefois continuer à faire perdre des PV. Tenir la position permet d’y rester. Le roi peut aussi s’abriter sur une maison, ou rester dans son château. Couper un arbre coûte 30 pièces, dégager un rocher 15 pièces. Les combats et destructions ne coûtent que des PV. Sans or, l’action attend. Fonder une maison coûte 150 pièces et jusqu’à 100 PV ; une unité plus forte conserve ses vies restantes et poursuit son activité.</p><p><strong>Rencontres :</strong> deux alliés fusionnent toujours en additionnant leurs PV, y compris sur une maison. Entre ennemis, le plus fort survit et perd 70 % des PV du vaincu. À égalité, les deux disparaissent. Le roi commence à 100 PV. Chaque maison au-delà des maisons de départ lui apporte 50 PV de force. Il gagne aussi 25 % des PV de ses autres unités, mais sa force reste plafonnée à 100 PV par maison restante. Les blessures sont conservées, même lorsque ce plafond est atteint. Les alliés qui le rejoignent fusionnent avec lui. Dans les neuf cases de son château, sa puissance défensive est multipliée par huit, avec 2 000 PV de remparts à user. Chaque maison soutient 200 PV d’armée. Au-delà de cette capacité totale, les unités perdent progressivement des PV, même sur une maison. Hors des maisons, les unités perdent davantage de vies lorsque le chemin vers une maison alliée dépasse quatre cases, jusqu’à 6 % de PV supplémentaires par seconde. Les routes de soutien ne traversent pas l’eau sans pont, les arbres, les rochers ou les barricades. Les unités de plus de 500 PV consomment 2 or par seconde pour 1 000 PV près des maisons ; ce coût augmente jusqu’à trois fois avec l’éloignement. Sans financement, elles perdent jusqu’à 3 % de leurs PV par seconde, même sur une maison. Hors d’une maison, les grandes unités ont aussi une usure proportionnelle à leur force. Dehors, le roi perd 5 % de ses PV par seconde (minimum 4 PV/s). Le retour au château arrête cette perte, sans effacer les dégâts. Sélectionnez le roi comme une unité pour le déplacer ; il peut raser les maisons adverses. Détruire du gazon ennemi coûte 2 PV plus 0,2 % des PV actuels par case ; raser une maison coûte 200 PV plus 5 % des PV actuels, sans dépense d’or. Ces coûts concernent aussi le roi et les monstres. Le terrain détruit redevient neutre, jusqu’à ce qu’une nouvelle maison y étende son gazon. Un royaume disparaît si son roi meurt, ou dès qu’il perd sa dernière maison, même si son roi et ses armées ont encore des PV. Le château s’effondre alors. Les adversaires peuvent s’éliminer entre eux.</p><p><strong>Économie :</strong> à 0 %, aucune rentrée d’or, y compris les barrages : seuls les fonds déjà accumulés financent les travaux et l’entretien. Pour chaque maison, le revenu par seconde vaut le taux d’impôt multiplié par 0,07 : 0,70 or à 10 %, 1,40 à 20 % et 2,10 à 30 %. Les revenus augmentent à tous les taux, sans seuil particulier. Les naissances passent progressivement de six secondes par maison à trois minutes. Le mode Bâtisseur fait aussi construire les unités fusionnées ; s’il manque de l’or, elles attendent près du chantier sur une maison et repartent dès qu’elles peuvent financer une fondation.</p><div class="sprite-sheet"><canvas id="sprites-preview" width="300" height="192" aria-label="Sprites quatre directions et trois gabarits"></canvas></div><p><strong>Trois gabarits :</strong> habitant sous 1 000 PV, guerrier de 1 000 à 10 000 PV inclus, colosse au-delà. Chaque gabarit existe de face, de dos, à gauche et à droite, dans les quatre couleurs.</p><ul><li><strong>Planification :</strong> sélectionner une ou plusieurs unités arrête toute la simulation. Cliquez ensuite la destination : seules les actions adaptées à cette case apparaissent. Le jeu reprend après l’ordre, sauf si vous aviez activé la pause manuelle. Échap annule la sélection.</li><li><strong>Affichage des PV :</strong> aucun chiffre au-dessus des unités par défaut, même pour les rois et les unités sélectionnées. Le survol affiche les PV exacts. Dans le menu, « Toujours afficher les PV des unités » active les nombres permanents ; ce choix est mémorisé dans ce navigateur.</li><li><strong>Sélection :</strong> clic ou rectangle sur les unités vertes. Maj ajoute à la sélection. Le roi est exclu des rectangles et de la touche A : il se sélectionne seul par un clic direct. Voir le roi recentre seulement la carte.</li><li><strong>Déplacer :</strong> choisissez une destination. Une case de château adverse vise son roi. À destination, les habitants reprennent leur doctrine ; le roi reste sur place.</li><li><strong>Capture royale :</strong> éliminer le roi d’un royaume transfère toutes ses maisons au vainqueur, avec leur production et leur territoire coloré. Cela vaut aussi entre adversaires. Son château s’effondre. Une mort sans vainqueur ne transfère aucune maison.</li><li><strong>Recommencer :</strong> le bouton ↶ en haut ou Recommencer la carte dans le menu remet le niveau à zéro après confirmation, sans perdre votre doctrine ni les niveaux débloqués.</li><li><strong>Fusionner :</strong> les unités sélectionnées convergent sur un point de rassemblement. Une fois les participants réunis, l’unité fusionnée reprend sa doctrine. Une unité morte ou réaffectée ne bloque pas l’attente.</li><li><strong>Maison :</strong> 150 or et jusqu’à 100 PV du bâtisseur. Une grosse unité conserve le reste de ses vies et peut continuer à bâtir. Aucune maison voisine, même en diagonale. La case doit être dégagée.</li><li><strong>Chantiers progressifs :</strong> un pont ou une barricade peut être ordonné sans disposer de tout son prix. À proximité du chantier, l’ouvrier investit l’or disponible puis les nouvelles rentrées. Le travail et l’or déjà investis restent enregistrés s’il meurt ou change d’ordre ; une autre unité peut terminer le reste. Le pont reste infranchissable et la barricade ne bloque pas la route tant que le chantier n’est pas achevé. L’ouvrier perd normalement des vies hors d’une maison, et doit toujours payer son entretien éventuel.</li><li><strong>Pont :</strong> 1 000 or au premier chantier, 500 pour reconstruire au même endroit. Le pont a 1 000 PV et peut être détruit ; les unités qui s’y trouvent tombent à l’eau. Tout camp peut traverser un pont ouvert ; l’ordre Attaquer permet de le détruire. Cliquez sur une rivière : l’unité rejoint la berge et construit exactement une case de pont. Une rivière plus large se traverse en posant chaque tronçon séparément.</li><li><strong>Barricade :</strong> 750 or, 1 500 PV. Elle bloque une case de terre. Les unités la contournent ; l’ordre Attaquer permet de la détruire.</li><li><strong>Barrage :</strong> 32 or. Il bloque le passage et rapporte 0,2 or par seconde et par case si les impôts sont supérieurs à 0 %. Il ne modifie pas le niveau d’eau.</li><li><strong>Grottes :</strong> présentes seulement dans certains niveaux, elles engendrent des monstres neutres sans économie. Ceux-ci ne perdent des PV qu’au combat ou en détruisant du territoire et fusionnent entre eux. Un pont ou une barricade détruite peut les libérer vers les autres camps. Détruire une grotte arrête les naissances. Ces zones sont facultatives pour la victoire.</li><li><strong>Impôts :</strong> de 0 à 30 %. Plus le taux est élevé, plus l’or rentre et plus les naissances ralentissent. L’automatisme ajuste le taux selon l’or et la population.</li><li><strong>Se déplacer :</strong> à l’arrivée, les habitants reprennent leur expansion et occupent les alentours. Le roi reste sur place. Les ordres par défaut sont réordonnables dans le conseil et la doctrine est sauvegardée.</li><li><strong>Travail en continu :</strong> construire des maisons, déblayer les arbres/rochers ou détruire les barricades les plus proches sur toute la carte accessible. Le bâtisseur peut combattre et raser les maisons adverses en avançant. Maisons : 150 or et jusqu’à 100 PV ; arbres : 30 or ; rochers : 15 or. Les destructions de barricades ne coûtent pas d’or. Quand l’or manque pour l’action suivante, ou qu’aucune tâche accessible ne reste, l’ordre prend fin et l’unité cherche une maison où s’abriter. Un nouvel ordre peut l’interrompre à tout moment.</li><li><strong>Tenir :</strong> arrête les déplacements. Sur une maison alliée, l’usure normale s’arrête ; les pénuries de soutien ou d’or restent dangereuses.</li><li><strong>Autonomie :</strong> annule les ordres et rend leurs choix aux habitants. Quand aucun travail accessible ne reste, ou quand l’or manque, les habitants attendent sur les maisons sans usure normale ; tous les alliés qui s’y rencontrent fusionnent. Ils repartent si un passage ou du travail s’ouvre. Votre doctrine donne la priorité aux maisons, à la destruction des maisons adverses ou à la coupe des arbres. Réordonnez-la dans le conseil. Une défense locale réagit aussi aux ennemis proches des maisons ou du château. Un ordre manuel reste prioritaire et le roi ne sort jamais seul. Les habitants évitent les rochers et ne construisent pas de ponts ou de barricades sans ordre. Toute autre action nécessite un ordre ; les adversaires gardent leur autonomie. L’épargne chantier réserve 1 000 pièces contre les fondations automatiques.</li></ul><p>Molette pour zoomer ; clic droit glissé ou Alt + glisser pour déplacer la carte. Sur écran tactile : glisser sélectionne, le bouton ↔ active le déplacement de carte. <kbd>Espace</kbd> pause, <kbd>Échap</kbd> annule un ordre, <kbd>F</kbd> fusion. La partie s’arrête quand cet onglet est masqué. Sauvegardes locales multiples : le bouton Sauver crée une copie nommée, Load game ouvre la bibliothèque et chaque nouvelle partie possède sa sauvegarde automatique. Les anciennes sauvegardes sont conservées. Export et import restent disponibles au menu. Limite : 150 unités par royaume.</p><div class="close-row"><span></span><button class="primary" id="close-help">J’ai compris</button></div>`,
+    `<span class="eyebrow">Le livre des couronnes</span><h2>Le monde n’attend pas vos ordres.</h2><p>Chacun des quatre royaumes commence avec <strong>un château de neuf cases et un roi. Le premier chapitre donne cinq maisons au joueur et deux à chaque adversaire ; les suivants, quatre au joueur et quatre à six par adversaire selon la série</strong>. Dans la première vallée, le vert possède un bassin plus vaste, protégé par des rivières fermées. Les trois adversaires disposent de deux ponts et de chemins dégagés entre leurs territoires ; ils privilégient leurs ennemis déjà accessibles. Chaque camp reçoit 5 000 pièces. Les graphismes sont identiques ; seule la couleur change.</p><p>Les maisons produisent chacune des habitants de <strong>100 PV</strong>. Ils cherchent le terrain libre le plus proche, suivent votre doctrine et fondent rapidement de nouvelles maisons dès qu’une case libre respecte l’espacement. Se déplacer, travailler et combattre use leurs vies. Sur le sol, les habitants perdent au moins 0,12 PV par seconde. Au-delà de dix cases de leur roi, cette usure augmente progressivement, jusqu’à cinq fois le rythme de base. L’usure normale s’arrête sur une maison alliée. Un manque de soutien ou d’or peut toutefois continuer à faire perdre des PV. Tenir la position permet d’y rester. Le roi peut aussi s’abriter sur une maison, ou rester dans son château. Couper un arbre coûte 30 pièces, dégager un rocher 15 pièces. Les combats et destructions ne coûtent que des PV. Sans or, l’action attend. Fonder une maison coûte 150 pièces et jusqu’à 100 PV ; une unité plus forte conserve ses vies restantes et poursuit son activité.</p><p><strong>Rencontres :</strong> deux alliés fusionnent toujours en additionnant leurs PV, y compris sur une maison. Entre ennemis, le plus fort survit et perd 70 % des PV du vaincu. À égalité, les deux disparaissent. Le roi commence à 100 PV. Chaque maison au-delà des maisons de départ lui apporte 50 PV de force. Il gagne aussi 25 % des PV de ses autres unités, mais sa force reste plafonnée à 100 PV par maison restante. Les blessures sont conservées, même lorsque ce plafond est atteint. Les alliés qui le rejoignent fusionnent avec lui. Dans les neuf cases de son château, sa puissance défensive est multipliée par huit, avec 2 000 PV de remparts à user. Chaque maison soutient 200 PV d’armée. Au-delà de cette capacité totale, les unités perdent progressivement des PV, même sur une maison. Hors des maisons, les unités perdent davantage de vies lorsque le chemin vers une maison alliée dépasse quatre cases, jusqu’à 6 % de PV supplémentaires par seconde. Les routes de soutien ne traversent pas l’eau sans pont, les arbres, les rochers ou les barricades. Les unités de plus de 500 PV consomment 2 or par seconde pour 1 000 PV près des maisons ; ce coût augmente jusqu’à trois fois avec l’éloignement. Sans financement, elles perdent jusqu’à 3 % de leurs PV par seconde, même sur une maison. Hors d’une maison, les grandes unités ont aussi une usure proportionnelle à leur force. Dehors, le roi perd 5 % de ses PV par seconde (minimum 4 PV/s). Le retour au château arrête cette perte, sans effacer les dégâts. Sélectionnez le roi comme une unité pour le déplacer ; il peut raser les maisons adverses. Détruire du gazon ennemi coûte 2 PV plus 0,2 % des PV actuels par case ; raser une maison coûte 200 PV plus 5 % des PV actuels, sans dépense d’or. Ces coûts concernent aussi le roi et les monstres. Le terrain détruit redevient neutre, jusqu’à ce qu’une nouvelle maison y étende son gazon. Un royaume disparaît si son roi meurt, ou dès qu’il perd sa dernière maison, même si son roi et ses armées ont encore des PV. Le château s’effondre alors. Les adversaires peuvent s’éliminer entre eux.</p><p><strong>Économie :</strong> à 0 %, aucune rentrée d’or, y compris les barrages : seuls les fonds déjà accumulés financent les travaux et l’entretien. Pour chaque maison, le revenu par seconde vaut le taux d’impôt multiplié par 0,07 : 0,70 or à 10 %, 1,40 à 20 % et 2,10 à 30 %. Les revenus augmentent à tous les taux, sans seuil particulier. Les naissances passent progressivement de six secondes par maison à trois minutes. Le mode Bâtisseur fait aussi construire les unités fusionnées ; s’il manque de l’or, elles attendent près du chantier sur une maison et repartent dès qu’elles peuvent financer une fondation.</p><div class="sprite-sheet"><canvas id="sprites-preview" width="300" height="192" aria-label="Sprites quatre directions et trois gabarits"></canvas></div><p><strong>Trois gabarits :</strong> habitant sous 1 000 PV, guerrier de 1 000 à 10 000 PV inclus, colosse au-delà. Chaque gabarit existe de face, de dos, à gauche et à droite, dans les quatre couleurs.</p><ul><li><strong>Planification :</strong> sélectionner une ou plusieurs unités arrête toute la simulation. Cliquez ensuite la destination : seules les actions adaptées à cette case apparaissent. Le jeu reprend après l’ordre, sauf si vous aviez activé la pause manuelle. Échap annule la sélection.</li><li><strong>Affichage des PV :</strong> aucun chiffre au-dessus des unités par défaut, même pour les rois et les unités sélectionnées. Le survol affiche les PV exacts. Dans le menu, « Toujours afficher les PV des unités » active les nombres permanents ; ce choix est mémorisé dans ce navigateur.</li><li><strong>Sélection :</strong> clic ou rectangle sur les unités vertes. Maj ajoute à la sélection. Le roi est exclu des rectangles et de la touche A : il se sélectionne seul par un clic direct. Voir le roi recentre seulement la carte.</li><li><strong>Déplacer :</strong> choisissez une destination. Une case de château adverse vise son roi. À destination, les habitants reprennent leur doctrine ; le roi reste sur place.</li><li><strong>Capture royale :</strong> éliminer le roi d’un royaume transfère toutes ses maisons au vainqueur, avec leur production et leur territoire coloré. Cela vaut aussi entre adversaires. Son château s’effondre. Une mort sans vainqueur ne transfère aucune maison.</li><li><strong>Recommencer :</strong> le bouton ↶ en haut ou Recommencer la carte dans le menu remet le niveau à zéro après confirmation, sans perdre votre doctrine ni les niveaux débloqués.</li><li><strong>Fusionner :</strong> les unités sélectionnées convergent sur un point de rassemblement. Une fois les participants réunis, l’unité fusionnée reprend sa doctrine. Une unité morte ou réaffectée ne bloque pas l’attente.</li><li><strong>Maison :</strong> 150 or et jusqu’à 100 PV du bâtisseur. Une grosse unité conserve le reste de ses vies et peut continuer à bâtir. Aucune maison voisine, même en diagonale. La case doit être dégagée.</li><li><strong>Chantiers progressifs :</strong> un pont ou une barricade peut être ordonné sans disposer de tout son prix. À proximité du chantier, l’ouvrier investit l’or disponible puis les nouvelles rentrées. Le travail et l’or déjà investis restent enregistrés s’il meurt ou change d’ordre ; une autre unité peut terminer le reste. Le pont reste infranchissable et la barricade ne bloque pas la route tant que le chantier n’est pas achevé. L’ouvrier perd normalement des vies hors d’une maison, et doit toujours payer son entretien éventuel.</li><li><strong>Pont :</strong> 1 000 or au premier chantier, 500 pour reconstruire au même endroit. Le pont a 1 000 PV et peut être détruit ; les unités qui s’y trouvent tombent à l’eau. Tout camp peut traverser un pont ouvert ; l’ordre Attaquer permet de le détruire. Cliquez sur une rivière : l’unité rejoint la berge et construit exactement une case de pont. Une rivière plus large se traverse en posant chaque tronçon séparément.</li><li><strong>Barricade :</strong> 750 or, 1 500 PV. Elle bloque une case de terre. Les unités la contournent ; l’ordre Attaquer permet de la détruire.</li><li><strong>Barrage :</strong> 32 or. Il bloque le passage et rapporte 0,2 or par seconde et par case si les impôts sont supérieurs à 0 %. Il ne modifie pas le niveau d’eau.</li><li><strong>Grottes :</strong> présentes seulement dans certains niveaux, elles engendrent des monstres neutres sans économie. Ceux-ci ne perdent des PV qu’au combat ou en détruisant du territoire et fusionnent entre eux. Un pont ou une barricade détruite peut les libérer vers les autres camps. Détruire une grotte arrête les naissances. Ces zones sont facultatives pour la victoire.</li><li><strong>Impôts :</strong> de 0 à 30 %. Plus le taux est élevé, plus l’or rentre et plus les naissances ralentissent. L’automatisme ajuste le taux selon l’or et la population.</li><li><strong>Se déplacer :</strong> à l’arrivée, les habitants reprennent leur expansion et occupent les alentours. Le roi reste sur place. Les ordres par défaut sont réordonnables dans le conseil et la doctrine est sauvegardée.</li><li><strong>Travail en continu :</strong> construire des maisons, déblayer les arbres/rochers ou détruire les barricades les plus proches sur toute la carte accessible. Le bâtisseur peut combattre et raser les maisons adverses en avançant. Maisons : 150 or et jusqu’à 100 PV ; arbres : 30 or ; rochers amovibles : 15 or. Les massifs permanents et les contours sont infranchissables et indestructibles. Les destructions de barricades ne coûtent pas d’or. Quand l’or manque pour l’action suivante, ou qu’aucune tâche accessible ne reste, l’ordre prend fin et l’unité cherche une maison où s’abriter. Un nouvel ordre peut l’interrompre à tout moment.</li><li><strong>Tenir :</strong> arrête les déplacements. Sur une maison alliée, l’usure normale s’arrête ; les pénuries de soutien ou d’or restent dangereuses.</li><li><strong>Autonomie :</strong> annule les ordres et rend leurs choix aux habitants. Quand aucun travail accessible ne reste, ou quand l’or manque, les habitants attendent sur les maisons sans usure normale ; tous les alliés qui s’y rencontrent fusionnent. Ils repartent si un passage ou du travail s’ouvre. Votre doctrine donne la priorité aux maisons, à la destruction des maisons adverses ou à la coupe des arbres. Réordonnez-la dans le conseil. Une défense locale réagit aussi aux ennemis proches des maisons ou du château. Un ordre manuel reste prioritaire et le roi ne sort jamais seul. Les habitants évitent les rochers et ne construisent pas de ponts ou de barricades sans ordre. Toute autre action nécessite un ordre ; les adversaires gardent leur autonomie. L’épargne chantier réserve 1 000 pièces contre les fondations automatiques.</li></ul><p>Molette pour zoomer ; clic droit glissé ou Alt + glisser pour déplacer la carte. Sur écran tactile : glisser sélectionne, le bouton ↔ active le déplacement de carte. <kbd>Espace</kbd> pause, <kbd>Échap</kbd> annule un ordre, <kbd>F</kbd> fusion. La partie s’arrête quand cet onglet est masqué. Sauvegardes locales multiples : le bouton Sauver crée une copie nommée, Load game ouvre la bibliothèque et chaque nouvelle partie possède sa sauvegarde automatique. Les anciennes sauvegardes sont conservées. Export et import restent disponibles au menu. Limite : 150 unités par royaume.</p><div class="close-row"><span></span><button class="primary" id="close-help">J’ai compris</button></div>`,
   );
   $("close-help").onclick = closeModal;
   const c = $<HTMLCanvasElement>("sprites-preview").getContext("2d")!;
@@ -529,15 +534,13 @@ function finish() {
       $("title").classList.remove("hidden");
       updateLoad();
     };
-    $("end-next").onclick = () =>
-      start(
-        createGame(
-          state.result === "won" && state.level < LEVELS.length - 1
-            ? state.level + 1
-            : state.level,
-          Date.now() >>> 0,
-        ),
-      );
+    $("end-next").onclick = () => {
+      const nextLevel =
+        state.result === "won" && state.level < LEVELS.length - 1
+          ? state.level + 1
+          : state.level;
+      start(createGame(nextLevel, 14243 + nextLevel * 7919));
+    };
   }, 1500);
 }
 function updateUI() {
@@ -1004,8 +1007,11 @@ document.addEventListener("visibilitychange", () => {
 const ro = new ResizeObserver(() => {
   renderer.resize();
   renderer.fit(state);
+  sceneRevision++;
 });
 ro.observe(canvas);
+let sceneRevision = 0;
+let lastDrawSignature = "";
 function frame(now: number) {
   const elapsed = last ? Math.min(0.1, (now - last) / 1000) : 0;
   last = now;
@@ -1019,7 +1025,13 @@ function frame(now: number) {
     state.result === "playing"
   ) {
     accumulator += elapsed * speed;
-    while (accumulator >= 0.2) {
+    const simulationStart = performance.now();
+    let computed = 0;
+    while (
+      accumulator >= 0.2 &&
+      (computed === 0 || performance.now() - simulationStart < 8)
+    ) {
+      computed++;
       step(state);
       accumulator -= 0.2;
     }
@@ -1035,13 +1047,49 @@ function frame(now: number) {
     }
     if (state.result !== "playing") finish();
   }
-  renderer.draw(
-    state,
-    selection,
-    contextPoint ?? hover,
-    drag,
-    contextPoint ? "destination" : targetOrder,
+  const drawSignature = [
+    sceneRevision,
+    state.time,
+    state.level,
+    state.seed,
+    state.turfRevision,
+    state.stats.cleared,
+    state.stats.bridges,
+    state.stats.dams,
+    state.houses.length,
+    state.ruins.length,
+    renderer.zoom,
+    renderer.ox,
+    renderer.oy,
+    renderer.width,
+    renderer.height,
+    renderer.showUnitHP,
+    [...selection].join(","),
+    hover?.x,
+    hover?.y,
+    contextPoint?.x,
+    contextPoint?.y,
+    drag?.x,
+    drag?.y,
+    drag?.w,
+    drag?.h,
+    renderer.pointer?.x,
+    renderer.pointer?.y,
+    targetOrder,
+  ].join("/");
+  const collapsing = [...renderer.collapseTimes.values()].some(
+    (t) => performance.now() - t < 1500,
   );
+  if (drawSignature !== lastDrawSignature || collapsing) {
+    renderer.draw(
+      state,
+      selection,
+      contextPoint ?? hover,
+      drag,
+      contextPoint ? "destination" : targetOrder,
+    );
+    lastDrawSignature = drawSignature;
+  }
   requestAnimationFrame(frame);
 }
 renderer.resize();

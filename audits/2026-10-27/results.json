@@ -1,0 +1,264 @@
+{
+  "simulation": {
+    "start": {
+      "n": 450,
+      "mean": 0.213,
+      "p50": 0.129,
+      "p95": 0.537,
+      "max": 2.864,
+      "initialUnits": 4,
+      "unitRange": [
+        4,
+        18
+      ],
+      "houses": 11,
+      "wallMs": 143
+    },
+    "developed": {
+      "n": 450,
+      "mean": 32.804,
+      "p50": 32.287,
+      "p95": 45.76,
+      "max": 113.593,
+      "initialUnits": 209,
+      "unitRange": [
+        202,
+        235
+      ],
+      "houses": 421,
+      "wallMs": 14801
+    },
+    "dense164": {
+      "n": 450,
+      "mean": 1.894,
+      "p50": 1.355,
+      "p95": 5.217,
+      "max": 13.955,
+      "initialUnits": 164,
+      "unitRange": [
+        11,
+        164
+      ],
+      "houses": 477,
+      "wallMs": 890
+    },
+    "dense600": {
+      "n": 450,
+      "mean": 5.046,
+      "p50": 2.303,
+      "p95": 17.008,
+      "max": 63.118,
+      "initialUnits": 600,
+      "unitRange": [
+        16,
+        600
+      ],
+      "houses": 477,
+      "wallMs": 2310
+    }
+  },
+  "render": {
+    "start/dpr1/cached": {
+      "n": 100,
+      "mean": 0.047,
+      "p50": 0.045,
+      "p95": 0.059,
+      "max": 0.103
+    },
+    "start/dpr1/selected-hover": {
+      "n": 100,
+      "mean": 0.052,
+      "p50": 0.049,
+      "p95": 0.065,
+      "max": 0.159
+    },
+    "start/dpr1/dirty-terrain": {
+      "n": 100,
+      "mean": 7.885,
+      "p50": 5.556,
+      "p95": 10.68,
+      "max": 168.734
+    },
+    "start/dpr2/cached": {
+      "n": 100,
+      "mean": 0.043,
+      "p50": 0.041,
+      "p95": 0.056,
+      "max": 0.126
+    },
+    "start/dpr2/selected-hover": {
+      "n": 100,
+      "mean": 0.05,
+      "p50": 0.048,
+      "p95": 0.064,
+      "max": 0.112
+    },
+    "start/dpr2/dirty-terrain": {
+      "n": 100,
+      "mean": 14.619,
+      "p50": 5.572,
+      "p95": 25.605,
+      "max": 636.184
+    },
+    "developed/dpr1/cached": {
+      "n": 100,
+      "mean": 0.733,
+      "p50": 0.715,
+      "p95": 0.845,
+      "max": 0.938
+    },
+    "developed/dpr1/selected-hover": {
+      "n": 100,
+      "mean": 3.391,
+      "p50": 1.112,
+      "p95": 1.221,
+      "max": 227.614
+    },
+    "developed/dpr1/dirty-terrain": {
+      "n": 100,
+      "mean": 15.726,
+      "p50": 12.616,
+      "p95": 22.167,
+      "max": 174.394
+    },
+    "developed/dpr2/cached": {
+      "n": 100,
+      "mean": 0.699,
+      "p50": 0.69,
+      "p95": 0.764,
+      "max": 0.814
+    },
+    "developed/dpr2/selected-hover": {
+      "n": 100,
+      "mean": 7.745,
+      "p50": 1.114,
+      "p95": 1.295,
+      "max": 662.247
+    },
+    "developed/dpr2/dirty-terrain": {
+      "n": 100,
+      "mean": 22.599,
+      "p50": 12.862,
+      "p95": 46.462,
+      "max": 465.93
+    },
+    "dense164/dpr1/cached": {
+      "n": 100,
+      "mean": 0.686,
+      "p50": 0.675,
+      "p95": 0.77,
+      "max": 0.844
+    },
+    "dense164/dpr1/selected-hover": {
+      "n": 100,
+      "mean": 2.908,
+      "p50": 0.801,
+      "p95": 0.881,
+      "max": 210.558
+    },
+    "dense164/dpr1/dirty-terrain": {
+      "n": 100,
+      "mean": 15.532,
+      "p50": 12.839,
+      "p95": 21.926,
+      "max": 137.597
+    },
+    "dense164/dpr2/cached": {
+      "n": 100,
+      "mean": 0.666,
+      "p50": 0.66,
+      "p95": 0.707,
+      "max": 0.715
+    },
+    "dense164/dpr2/selected-hover": {
+      "n": 100,
+      "mean": 6.953,
+      "p50": 0.81,
+      "p95": 0.938,
+      "max": 613.432
+    },
+    "dense164/dpr2/dirty-terrain": {
+      "n": 100,
+      "mean": 20.793,
+      "p50": 12.868,
+      "p95": 40.063,
+      "max": 363.31
+    },
+    "dense600/dpr1/cached": {
+      "n": 100,
+      "mean": 3.073,
+      "p50": 1.128,
+      "p95": 1.223,
+      "max": 194.8
+    },
+    "dense600/dpr1/selected-hover": {
+      "n": 100,
+      "mean": 3.54,
+      "p50": 1.587,
+      "p95": 1.761,
+      "max": 194.582
+    },
+    "dense600/dpr1/dirty-terrain": {
+      "n": 100,
+      "mean": 16.893,
+      "p50": 13.278,
+      "p95": 27.279,
+      "max": 158.41
+    },
+    "dense600/dpr2/cached": {
+      "n": 100,
+      "mean": 6.681,
+      "p50": 1.136,
+      "p95": 1.2,
+      "max": 555.87
+    },
+    "dense600/dpr2/selected-hover": {
+      "n": 100,
+      "mean": 7.026,
+      "p50": 1.636,
+      "p95": 1.794,
+      "max": 539.388
+    },
+    "dense600/dpr2/dirty-terrain": {
+      "n": 100,
+      "mean": 24.804,
+      "p50": 13.608,
+      "p95": 53.055,
+      "max": 419.531
+    }
+  },
+  "serialization": {
+    "start": {
+      "n": 100,
+      "mean": 0.193,
+      "p50": 0.186,
+      "p95": 0.223,
+      "max": 0.343,
+      "bytes": 76276
+    },
+    "developed": {
+      "n": 100,
+      "mean": 0.462,
+      "p50": 0.456,
+      "p95": 0.493,
+      "max": 0.581,
+      "bytes": 168079
+    },
+    "dense164": {
+      "n": 100,
+      "mean": 0.386,
+      "p50": 0.375,
+      "p95": 0.42,
+      "max": 0.786,
+      "bytes": 132537
+    },
+    "dense600": {
+      "n": 100,
+      "mean": 0.527,
+      "p50": 0.509,
+      "p95": 0.579,
+      "max": 1.603,
+      "bytes": 177810
+    }
+  }
+}

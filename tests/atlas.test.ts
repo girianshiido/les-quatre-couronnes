@@ -44,7 +44,7 @@ test("all 216 directional actor frames are distinct, populated and in the atlas 
   assert.equal(hashes.size, 216);
 });
 test("five biomes and every terrain variant fit the committed world atlas", () => {
-  assert.deepEqual([world.width, world.height], [256, 1920]);
+  assert.deepEqual([world.width, world.height], [256, 5 * TERRAIN_FRAMES.length * 32]);
   for (let b = 0; b < 5; b++)
     for (const kind of TERRAIN_FRAMES)
       for (let v = 0; v < 8; v++) {

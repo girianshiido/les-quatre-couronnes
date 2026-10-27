@@ -35,6 +35,8 @@ export class Renderer {
   influence = document.createElement("canvas");
   influenceKey = "";
   cached = "";
+  terrainCells: string[] = [];
+  influenceCells: string[] = [];
   atlases?: Atlases;
   collapseTimes = new Map<string, number>();
   zoom = 1;
@@ -82,271 +84,298 @@ export class Renderer {
     this.oy = y - ((y - this.oy) * z) / this.zoom;
     this.zoom = z;
   }
+  paintAtlasTerrain(s: State) {
+    if (
+      this.terrain.width !== s.size * CELL ||
+      this.terrain.height !== s.size * CELL ||
+      !this.cached
+    ) {
+      this.terrain.width = s.size * CELL;
+      this.terrain.height = s.size * CELL;
+      this.terrainCells = [];
+    }
+    const c = this.tctx,
+      biome = LEVELS[s.level].biomeId;
+    c.imageSmoothingEnabled = false;
+    const wet = (x: number, y: number) =>
+      ["water", "bridge", "dam"].includes(tile(s, x, y)?.terrain ?? "");
+    for (let y = 0; y < s.size; y++)
+      for (let x = 0; x < s.size; x++) {
+        const t = tile(s, x, y)!,
+          i = y * s.size + x;
+        const dirs = [
+          [0, -1],
+          [1, 0],
+          [0, 1],
+          [-1, 0],
+        ];
+        let mask = 0,
+          shore = 0;
+        for (let d = 0; d < 4; d++) {
+          const [dx, dy] = dirs[d],
+            n = tile(s, x + dx, y + dy);
+          if (n?.terrain === "rock" && n.permanent) mask |= 1 << d;
+          if (n && !wet(x + dx, y + dy)) shore |= 1 << d;
+        }
+        const token = `${biome}/${t.terrain}/${t.variant}/${t.permanent}/${mask}/${shore}`;
+        if (this.terrainCells[i] === token) continue;
+        this.terrainCells[i] = token;
+        const draw = (kind: TerrainFrame) => {
+          const f = terrainFrame(
+            biome,
+            kind,
+            t.terrain === "rock" && t.permanent
+              ? (x % 4) + (y % 2) * 4
+              : t.variant,
+          );
+          c.drawImage(
+            this.atlases!.world,
+            f.x,
+            f.y,
+            32,
+            32,
+            x * CELL,
+            y * CELL,
+            CELL,
+            CELL,
+          );
+        };
+        let kind: TerrainFrame =
+          t.terrain === "bridge"
+            ? !wet(x - 1, y) && !wet(x + 1, y)
+              ? "bridge-x"
+              : "bridge-y"
+            : t.terrain;
+        if (t.terrain === "rock" && t.permanent)
+          kind = `massif-${mask}` as TerrainFrame;
+        draw(kind);
+        if (wet(x, y))
+          for (let d = 0; d < 4; d++)
+            if (shore & (1 << d))
+              draw(
+                ["shore-n", "shore-e", "shore-s", "shore-w"][d] as TerrainFrame,
+              );
+      }
+    this.cached = `${s.level}-${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => `${b.id}${b.construction ? "p" : "b"}`).join(".")}`;
+  }
   paintTerrain(s: State) {
     const biome = LEVELS[s.level].biomeId;
-    this.terrain.width = s.size * CELL;
-    this.terrain.height = s.size * CELL;
+    if (!this.atlases) {
+      this.terrain.width = s.size * CELL;
+      this.terrain.height = s.size * CELL;
+    }
     const c = this.tctx;
     c.imageSmoothingEnabled = false;
     if (this.atlases) {
-      const wet = (x: number, y: number) => {
-        const t = tile(s, x, y)?.terrain;
-        return t === "water" || t === "bridge" || t === "dam";
-      };
-      for (let y = 0; y < s.size; y++)
-        for (let x = 0; x < s.size; x++) {
-          const t = tile(s, x, y)!;
-          let kind: TerrainFrame =
-            t.terrain === "bridge"
-              ? !wet(x - 1, y) && !wet(x + 1, y)
-                ? "bridge-x"
-                : "bridge-y"
-              : t.terrain;
-          const draw = (kind: TerrainFrame) => {
-            const f = terrainFrame(biome, kind, t.variant);
-            c.drawImage(
-              this.atlases!.world,
-              f.x,
-              f.y,
-              32,
-              32,
-              x * CELL,
-              y * CELL,
-              CELL,
-              CELL,
-            );
-          };
-          draw(kind);
-          if (wet(x, y)) {
-            for (const [dx, dy, side] of [
-              [0, -1, "n"],
-              [1, 0, "e"],
-              [0, 1, "s"],
-              [-1, 0, "w"],
-            ] as const)
-              if (tile(s, x + dx, y + dy) && !wet(x + dx, y + dy))
-                draw(`shore-${side}`);
-          }
+      this.paintAtlasTerrain(s);
+      return;
+    }
+    for (let y = 0; y < s.size; y++)
+      for (let x = 0; x < s.size; x++) {
+        const t = tile(s, x, y)!,
+          px = x * CELL,
+          py = y * CELL;
+        const grass = [
+          [
+            "#59774a",
+            "#5e7c4f",
+            "#628052",
+            "#587547",
+            "#668354",
+            "#5b794b",
+            "#607d4e",
+            "#648150",
+          ],
+          [
+            "#b79b68",
+            "#bfa572",
+            "#c5ab77",
+            "#c3a570",
+            "#c7ae7a",
+            "#b69a67",
+            "#baa16e",
+            "#c8ae7d",
+          ],
+          [
+            "#bfcecf",
+            "#c6d4d4",
+            "#cbd9d8",
+            "#b9cacc",
+            "#ccdad8",
+            "#c0d0d2",
+            "#c6d5d7",
+            "#cfdddc",
+          ],
+          [
+            "#455d50",
+            "#4b6556",
+            "#506958",
+            "#435e50",
+            "#526d5c",
+            "#496457",
+            "#4d6758",
+            "#536d5e",
+          ],
+          [
+            "#625877",
+            "#685e80",
+            "#6e6385",
+            "#605776",
+            "#73688a",
+            "#655b7b",
+            "#6b6181",
+            "#746a8c",
+          ],
+        ][biome];
+        c.fillStyle =
+          t.terrain === "water" || t.terrain === "dam"
+            ? ["#407d86", "#4a9796", "#61889f", "#355e68", "#626eab"][biome]
+            : grass[t.variant];
+        c.fillRect(px, py, CELL, CELL);
+        if (t.terrain === "water") {
+          c.fillStyle = ["#53939a", "#6bb5ab", "#8caebb", "#4c7b83", "#919acb"][
+            s.level
+          ];
+          c.fillRect(px + 2, py + 5 + (t.variant % 3), 7, 1);
+          c.fillStyle = "#366d77";
+          c.fillRect(px + 8, py + 12, 6, 1);
+        } else {
+          c.fillStyle = "#88a06855";
+          c.fillRect(px + 3, py + 3, 1, 2);
+          c.fillRect(px + 11, py + 12, 2, 1);
         }
-    } else
-      for (let y = 0; y < s.size; y++)
-        for (let x = 0; x < s.size; x++) {
-          const t = tile(s, x, y)!,
-            px = x * CELL,
-            py = y * CELL;
-          const grass = [
-            [
-              "#59774a",
-              "#5e7c4f",
-              "#628052",
-              "#587547",
-              "#668354",
-              "#5b794b",
-              "#607d4e",
-              "#648150",
-            ],
-            [
-              "#b79b68",
-              "#bfa572",
-              "#c5ab77",
-              "#c3a570",
-              "#c7ae7a",
-              "#b69a67",
-              "#baa16e",
-              "#c8ae7d",
-            ],
-            [
-              "#bfcecf",
-              "#c6d4d4",
-              "#cbd9d8",
-              "#b9cacc",
-              "#ccdad8",
-              "#c0d0d2",
-              "#c6d5d7",
-              "#cfdddc",
-            ],
-            [
-              "#455d50",
-              "#4b6556",
-              "#506958",
-              "#435e50",
-              "#526d5c",
-              "#496457",
-              "#4d6758",
-              "#536d5e",
-            ],
-            [
-              "#625877",
-              "#685e80",
-              "#6e6385",
-              "#605776",
-              "#73688a",
-              "#655b7b",
-              "#6b6181",
-              "#746a8c",
-            ],
-          ][biome];
-          c.fillStyle =
-            t.terrain === "water" || t.terrain === "dam"
-              ? ["#407d86", "#4a9796", "#61889f", "#355e68", "#626eab"][biome]
-              : grass[t.variant];
-          c.fillRect(px, py, CELL, CELL);
-          if (t.terrain === "water") {
-            c.fillStyle = [
-              "#53939a",
-              "#6bb5ab",
-              "#8caebb",
-              "#4c7b83",
-              "#919acb",
-            ][s.level];
-            c.fillRect(px + 2, py + 5 + (t.variant % 3), 7, 1);
-            c.fillStyle = "#366d77";
-            c.fillRect(px + 8, py + 12, 6, 1);
+        if (t.terrain === "tree" && biome === 1) {
+          c.fillStyle = "#4e693d";
+          if (t.variant % 2) {
+            c.fillRect(px + 6, py + 1, 4, 14);
+            c.fillRect(px + 2, py + 5, 3, 6);
+            c.fillRect(px + 3, py + 9, 4, 2);
+            c.fillRect(px + 11, py + 3, 3, 5);
+            c.fillRect(px + 8, py + 6, 4, 2);
+            c.fillStyle = "#7f9455";
+            c.fillRect(px + 7, py + 2, 1, 11);
           } else {
-            c.fillStyle = "#88a06855";
-            c.fillRect(px + 3, py + 3, 1, 2);
-            c.fillRect(px + 11, py + 12, 2, 1);
-          }
-          if (t.terrain === "tree" && biome === 1) {
-            c.fillStyle = "#4e693d";
-            if (t.variant % 2) {
-              c.fillRect(px + 6, py + 1, 4, 14);
-              c.fillRect(px + 2, py + 5, 3, 6);
-              c.fillRect(px + 3, py + 9, 4, 2);
-              c.fillRect(px + 11, py + 3, 3, 5);
-              c.fillRect(px + 8, py + 6, 4, 2);
-              c.fillStyle = "#7f9455";
-              c.fillRect(px + 7, py + 2, 1, 11);
-            } else {
-              c.fillStyle = "#896b42";
-              c.fillRect(px + 7, py + 4, 2, 11);
-              c.fillRect(px + 8, py + 1, 2, 6);
-              c.fillStyle = "#4f7648";
-              for (const [dx, dy] of [
-                [-7, 2],
-                [6, 3],
-                [-5, -3],
-                [5, -3],
-              ]) {
-                c.beginPath();
-                c.moveTo(px + 8, py + 1);
-                c.lineTo(px + 8 + dx, py + 1 + dy);
-                c.lineTo(px + 8 + dx, py + 4 + dy);
-                c.fill();
-              }
+            c.fillStyle = "#896b42";
+            c.fillRect(px + 7, py + 4, 2, 11);
+            c.fillRect(px + 8, py + 1, 2, 6);
+            c.fillStyle = "#4f7648";
+            for (const [dx, dy] of [
+              [-7, 2],
+              [6, 3],
+              [-5, -3],
+              [5, -3],
+            ]) {
+              c.beginPath();
+              c.moveTo(px + 8, py + 1);
+              c.lineTo(px + 8 + dx, py + 1 + dy);
+              c.lineTo(px + 8 + dx, py + 4 + dy);
+              c.fill();
             }
-          } else if (t.terrain === "tree" && biome === 3) {
-            c.fillStyle = "#665d3f";
-            c.fillRect(px + 7, py + 4, 3, 11);
-            c.fillStyle = "#254e43";
-            c.beginPath();
-            c.ellipse(px + 8, py + 4, 7, 6, 0, 0, Math.PI * 2);
-            c.fill();
-            c.fillStyle = "#4d7860";
-            c.fillRect(px + 3, py + 1, 6, 3);
-            c.fillStyle = "#506b4a";
-            c.fillRect(px + 2, py + 6, 1, 6);
-            c.fillRect(px + 12, py + 6, 1, 5);
-          } else if (t.terrain === "tree" && biome === 4) {
-            c.fillStyle = "#37314988";
-            c.fillRect(px + 3, py + 10, 12, 6);
-            c.fillStyle = "#8fc9c9";
-            c.beginPath();
-            c.moveTo(px + 8, py - 3);
-            c.lineTo(px + 13, py + 5);
-            c.lineTo(px + 9, py + 14);
-            c.lineTo(px + 3, py + 5);
-            c.fill();
-            c.fillStyle = "#d6ece0";
-            c.beginPath();
-            c.moveTo(px + 8, py - 3);
-            c.lineTo(px + 9, py + 14);
-            c.lineTo(px + 3, py + 5);
-            c.fill();
-            c.fillStyle = "#8f91c5";
-            c.fillRect(px + 1, py + 8, 3, 6);
-          } else if (t.terrain === "tree") {
-            c.fillStyle = "#294b354f";
-            c.fillRect(px + 3, py + 8, 12, 8);
-            c.fillStyle = "#644c37";
-            c.fillRect(px + 7, py + 8, 3, 7);
-            c.fillStyle = "#264b37";
+          }
+        } else if (t.terrain === "tree" && biome === 3) {
+          c.fillStyle = "#665d3f";
+          c.fillRect(px + 7, py + 4, 3, 11);
+          c.fillStyle = "#254e43";
+          c.beginPath();
+          c.ellipse(px + 8, py + 4, 7, 6, 0, 0, Math.PI * 2);
+          c.fill();
+          c.fillStyle = "#4d7860";
+          c.fillRect(px + 3, py + 1, 6, 3);
+          c.fillStyle = "#506b4a";
+          c.fillRect(px + 2, py + 6, 1, 6);
+          c.fillRect(px + 12, py + 6, 1, 5);
+        } else if (t.terrain === "tree" && biome === 4) {
+          c.fillStyle = "#37314988";
+          c.fillRect(px + 3, py + 10, 12, 6);
+          c.fillStyle = "#8fc9c9";
+          c.beginPath();
+          c.moveTo(px + 8, py - 3);
+          c.lineTo(px + 13, py + 5);
+          c.lineTo(px + 9, py + 14);
+          c.lineTo(px + 3, py + 5);
+          c.fill();
+          c.fillStyle = "#d6ece0";
+          c.beginPath();
+          c.moveTo(px + 8, py - 3);
+          c.lineTo(px + 9, py + 14);
+          c.lineTo(px + 3, py + 5);
+          c.fill();
+          c.fillStyle = "#8f91c5";
+          c.fillRect(px + 1, py + 8, 3, 6);
+        } else if (t.terrain === "tree") {
+          c.fillStyle = "#294b354f";
+          c.fillRect(px + 3, py + 8, 12, 8);
+          c.fillStyle = "#644c37";
+          c.fillRect(px + 7, py + 8, 3, 7);
+          c.fillStyle = "#264b37";
+          c.beginPath();
+          c.moveTo(px + 8, py - 2);
+          c.lineTo(px + 15, py + 11);
+          c.lineTo(px + 1, py + 11);
+          c.fill();
+          c.fillStyle = "#3c6541";
+          c.beginPath();
+          c.moveTo(px + 7, py);
+          c.lineTo(px + 11, py + 7);
+          c.lineTo(px + 3, py + 7);
+          c.fill();
+          c.fillStyle = "#658252";
+          c.fillRect(px + 6, py + 2, 2, 3);
+          if (biome === 2) {
+            c.fillStyle = "#eff4ec";
             c.beginPath();
             c.moveTo(px + 8, py - 2);
-            c.lineTo(px + 15, py + 11);
-            c.lineTo(px + 1, py + 11);
+            c.lineTo(px + 13, py + 6);
+            c.lineTo(px + 4, py + 6);
             c.fill();
-            c.fillStyle = "#3c6541";
-            c.beginPath();
-            c.moveTo(px + 7, py);
-            c.lineTo(px + 11, py + 7);
-            c.lineTo(px + 3, py + 7);
-            c.fill();
-            c.fillStyle = "#658252";
-            c.fillRect(px + 6, py + 2, 2, 3);
-            if (biome === 2) {
-              c.fillStyle = "#eff4ec";
-              c.beginPath();
-              c.moveTo(px + 8, py - 2);
-              c.lineTo(px + 13, py + 6);
-              c.lineTo(px + 4, py + 6);
-              c.fill();
-              c.fillRect(px + 1, py + 10, 13, 2);
-            }
-          }
-          if (t.terrain === "rock") {
-            c.fillStyle = "#31423f55";
-            c.fillRect(px + 2, py + 10, 13, 5);
-            c.fillStyle = [
-              "#6f7973",
-              "#997947",
-              "#7e96a2",
-              "#657466",
-              "#9791b1",
-            ][s.level];
-            c.beginPath();
-            c.moveTo(px + 2, py + 12);
-            c.lineTo(px + 3, py + 5);
-            c.lineTo(px + 8, py + 1);
-            c.lineTo(px + 13, py + 5);
-            c.lineTo(px + 15, py + 12);
-            c.fill();
-            c.fillStyle = [
-              "#a1a69a",
-              "#d6b782",
-              "#e0e9e8",
-              "#8f9b7d",
-              "#c5bde0",
-            ][s.level];
-            c.beginPath();
-            c.moveTo(px + 3, py + 5);
-            c.lineTo(px + 8, py + 1);
-            c.lineTo(px + 9, py + 7);
-            c.lineTo(px + 3, py + 10);
-            c.fill();
-          }
-          if (t.terrain === "barricade") {
-            c.fillStyle = "#403c2b";
-            c.fillRect(px, py + 5, 16, 9);
-            c.fillStyle = "#a38556";
-            for (let i = 1; i < 16; i += 4) {
-              c.fillRect(px + i, py + 2, 2, 12);
-              c.fillStyle = "#ccaf74";
-              c.fillRect(px + i, py + 1, 2, 2);
-              c.fillStyle = "#a38556";
-            }
-            c.fillStyle = factionColor(t.owner ?? 0);
-            c.fillRect(px, py + 6, 16, 2);
-          }
-          if (t.terrain === "bridge" || t.terrain === "dam") {
-            c.fillStyle = t.terrain === "dam" ? "#aaa58b" : "#94714b";
-            c.fillRect(px, py + 1, 16, 14);
-            c.fillStyle = t.terrain === "dam" ? "#d1c8a8" : "#c7a573";
-            for (let j = 2; j < 15; j += 4) c.fillRect(px, py + j, 16, 2);
-            c.fillStyle = factionColor(t.owner ?? 0);
-            c.fillRect(px, py + 1, 2, 14);
+            c.fillRect(px + 1, py + 10, 13, 2);
           }
         }
+        if (t.terrain === "rock") {
+          c.fillStyle = "#31423f55";
+          c.fillRect(px + 2, py + 10, 13, 5);
+          c.fillStyle = ["#6f7973", "#997947", "#7e96a2", "#657466", "#9791b1"][
+            s.level
+          ];
+          c.beginPath();
+          c.moveTo(px + 2, py + 12);
+          c.lineTo(px + 3, py + 5);
+          c.lineTo(px + 8, py + 1);
+          c.lineTo(px + 13, py + 5);
+          c.lineTo(px + 15, py + 12);
+          c.fill();
+          c.fillStyle = ["#a1a69a", "#d6b782", "#e0e9e8", "#8f9b7d", "#c5bde0"][
+            s.level
+          ];
+          c.beginPath();
+          c.moveTo(px + 3, py + 5);
+          c.lineTo(px + 8, py + 1);
+          c.lineTo(px + 9, py + 7);
+          c.lineTo(px + 3, py + 10);
+          c.fill();
+        }
+        if (t.terrain === "barricade") {
+          c.fillStyle = "#403c2b";
+          c.fillRect(px, py + 5, 16, 9);
+          c.fillStyle = "#a38556";
+          for (let i = 1; i < 16; i += 4) {
+            c.fillRect(px + i, py + 2, 2, 12);
+            c.fillStyle = "#ccaf74";
+            c.fillRect(px + i, py + 1, 2, 2);
+            c.fillStyle = "#a38556";
+          }
+          c.fillStyle = factionColor(t.owner ?? 0);
+          c.fillRect(px, py + 6, 16, 2);
+        }
+        if (t.terrain === "bridge" || t.terrain === "dam") {
+          c.fillStyle = t.terrain === "dam" ? "#aaa58b" : "#94714b";
+          c.fillRect(px, py + 1, 16, 14);
+          c.fillStyle = t.terrain === "dam" ? "#d1c8a8" : "#c7a573";
+          for (let j = 2; j < 15; j += 4) c.fillRect(px, py + j, 16, 2);
+          c.fillStyle = factionColor(t.owner ?? 0);
+          c.fillRect(px, py + 1, 2, 14);
+        }
+      }
     this.cached = `${s.level}-${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => `${b.id}${b.construction ? "p" : "b"}`).join(".")}`;
   }
   paintInfluence(s: State) {
@@ -356,8 +385,14 @@ export class Renderer {
     const key = `${s.level}-${s.seed}-${s.turfRevision}-${growthClock}-${s.houses.reduce((n, h) => n + h.id * (h.team + 1), 0)}-${s.stats.cleared}`;
     if (key === this.influenceKey) return;
     this.influenceKey = key;
-    this.influence.width = s.size * CELL;
-    this.influence.height = s.size * CELL;
+    if (
+      this.influence.width !== s.size * CELL ||
+      this.influence.height !== s.size * CELL
+    ) {
+      this.influence.width = s.size * CELL;
+      this.influence.height = s.size * CELL;
+      this.influenceCells = [];
+    }
     const c = this.influence.getContext("2d")!,
       owners = new Int8Array(s.tiles.length).fill(-1),
       strength = new Float32Array(s.tiles.length),
@@ -382,8 +417,18 @@ export class Renderer {
           }
         }
     }
-    for (let i = 0; i < owners.length; i++)
-      if (owners[i] >= 0 && s.clearedTurf[i] !== sources[i]) {
+    for (let i = 0; i < owners.length; i++) {
+      const active = owners[i] >= 0 && s.clearedTurf[i] !== sources[i];
+      const token = active ? `${owners[i]}/${strength[i].toFixed(3)}` : "";
+      if (this.influenceCells[i] === token) continue;
+      this.influenceCells[i] = token;
+      c.clearRect(
+        (i % s.size) * CELL,
+        Math.floor(i / s.size) * CELL,
+        CELL,
+        CELL,
+      );
+      if (active) {
         const x = (i % s.size) * CELL,
           y = Math.floor(i / s.size) * CELL;
         c.globalAlpha = strength[i] * 0.38;
@@ -395,6 +440,7 @@ export class Renderer {
         c.fillRect(x + 12, y + 2, 1, 3);
         c.fillRect(x + 11, y + 3, 3, 1);
       }
+    }
     c.globalAlpha = 1;
   }
   house(c: CanvasRenderingContext2D, x: number, y: number, team: number) {

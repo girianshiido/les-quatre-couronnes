@@ -1,0 +1,242 @@
+[
+  {
+    "name": "walkable",
+    "calls": 15652212,
+    "perStep": 313044.24
+  },
+  {
+    "name": "canHouse",
+    "calls": 1292176,
+    "perStep": 25843.52
+  },
+  {
+    "name": "structureAt",
+    "calls": 987925,
+    "perStep": 19758.5
+  },
+  {
+    "name": "peacefulTile",
+    "calls": 188455,
+    "perStep": 3769.1
+  },
+  {
+    "name": "territoryAt",
+    "calls": 147604,
+    "perStep": 2952.08
+  },
+  {
+    "name": "resting",
+    "calls": 24701,
+    "perStep": 494.02
+  },
+  {
+    "name": "unitUpkeep",
+    "calls": 21779,
+    "perStep": 435.58
+  },
+  {
+    "name": "birthInterval",
+    "calls": 21159,
+    "perStep": 423.18
+  },
+  {
+    "name": "random",
+    "calls": 15549,
+    "perStep": 310.98
+  },
+  {
+    "name": "suppliedUpkeep",
+    "calls": 10901,
+    "perStep": 218.02
+  },
+  {
+    "name": "lifeDrain",
+    "calls": 10878,
+    "perStep": 217.56
+  },
+  {
+    "name": "supportDrain",
+    "calls": 10878,
+    "perStep": 217.56
+  },
+  {
+    "name": "armyCapacity",
+    "calls": 10678,
+    "perStep": 213.56
+  },
+  {
+    "name": "sheltered",
+    "calls": 9689,
+    "perStep": 193.78
+  },
+  {
+    "name": "buildingReserve",
+    "calls": 7287,
+    "perStep": 145.74
+  },
+  {
+    "name": "supplyDistance",
+    "calls": 4325,
+    "perStep": 86.5
+  },
+  {
+    "name": "findStep",
+    "calls": 4110,
+    "perStep": 82.2
+  },
+  {
+    "name": "savingForHouse",
+    "calls": 4009,
+    "perStep": 80.18
+  },
+  {
+    "name": "act",
+    "calls": 3214,
+    "perStep": 64.28
+  },
+  {
+    "name": "aiSettlementTarget",
+    "calls": 3157,
+    "perStep": 63.14
+  },
+  {
+    "name": "updateDefence",
+    "calls": 3157,
+    "perStep": 63.14
+  },
+  {
+    "name": "aiRaidTarget",
+    "calls": 3157,
+    "perStep": 63.14
+  },
+  {
+    "name": "playerExpansionTarget",
+    "calls": 3157,
+    "perStep": 63.14
+  },
+  {
+    "name": "updateContinuousWork",
+    "calls": 3157,
+    "perStep": 63.14
+  },
+  {
+    "name": "nextStep",
+    "calls": 2472,
+    "perStep": 49.44
+  },
+  {
+    "name": "updateRest",
+    "calls": 2203,
+    "perStep": 44.06
+  },
+  {
+    "name": "shelterPlan",
+    "calls": 2203,
+    "perStep": 44.06
+  },
+  {
+    "name": "autonomousDestination",
+    "calls": 1684,
+    "perStep": 33.68
+  },
+  {
+    "name": "landConnected",
+    "calls": 1638,
+    "perStep": 32.76
+  },
+  {
+    "name": "injure",
+    "calls": 1216,
+    "perStep": 24.32
+  },
+  {
+    "name": "destroyTurf",
+    "calls": 949,
+    "perStep": 18.98
+  },
+  {
+    "name": "raidBlockers",
+    "calls": 603,
+    "perStep": 12.06
+  },
+  {
+    "name": "kingCapacity",
+    "calls": 440,
+    "perStep": 8.8
+  },
+  {
+    "name": "addHouse",
+    "calls": 401,
+    "perStep": 8.02
+  },
+  {
+    "name": "spawn",
+    "calls": 232,
+    "perStep": 4.64
+  },
+  {
+    "name": "goldIncome",
+    "calls": 200,
+    "perStep": 4
+  },
+  {
+    "name": "armyHP",
+    "calls": 200,
+    "perStep": 4
+  },
+  {
+    "name": "maintenanceCost",
+    "calls": 200,
+    "perStep": 4
+  },
+  {
+    "name": "mergeStackedAllies",
+    "calls": 179,
+    "perStep": 3.58
+  },
+  {
+    "name": "hasDestinationOrder",
+    "calls": 156,
+    "perStep": 3.12
+  },
+  {
+    "name": "refreshKings",
+    "calls": 110,
+    "perStep": 2.2
+  },
+  {
+    "name": "resolveEncounter",
+    "calls": 96,
+    "perStep": 1.92
+  },
+  {
+    "name": "step",
+    "calls": 50,
+    "perStep": 1
+  },
+  {
+    "name": "log",
+    "calls": 19,
+    "perStep": 0.38
+  },
+  {
+    "name": "razeHouse",
+    "calls": 10,
+    "perStep": 0.2
+  },
+  {
+    "name": "houseDestructionCost",
+    "calls": 10,
+    "perStep": 0.2
+  },
+  {
+    "name": "combatPower",
+    "calls": 9,
+    "perStep": 0.18
+  },
+  {
+    "name": "finishEncounter",
+    "calls": 9,
+    "perStep": 0.18
+  }
+]

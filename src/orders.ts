@@ -27,7 +27,7 @@ export function destinationActions(
   p: Point,
 ): DestinationAction[] {
   const t = tile(s, p.x, p.y);
-  if (!t || !units.length) return [];
+  if (!t || t.permanent || !units.length) return [];
   const gold = s.kingdoms[0].gold,
     workers = units.filter((u) => !u.royal).sort((a, b) => a.hp - b.hp);
   const reachable = (u: Unit, q: Point) =>

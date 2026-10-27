@@ -1,0 +1,37 @@
+{
+ "elapsed": 58.6,
+ "speed": 5,
+ "units": 252,
+ "houses": 443,
+ "simulation": {
+  "n": 1464,
+  "mean": 16.51,
+  "p95": 21.5,
+  "max": 38.3
+ },
+ "draw": {
+  "n": 1464,
+  "mean": 0.77,
+  "p95": 1.5,
+  "max": 2
+ },
+ "ui": {
+  "n": 164,
+  "mean": 0.67,
+  "p95": 0.8,
+  "max": 1
+ },
+ "frameInterval": {
+  "n": 3513,
+  "mean": 16.67,
+  "p95": 17.6,
+  "max": 33.3
+ },
+ "frameWork": {
+  "n": 3513,
+  "mean": 7.24,
+  "p95": 20.7,
+  "max": 39.4
+ },
+ "longTasks": null
+}

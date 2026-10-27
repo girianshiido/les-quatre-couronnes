@@ -14,6 +14,22 @@ export const TERRAIN_FRAMES = [
   "shore-e",
   "shore-s",
   "shore-w",
+  "massif-0",
+  "massif-1",
+  "massif-2",
+  "massif-3",
+  "massif-4",
+  "massif-5",
+  "massif-6",
+  "massif-7",
+  "massif-8",
+  "massif-9",
+  "massif-10",
+  "massif-11",
+  "massif-12",
+  "massif-13",
+  "massif-14",
+  "massif-15",
 ] as const;
 export type TerrainFrame = (typeof TERRAIN_FRAMES)[number];
 export interface Atlases {

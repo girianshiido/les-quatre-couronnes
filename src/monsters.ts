@@ -14,6 +14,7 @@ import {
   destroyTurf,
   houseDestructionCost,
   razeHouse,
+  invalidateWorld,
 } from "./engine";
 const proxy = (m: Monster): Unit => ({
   id: m.id,
@@ -144,6 +145,7 @@ export function monsterCanMove(s: State, p: Point) {
   const t = tile(s, p.x, p.y);
   return (
     !!t &&
+    !t.permanent &&
     !["water", "dam", "rock"].includes(t.terrain) &&
     t.cave === undefined &&
     !(t.terrain === "barricade" && t.owner === 4)
@@ -174,6 +176,7 @@ export function attackCave(s: State, u: Unit, c: Cave) {
     s.stats.cleared++;
     s.caves = s.caves.filter((v) => v.id !== c.id);
     delete tile(s, c.x, c.y)!.cave;
+    invalidateWorld(s);
     log(s, "Une grotte est détruite. Plus aucun monstre n’en sortira.", u.team);
   }
   return u.hp > 0 && c.hp <= 0;

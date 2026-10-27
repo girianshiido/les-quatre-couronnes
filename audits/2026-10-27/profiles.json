@@ -1,0 +1,1038 @@
+{
+  "dense164": {
+    "sampledMs": 886.0,
+    "self": [
+      {
+        "name": "supplyDistance",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 24.9,
+        "ms": 220.5
+      },
+      {
+        "name": "step",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 10.4,
+        "ms": 92.1
+      },
+      {
+        "name": "(anonymous)",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 10.1,
+        "ms": 89.4
+      },
+      {
+        "name": "supportDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 9.4,
+        "ms": 83.3
+      },
+      {
+        "name": "suppliedUpkeep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 6.1,
+        "ms": 54.0
+      },
+      {
+        "name": "lifeDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 4.4,
+        "ms": 38.9
+      },
+      {
+        "name": "act",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 4.0,
+        "ms": 35.4
+      },
+      {
+        "name": "nextStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 3.9,
+        "ms": 34.9
+      },
+      {
+        "name": "findStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 3.7,
+        "ms": 32.8
+      },
+      {
+        "name": "post",
+        "file": "node:inspector",
+        "line": 115,
+        "pct": 3.5,
+        "ms": 30.6
+      },
+      {
+        "name": "aiRaidTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 3.4,
+        "ms": 29.8
+      },
+      {
+        "name": "playerExpansionTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.8,
+        "ms": 24.4
+      },
+      {
+        "name": "territoryAt",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.7,
+        "ms": 23.8
+      },
+      {
+        "name": "updateDefence",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.1,
+        "ms": 18.3
+      },
+      {
+        "name": "aiSettlementTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.5,
+        "ms": 13.5
+      },
+      {
+        "name": "kingCapacity",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.3,
+        "ms": 11.3
+      },
+      {
+        "name": "(program)",
+        "file": "",
+        "line": 0,
+        "pct": 1.0,
+        "ms": 8.8
+      },
+      {
+        "name": "(anonymous)",
+        "file": "audit.ts",
+        "line": 0,
+        "pct": 0.7,
+        "ms": 6.3
+      }
+    ],
+    "inclusive": [
+      {
+        "name": "(root)",
+        "file": "",
+        "line": 0,
+        "pct": 100.0,
+        "ms": 886.0
+      },
+      {
+        "name": "(anonymous)",
+        "file": "audit.ts",
+        "line": 0,
+        "pct": 98.2,
+        "ms": 869.7
+      },
+      {
+        "name": "step",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 93.6,
+        "ms": 828.9
+      },
+      {
+        "name": "(anonymous)",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 34.0,
+        "ms": 301.6
+      },
+      {
+        "name": "act",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 32.5,
+        "ms": 288.3
+      },
+      {
+        "name": "supplyDistance",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 24.9,
+        "ms": 220.5
+      },
+      {
+        "name": "suppliedUpkeep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 22.3,
+        "ms": 198.0
+      },
+      {
+        "name": "maintenanceCost",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 22.3,
+        "ms": 198.0
+      },
+      {
+        "name": "supportDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 19.0,
+        "ms": 168.6
+      },
+      {
+        "name": "nextStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 7.6,
+        "ms": 67.8
+      },
+      {
+        "name": "playerExpansionTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 7.3,
+        "ms": 64.6
+      },
+      {
+        "name": "lifeDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 6.8,
+        "ms": 60.4
+      },
+      {
+        "name": "updateDefence",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 6.0,
+        "ms": 52.8
+      },
+      {
+        "name": "resting",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 4.6,
+        "ms": 40.5
+      },
+      {
+        "name": "aiRaidTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 4.2,
+        "ms": 37.4
+      },
+      {
+        "name": "updateRest",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 4.1,
+        "ms": 36.4
+      },
+      {
+        "name": "shelterPlan",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 4.0,
+        "ms": 35.6
+      },
+      {
+        "name": "findStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 3.7,
+        "ms": 32.8
+      }
+    ]
+  },
+  "developed": {
+    "sampledMs": 14796.5,
+    "self": [
+      {
+        "name": "findStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 25.6,
+        "ms": 3784.4
+      },
+      {
+        "name": "nextStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 22.8,
+        "ms": 3366.6
+      },
+      {
+        "name": "(anonymous)",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 11.1,
+        "ms": 1639.1
+      },
+      {
+        "name": "playerExpansionTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 10.4,
+        "ms": 1534.1
+      },
+      {
+        "name": "territoryAt",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 6.4,
+        "ms": 939.8
+      },
+      {
+        "name": "act",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 4.3,
+        "ms": 638.5
+      },
+      {
+        "name": "step",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.4,
+        "ms": 361.5
+      },
+      {
+        "name": "canHouse",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.4,
+        "ms": 352.0
+      },
+      {
+        "name": "updateRest",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.8,
+        "ms": 272.0
+      },
+      {
+        "name": "supportDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.8,
+        "ms": 259.1
+      },
+      {
+        "name": "updateDefence",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.3,
+        "ms": 194.2
+      },
+      {
+        "name": "shelterPlan",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.1,
+        "ms": 166.5
+      },
+      {
+        "name": "walkable",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.1,
+        "ms": 162.1
+      },
+      {
+        "name": "supplyDistance",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.0,
+        "ms": 146.1
+      },
+      {
+        "name": "resting",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 0.9,
+        "ms": 139.0
+      },
+      {
+        "name": "lifeDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 0.9,
+        "ms": 128.5
+      },
+      {
+        "name": "raidBlockers",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 0.8,
+        "ms": 117.5
+      },
+      {
+        "name": "(garbage collector)",
+        "file": "",
+        "line": 0,
+        "pct": 0.7,
+        "ms": 110.2
+      }
+    ],
+    "inclusive": [
+      {
+        "name": "(root)",
+        "file": "",
+        "line": 0,
+        "pct": 100.0,
+        "ms": 14796.5
+      },
+      {
+        "name": "(anonymous)",
+        "file": "audit.ts",
+        "line": 0,
+        "pct": 98.7,
+        "ms": 14610.8
+      },
+      {
+        "name": "step",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 98.3,
+        "ms": 14544.5
+      },
+      {
+        "name": "act",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 90.2,
+        "ms": 13343.8
+      },
+      {
+        "name": "(anonymous)",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 59.9,
+        "ms": 8868.3
+      },
+      {
+        "name": "nextStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 49.1,
+        "ms": 7265.8
+      },
+      {
+        "name": "updateDefence",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 48.1,
+        "ms": 7113.5
+      },
+      {
+        "name": "playerExpansionTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 31.6,
+        "ms": 4676.2
+      },
+      {
+        "name": "findStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 26.3,
+        "ms": 3898.0
+      },
+      {
+        "name": "updateRest",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 10.2,
+        "ms": 1511.3
+      },
+      {
+        "name": "shelterPlan",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 7.8,
+        "ms": 1160.4
+      },
+      {
+        "name": "peacefulTile",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 6.6,
+        "ms": 980.0
+      },
+      {
+        "name": "territoryAt",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 6.4,
+        "ms": 939.8
+      },
+      {
+        "name": "supportDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.7,
+        "ms": 395.4
+      },
+      {
+        "name": "canHouse",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.4,
+        "ms": 352.0
+      },
+      {
+        "name": "resting",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.9,
+        "ms": 276.2
+      },
+      {
+        "name": "lifeDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.7,
+        "ms": 255.3
+      },
+      {
+        "name": "walkable",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.1,
+        "ms": 162.1
+      }
+    ]
+  },
+  "start": {
+    "sampledMs": 138.6,
+    "self": [
+      {
+        "name": "post",
+        "file": "node:inspector",
+        "line": 115,
+        "pct": 28.1,
+        "ms": 38.9
+      },
+      {
+        "name": "(anonymous)",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 17.6,
+        "ms": 24.3
+      },
+      {
+        "name": "supplyDistance",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 14.1,
+        "ms": 19.5
+      },
+      {
+        "name": "goldIncome",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 11.7,
+        "ms": 16.3
+      },
+      {
+        "name": "supportDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 6.7,
+        "ms": 9.3
+      },
+      {
+        "name": "findStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 4.4,
+        "ms": 6.2
+      },
+      {
+        "name": "nextStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.7,
+        "ms": 3.8
+      },
+      {
+        "name": "(garbage collector)",
+        "file": "",
+        "line": 0,
+        "pct": 2.7,
+        "ms": 3.8
+      },
+      {
+        "name": "updateDefence",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.9,
+        "ms": 2.6
+      },
+      {
+        "name": "resting",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.8,
+        "ms": 2.5
+      },
+      {
+        "name": "loadGame",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.7,
+        "ms": 2.4
+      },
+      {
+        "name": "landConnected",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.6,
+        "ms": 2.2
+      },
+      {
+        "name": "playerExpansionTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.0,
+        "ms": 1.3
+      },
+      {
+        "name": "wrappedFn",
+        "file": "errors",
+        "line": 538,
+        "pct": 0.9,
+        "ms": 1.2
+      },
+      {
+        "name": "step",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 0.9,
+        "ms": 1.2
+      },
+      {
+        "name": "autonomousDestination",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 0.8,
+        "ms": 1.1
+      },
+      {
+        "name": "aiSettlementTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 0.6,
+        "ms": 0.8
+      },
+      {
+        "name": "act",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 0.4,
+        "ms": 0.6
+      }
+    ],
+    "inclusive": [
+      {
+        "name": "(root)",
+        "file": "",
+        "line": 0,
+        "pct": 100.0,
+        "ms": 138.6
+      },
+      {
+        "name": "(anonymous)",
+        "file": "audit.ts",
+        "line": 0,
+        "pct": 97.3,
+        "ms": 134.9
+      },
+      {
+        "name": "step",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 65.2,
+        "ms": 90.3
+      },
+      {
+        "name": "post",
+        "file": "node:inspector",
+        "line": 115,
+        "pct": 28.1,
+        "ms": 38.9
+      },
+      {
+        "name": "(anonymous)",
+        "file": "audit.ts",
+        "line": 1,
+        "pct": 28.1,
+        "ms": 38.9
+      },
+      {
+        "name": "goldIncome",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 23.9,
+        "ms": 33.1
+      },
+      {
+        "name": "supportDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 20.7,
+        "ms": 28.8
+      },
+      {
+        "name": "(anonymous)",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 17.6,
+        "ms": 24.3
+      },
+      {
+        "name": "act",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 15.4,
+        "ms": 21.3
+      },
+      {
+        "name": "supplyDistance",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 14.1,
+        "ms": 19.5
+      },
+      {
+        "name": "nextStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 8.1,
+        "ms": 11.2
+      },
+      {
+        "name": "findStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 5.4,
+        "ms": 7.4
+      },
+      {
+        "name": "loadGame",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 3.2,
+        "ms": 4.4
+      },
+      {
+        "name": "lifeDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.9,
+        "ms": 4.0
+      },
+      {
+        "name": "resting",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.7,
+        "ms": 3.8
+      },
+      {
+        "name": "(garbage collector)",
+        "file": "",
+        "line": 0,
+        "pct": 2.7,
+        "ms": 3.8
+      },
+      {
+        "name": "updateDefence",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.9,
+        "ms": 2.6
+      },
+      {
+        "name": "landConnected",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.6,
+        "ms": 2.2
+      }
+    ]
+  },
+  "dense600": {
+    "sampledMs": 2307.0,
+    "self": [
+      {
+        "name": "findStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 16.5,
+        "ms": 381.8
+      },
+      {
+        "name": "nextStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 14.3,
+        "ms": 329.1
+      },
+      {
+        "name": "supplyDistance",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 10.8,
+        "ms": 250.0
+      },
+      {
+        "name": "(anonymous)",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 10.5,
+        "ms": 242.6
+      },
+      {
+        "name": "step",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 10.1,
+        "ms": 232.3
+      },
+      {
+        "name": "supportDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 6.1,
+        "ms": 140.9
+      },
+      {
+        "name": "act",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 5.9,
+        "ms": 135.5
+      },
+      {
+        "name": "lifeDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 4.5,
+        "ms": 104.2
+      },
+      {
+        "name": "updateDefence",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 4.1,
+        "ms": 95.5
+      },
+      {
+        "name": "aiRaidTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.8,
+        "ms": 65.4
+      },
+      {
+        "name": "playerExpansionTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.5,
+        "ms": 58.2
+      },
+      {
+        "name": "suppliedUpkeep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.3,
+        "ms": 52.5
+      },
+      {
+        "name": "aiSettlementTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.9,
+        "ms": 42.7
+      },
+      {
+        "name": "post",
+        "file": "node:inspector",
+        "line": 115,
+        "pct": 1.3,
+        "ms": 31.0
+      },
+      {
+        "name": "resting",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 1.2,
+        "ms": 27.7
+      },
+      {
+        "name": "(program)",
+        "file": "",
+        "line": 0,
+        "pct": 1.0,
+        "ms": 22.6
+      },
+      {
+        "name": "(garbage collector)",
+        "file": "",
+        "line": 0,
+        "pct": 0.6,
+        "ms": 15.0
+      },
+      {
+        "name": "(anonymous)",
+        "file": "audit.ts",
+        "line": 0,
+        "pct": 0.5,
+        "ms": 12.6
+      }
+    ],
+    "inclusive": [
+      {
+        "name": "(root)",
+        "file": "",
+        "line": 0,
+        "pct": 100.0,
+        "ms": 2307.0
+      },
+      {
+        "name": "(anonymous)",
+        "file": "audit.ts",
+        "line": 0,
+        "pct": 98.3,
+        "ms": 2266.9
+      },
+      {
+        "name": "step",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 96.2,
+        "ms": 2218.2
+      },
+      {
+        "name": "act",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 58.3,
+        "ms": 1344.0
+      },
+      {
+        "name": "nextStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 31.1,
+        "ms": 717.1
+      },
+      {
+        "name": "(anonymous)",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 30.5,
+        "ms": 703.4
+      },
+      {
+        "name": "updateDefence",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 20.4,
+        "ms": 471.2
+      },
+      {
+        "name": "findStep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 16.8,
+        "ms": 388.0
+      },
+      {
+        "name": "supportDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 13.2,
+        "ms": 303.4
+      },
+      {
+        "name": "supplyDistance",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 10.8,
+        "ms": 250.0
+      },
+      {
+        "name": "suppliedUpkeep",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 7.6,
+        "ms": 176.0
+      },
+      {
+        "name": "maintenanceCost",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 7.6,
+        "ms": 176.0
+      },
+      {
+        "name": "lifeDrain",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 6.1,
+        "ms": 139.8
+      },
+      {
+        "name": "resting",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 4.7,
+        "ms": 108.1
+      },
+      {
+        "name": "aiRaidTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 3.4,
+        "ms": 79.3
+      },
+      {
+        "name": "playerExpansionTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 3.4,
+        "ms": 78.3
+      },
+      {
+        "name": "aiSettlementTarget",
+        "file": "engine.ts",
+        "line": 1,
+        "pct": 2.1,
+        "ms": 47.8
+      },
+      {
+        "name": "post",
+        "file": "node:inspector",
+        "line": 115,
+        "pct": 1.3,
+        "ms": 31.0
+      }
+    ]
+  }
+}

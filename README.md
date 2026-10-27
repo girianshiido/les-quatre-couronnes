@@ -6,7 +6,7 @@ Jeu de stratégie autonome en TypeScript et Canvas : quatre royaumes identiques,
 
 ## La campagne
 
-**25 niveaux en cinq séries** : forêt et montagne, désert, neige, marais, forêt de cristal. Chaque victoire débloque le niveau suivant. Les cartes sont asymétriques : départs plus ouverts ou confinés, rivières, plateaux, îlots, gorges et clairières. Certaines cartes proposent des grottes facultatives.
+**25 niveaux en cinq séries** : forêt et montagne, désert, neige, marais, forêt de cristal. Chaque victoire débloque le niveau suivant. Les 25 cartes sont fixes, enregistrées case par case et différentes : départs décalés, rivières, îlots, gorges et clairières. Une nouvelle partie retrouve toujours la même géographie. Certaines cartes proposent des grottes facultatives.
 
 Toutes les nouvelles cartes font **48 × 48 cases**, sans quadrillage visible. Tous les camps commencent avec **5 000 or**, un château de neuf cases et un roi de 100 PV. Le premier niveau donne **cinq maisons au joueur et deux à chaque adversaire**, avec des cours d’eau d’une case de large. Son bassin est plus vaste et isolé, tandis que deux ponts déjà achevés relient les trois adversaires entre eux. Ensuite le joueur en reçoit quatre ; les adversaires quatre à six selon la série. Les règles et les impôts s’appliquent de façon identique aux quatre camps.
 
@@ -14,7 +14,7 @@ Toutes les nouvelles cartes font **48 × 48 cases**, sans quadrillage visible. T
 
 ## Habitants, vie et territoire
 
-Les habitants naissent à **100 PV**. Ils cherchent des tâches accessibles suivant votre doctrine : maisons, destruction des maisons adverses ou coupe d’arbres. Une maison ne peut jamais toucher une autre maison, même en diagonale. Les autres travaux et les assauts directs contre les rois demandent un ordre. En cas d’invasion, les habitants proches des maisons ou du château défendent leur territoire ; un ordre manuel reste prioritaire.
+Les habitants naissent à **100 PV**. Ils cherchent des tâches accessibles suivant votre doctrine : maisons, destruction des maisons adverses ou coupe d’arbres. Une maison ne peut jamais toucher une autre maison, même en diagonale. Les autres travaux et les assauts directs contre les rois demandent un ordre. Les massifs rocheux raccordés et les contours permanents sont indestructibles ; les petits rochers isolés restent déblayables. En cas d’invasion, les habitants proches des maisons ou du château défendent leur territoire ; un ordre manuel reste prioritaire.
 
 - **Fusion :** deux alliés qui se rencontrent additionnent leurs PV. Sur toute case, y compris une maison, les alliés fusionnent obligatoirement. S’abriter sur la même maison rassemble donc aussi les unités. Les unités qui rejoignent leur roi fusionnent avec lui.
 - **Combat :** entre unités ordinaires, la plus forte gagne et perd 70 % des PV du vaincu. À égalité, les deux meurent. Les combats et destructions ne coûtent pas d’or.
@@ -169,3 +169,11 @@ Les 25 niveaux utilisent désormais **48 × 48 cases**. Les thèmes, scénarios 
 **Fusion obligatoire :** deux habitants du même camp ne peuvent jamais occuper une même case, même en restant immobiles ou à l’abri. Ils deviennent une unité qui additionne leurs PV. L’ordre S’abriter sur une maison provoque donc aussi une fusion du groupe à l’arrivée. Un nouveau-né apporte exactement 100 PV à l’allié présent sur sa case de sortie. Le roi reste l’unique personnage de sa case lorsqu’il absorbe ses habitants. Les anciennes sauvegardes contenant des habitants superposés sont regroupées au chargement, en conservant leurs PV.
 
 Le déblayage des rochers coûte désormais **15 or** (toujours 3 PV). Les maisons rapportent le double : **0,07 × taux d’impôt en or par seconde et par maison**, sans changement du rythme des naissances. À 0 %, aucune rentrée d’or. Le curseur de vitesse est situé dans les commandes au bas de la carte, de 0 à ×5, et une nouvelle partie commence à ×1. Revenir au-dessus de zéro reprend le jeu sauf en pause manuelle ou en planification ; le bouton ▶ ou Espace permet aussi de reprendre à ×1 depuis zéro.
+
+## Mise à jour du 28 octobre 2026
+
+La campagne utilise 25 grilles fixes de 48 × 48, avec des limites extérieures infranchissables et des massifs raccordés sur plusieurs cases. Les anciennes sauvegardes conservent leur géographie. Les adversaires planifient un trajet complet de ponts, financent ses cases successives et reprennent le même chantier si un ouvrier disparaît.
+
+Les personnages, rois, monstres et bâtiments utilisent de nouvelles planches Imagegen assemblées à une résolution pixel art commune. Les cinq terrains ont des raccords vérifiés, notamment le sable et l’eau du désert. Sources et prompts : `art-source/imagegen/pixel-v2/`.
+
+Les index par case, les chemins partagés, les buffers de recherche réutilisés et les caches de ravitaillement réduisent les calculs répétés. Le terrain et le gazon sont repeints localement ; la simulation a un budget par image et le dessin immobile s’arrête. Sur la sauvegarde de l’audit, le test de bureau à ×5 passe d’environ 17 à 60 images/s ; ce résultat ne vaut pas validation sur téléphone.

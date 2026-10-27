@@ -1,3 +1,4 @@
+import { CAMPAIGN_MAPS } from "./campaign-maps";
 import {
   DEFAULT_PRIORITIES,
   validPriorities,
@@ -41,6 +42,7 @@ export interface Point {
 export interface Tile {
   terrain: Terrain;
   variant: number;
+  permanent?: boolean;
   owner?: number;
   house?: number;
   castle?: number;
@@ -78,6 +80,7 @@ export interface Kingdom {
   tax: number;
   automatic: boolean;
   bridgeSaving: boolean;
+  crossingPlan?: Point[];
   alive: boolean;
   hp: number;
   fortification: number;
@@ -139,6 +142,165 @@ export interface State {
   ruins: { team: number; x: number; y: number; time: number }[];
   result: "playing" | "won" | "lost";
   stats: { cleared: number; bridges: number; dams: number; merged: number };
+}
+interface SpatialIndex {
+  houses: Map<number, House>;
+  houseCells: Map<number, House>;
+  structures: Map<number, Structure>;
+  plots: Uint8Array;
+  danger: Uint8Array[];
+  counts: number[];
+}
+const spatial = new WeakMap<State, SpatialIndex>();
+const simulating = new WeakSet<State>();
+const worldSignatures = new WeakMap<State, number>();
+function spatialIndex(s: State) {
+  if (!simulating.has(s)) return;
+  let index = spatial.get(s);
+  if (index) return index;
+  index = {
+    houses: new Map(),
+    houseCells: new Map(),
+    structures: new Map(),
+    plots: new Uint8Array(s.tiles.length),
+    danger: Array.from({ length: 4 }, () => new Uint8Array(s.tiles.length)),
+    counts: [0, 0, 0, 0],
+  };
+  for (let i = 0; i < s.tiles.length; i++) {
+    const t = s.tiles[i];
+    index.plots[i] = Number(
+      !t.permanent &&
+        t.terrain === "grass" &&
+        t.house === undefined &&
+        t.castle === undefined &&
+        t.cave === undefined,
+    );
+  }
+  for (const h of s.houses) {
+    index.houses.set(h.id, h);
+    index.houseCells.set(idx(s, h.x, h.y), h);
+    index.counts[h.team]++;
+    for (let dy = -5; dy <= 5; dy++)
+      for (let dx = -5 + Math.abs(dy); dx <= 5 - Math.abs(dy); dx++)
+        if (inside(s, h.x + dx, h.y + dy))
+          index.danger[h.team][idx(s, h.x + dx, h.y + dy)] = 1;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++)
+        if (inside(s, h.x + dx, h.y + dy))
+          index.plots[idx(s, h.x + dx, h.y + dy)] = 0;
+  }
+  for (const b of s.structures)
+    for (const p of b.cells) {
+      index.structures.set(idx(s, p.x, p.y), b);
+      index.plots[idx(s, p.x, p.y)] = 0;
+    }
+  spatial.set(s, index);
+  return index;
+}
+function houseById(s: State, id: number | undefined) {
+  return id === undefined
+    ? undefined
+    : (spatialIndex(s)?.houses.get(id) ?? s.houses.find((h) => h.id === id));
+}
+export function invalidateWorld(s: State) {
+  spatial.delete(s);
+  connectivity.delete(s);
+  supplyFields.delete(s);
+  flowCaches.delete(s);
+  shelterPlans.delete(s);
+  landLinks.delete(s);
+}
+const connectivity = new WeakMap<State, Int32Array>();
+function sameLand(s: State, a: Point, b: Point) {
+  let regions = connectivity.get(s);
+  if (!regions) {
+    regions = new Int32Array(s.tiles.length).fill(-1);
+    const queue = new Int32Array(s.tiles.length);
+    let region = 0;
+    const pass = (i: number) =>
+      !s.tiles[i].permanent &&
+      !["water", "dam", "barricade"].includes(s.tiles[i].terrain);
+    for (let i = 0; i < regions.length; i++) {
+      if (regions[i] >= 0 || !pass(i)) continue;
+      let head = 0,
+        tail = 0;
+      queue[tail++] = i;
+      regions[i] = region;
+      while (head < tail) {
+        const at = queue[head++],
+          x = at % s.size,
+          y = Math.floor(at / s.size);
+        for (const n of [
+          x > 0 ? at - 1 : -1,
+          x < s.size - 1 ? at + 1 : -1,
+          y > 0 ? at - s.size : -1,
+          y < s.size - 1 ? at + s.size : -1,
+        ])
+          if (n >= 0 && regions[n] < 0 && pass(n)) {
+            regions[n] = region;
+            queue[tail++] = n;
+          }
+      }
+      region++;
+    }
+    if (simulating.has(s)) connectivity.set(s, regions);
+  }
+  const ai = idx(s, a.x, a.y),
+    bi = idx(s, b.x, b.y);
+  return regions[ai] >= 0 && regions[ai] === regions[bi];
+}
+const unitCells = new WeakMap<State, Map<number, Unit[]>>();
+function unitsAt(s: State, p: Point) {
+  if (!simulating.has(s))
+    return s.units.filter((u) => u.hp > 0 && u.x === p.x && u.y === p.y);
+  let cells = unitCells.get(s);
+  if (!cells) {
+    cells = new Map();
+    for (const u of s.units) {
+      if (u.hp <= 0) continue;
+      const i = idx(s, u.x, u.y);
+      const bucket = cells.get(i) ?? [];
+      bucket.push(u);
+      cells.set(i, bucket);
+    }
+    unitCells.set(s, cells);
+  }
+  return (cells.get(idx(s, p.x, p.y)) ?? []).filter((u) => u.hp > 0);
+}
+function moveInIndex(s: State, u: Unit, p: Point) {
+  const cells = unitCells.get(s);
+  if (!cells) return;
+  const old = idx(s, u.x, u.y),
+    next = idx(s, p.x, p.y);
+  cells.set(
+    old,
+    (cells.get(old) ?? []).filter((v) => v.id !== u.id),
+  );
+  const bucket = cells.get(next) ?? [];
+  bucket.push(u);
+  cells.set(next, bucket);
+}
+function worldSignature(s: State) {
+  let hash = 2166136261;
+  for (const t of s.tiles) {
+    hash = Math.imul(
+      hash ^
+        (t.terrain.charCodeAt(0) +
+          (t.terrain === "barricade" ? 256 : 0) +
+          (t.owner ?? 9) * 512 +
+          (t.castle ?? 9) * 8192 +
+          (t.cave ?? 0) * 131072),
+      16777619,
+    );
+  }
+  for (const h of s.houses)
+    hash = Math.imul(
+      hash ^ (h.id + h.team * 65537 + h.x * 193 + h.y * 307),
+      16777619,
+    );
+  for (const b of s.structures)
+    hash = Math.imul(hash ^ (b.id + (b.construction ? 0 : 65537)), 16777619);
+  return hash;
 }
 export const TEAM_NAMES = ["Émeraude", "Azur", "Ambre", "Carmin"];
 export const COLORS = ["#73cc97", "#70baff", "#edc86b", "#ef8580"];
@@ -216,7 +378,105 @@ export function log(s: State, text: string, team = 0) {
   s.events.unshift({ time: s.time, text, team });
   s.events.length = Math.min(30, s.events.length);
 }
+/** A campaign map is literal data; only the simulation random stream uses the caller's seed. */
 export function createGame(level = 0, seed = 14243): State {
+  level = Math.max(0, Math.min(LEVELS.length - 1, Math.floor(level)));
+  if (LEVELS[level].size !== 48) return createGeneratedGame(level, seed);
+  const map = CAMPAIGN_MAPS[level];
+  const s = createGeneratedGame(level, 14243 + level * 7919);
+  s.seed = seed;
+  s.rng = seed >>> 0;
+  s.houses = [];
+  s.structures = [];
+  s.bridgeSites = [];
+  s.caves = [];
+  s.monsters = [];
+  s.events = [];
+  s.stats = { cleared: 0, bridges: 0, dams: 0, merged: 0 };
+  s.tiles = map.rows.flatMap((row, y) =>
+    [...row].map((code, x): Tile => ({
+      terrain:
+        code === "#"
+          ? "rock"
+          : code === "r"
+            ? "rock"
+            : code === "T"
+              ? "tree"
+              : code === "~"
+                ? "water"
+                : "grass",
+      variant: ((x * 37 + y * 19 + level * 7) ^ ((x + y) * 13)) & 7,
+      ...(code === "#" || x === 0 || y === 0 || x === 47 || y === 47
+        ? { permanent: true }
+        : {}),
+    })),
+  );
+  for (const k of s.kingdoms) {
+    k.castle = { ...map.castles[k.id] };
+    k.hp = 100;
+    k.gold = 5000;
+    k.tax = 12;
+    k.automatic = true;
+    k.alive = true;
+    k.births = 0;
+    k.kills = 0;
+    const c = k.castle;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const t = tile(s, c.x + dx, c.y + dy)!;
+        t.terrain = "grass";
+        delete t.permanent;
+        t.castle = k.id;
+      }
+    const offsets =
+      level === 0 && k.id !== 0
+        ? [
+            [-4, -3],
+            [4, 3],
+          ]
+        : [
+            [-4, -3],
+            [3, -4],
+            [-3, 4],
+            [4, 3],
+            [0, 5],
+            [0, -5],
+          ].slice(
+            0,
+            k.id === 0 ? (level === 0 ? 5 : 4) : LEVELS[level].enemyHouses,
+          );
+    for (const [dx, dy] of offsets) {
+      const t = tile(s, c.x + dx, c.y + dy)!;
+      t.terrain = "grass";
+      delete t.permanent;
+      addHouse(s, k.id, c.x + dx, c.y + dy, false);
+    }
+    const king = s.units.find((u) => u.royal && u.team === k.id)!;
+    king.x = c.x;
+    king.y = c.y;
+    king.hp = 100;
+    king.reserve = 100;
+  }
+  for (const [x, y, team] of map.bridges) {
+    tile(s, x, y)!.terrain = "bridge";
+    tile(s, x, y)!.owner = team;
+    s.structures.push({
+      id: s.nextId++,
+      team,
+      kind: "bridge",
+      hp: 1000,
+      maxHp: 1000,
+      cells: [{ x, y }],
+    });
+    s.bridgeSites.push([{ x, y }]);
+    s.stats.bridges++;
+  }
+  seedCaves(s);
+  invalidateWorld(s);
+  log(s, "Quatre couronnes. Une vallée dont chaque passage compte.");
+  return s;
+}
+function createGeneratedGame(level = 0, seed = 14243): State {
   level = Math.max(0, Math.min(LEVELS.length - 1, Math.floor(level)));
   const size = LEVELS[level].size,
     biome = LEVELS[level].biomeId,
@@ -474,7 +734,16 @@ export function territoryAt(s: State, p: Point) {
   let best: House | undefined,
     bestDistance = 99,
     bestGrowth = 0;
-  for (const h of s.houses) {
+  const index = spatialIndex(s);
+  const nearby: House[] = [];
+  if (index)
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!inside(s, p.x + dx, p.y + dy)) continue;
+        const h = index.houseCells.get(idx(s, p.x + dx, p.y + dy));
+        if (h) nearby.push(h);
+      }
+  for (const h of index ? nearby : s.houses) {
     const dx = p.x - h.x,
       dy = p.y - h.y;
     if (Math.abs(dx) > 1 || Math.abs(dy) > 1) continue;
@@ -505,15 +774,18 @@ export function houseDestructionCost(hp: number) {
 export function razeHouse(s: State, house: House) {
   s.houses = s.houses.filter((h) => h.id !== house.id);
   delete tile(s, house.x, house.y)!.house;
-  supplyFields.delete(s);
+  invalidateWorld(s);
   if (!s.houses.some((h) => h.team === house.team))
     destroyKingdom(s, house.team, house.team);
   else refreshKings(s);
 }
 export function canHouse(s: State, x: number, y: number) {
+  const index = spatialIndex(s);
+  if (index) return inside(s, x, y) && !!index.plots[idx(s, x, y)];
   const t = tile(s, x, y);
   if (
     !t ||
+    t.permanent ||
     t.terrain !== "grass" ||
     t.house !== undefined ||
     t.cave !== undefined ||
@@ -548,7 +820,7 @@ export function addHouse(
     founded: s.time,
   };
   s.houses.push(h);
-  supplyFields.delete(s);
+  invalidateWorld(s);
   tile(s, x, y)!.house = h.id;
   return true;
 }
@@ -579,6 +851,7 @@ export function walkable(s: State, x: number, y: number, team: number) {
   const t = tile(s, x, y);
   return (
     !!t &&
+    !t.permanent &&
     t.terrain !== "water" &&
     t.terrain !== "dam" &&
     (t.terrain !== "barricade" || t.owner !== team)
@@ -593,7 +866,7 @@ export function totalHP(s: State, team: number) {
     .reduce((v, u) => v + u.hp, 0);
 }
 export function resting(s: State, u: Unit) {
-  const h = s.houses.find((h) => h.id === tile(s, u.x, u.y)?.house);
+  const h = houseById(s, tile(s, u.x, u.y)?.house);
   return !!h && h.team === u.team;
 }
 export function lifeDrain(s: State, u: Unit) {
@@ -640,6 +913,7 @@ export function supplyDistance(s: State, u: Unit) {
           t = s.tiles[n];
         if (
           field[n] >= 0 ||
+          t.permanent ||
           ["water", "dam", "rock", "tree", "barricade"].includes(t.terrain) ||
           t.cave !== undefined ||
           (t.castle !== undefined && t.castle !== u.team)
@@ -661,10 +935,16 @@ export function armyHP(s: State, team: number) {
   );
 }
 export function armyCapacity(s: State, team: number) {
-  return s.houses.filter((h) => h.team === team).length * 200;
+  return (
+    (spatialIndex(s)?.counts[team] ??
+      s.houses.filter((h) => h.team === team).length) * 200
+  );
 }
 export function kingCapacity(s: State, team: number) {
-  return s.houses.filter((h) => h.team === team).length * 100;
+  return (
+    (spatialIndex(s)?.counts[team] ??
+      s.houses.filter((h) => h.team === team).length) * 100
+  );
 }
 export function supportDrain(s: State, u: Unit, people = armyHP(s, u.team)) {
   if (u.royal) return 0;
@@ -849,7 +1129,9 @@ function formationStep(
   team: number,
   peaceful: boolean,
   clearObstacles: boolean,
+  civilian = false,
 ) {
+  if (start.x === goal.x && start.y === goal.y) return;
   let caches = flowCaches.get(s);
   if (!caches) {
     caches = {
@@ -865,11 +1147,16 @@ function formationStep(
     cache.fields.clear();
   }
   const target = idx(s, goal.x, goal.y),
-    fieldKey = `${target}-${team}-${clearObstacles}`;
+    fieldKey = `${target}-${team}-${clearObstacles}-${civilian}`;
   let field = cache.fields.get(fieldKey);
   const pass = (x: number, y: number) =>
     inside(s, x, y) &&
     (clearObstacles || !["tree", "rock"].includes(tile(s, x, y)!.terrain)) &&
+    (!civilian ||
+      (!["rock", "barricade"].includes(tile(s, x, y)!.terrain) &&
+        tile(s, x, y)!.cave === undefined &&
+        (tile(s, x, y)!.castle === undefined ||
+          tile(s, x, y)!.castle === team))) &&
     ((walkable(s, x, y, team) && tile(s, x, y)?.terrain !== "barricade") ||
       (x === goal.x &&
         y === goal.y &&
@@ -902,7 +1189,7 @@ function formationStep(
         queue[tail++] = ni;
       }
     }
-    if (cache.fields.size >= 32)
+    if (cache.fields.size >= 128)
       cache.fields.delete(cache.fields.keys().next().value!);
     cache.fields.set(fieldKey, field);
   }
@@ -929,18 +1216,23 @@ export function nextStep(
   civilian = false,
 ): Point | undefined {
   if (
-    (start as Unit).formation &&
-    ["move", "attack", "merge", "shelter"].includes((start as Unit).order)
+    !isContinuousOrder((start as Unit).order) &&
+    (start as Unit).order !== "raid" &&
+    (!!(start as Unit).formation || distance(start, goal) > 6)
   )
     return (
-      formationStep(s, start, goal, team, peaceful, false) ??
-      formationStep(s, start, goal, team, peaceful, true)
+      formationStep(s, start, goal, team, peaceful, false, civilian) ??
+      formationStep(s, start, goal, team, peaceful, true, civilian)
     );
   return (
     findStep(s, start, goal, team, peaceful, false, civilian) ??
     findStep(s, start, goal, team, peaceful, true, civilian)
   );
 }
+const searchBuffers = new WeakMap<
+  State,
+  { prev: Int32Array; queue: Int32Array; seen: Uint32Array; stamp: number }
+>();
 function findStep(
   s: State,
   start: Point,
@@ -954,9 +1246,23 @@ function findStep(
     (start as Unit).order === "raid"
       ? raidBlockers(s, start as Unit)
       : undefined;
-  const total = s.size * s.size,
-    prev = new Int32Array(total).fill(-1),
-    queue = new Int32Array(total);
+  const total = s.size * s.size;
+  let buffers = searchBuffers.get(s);
+  if (!buffers || buffers.prev.length !== total) {
+    buffers = {
+      prev: new Int32Array(total),
+      queue: new Int32Array(total),
+      seen: new Uint32Array(total),
+      stamp: 0,
+    };
+    searchBuffers.set(s, buffers);
+  }
+  buffers.stamp = (buffers.stamp + 1) >>> 0;
+  if (!buffers.stamp) {
+    buffers.seen.fill(0);
+    buffers.stamp = 1;
+  }
+  const { prev, queue, seen, stamp } = buffers;
   let head = 0,
     tail = 0;
   const st = idx(s, start.x, start.y),
@@ -964,6 +1270,7 @@ function findStep(
   if (st === end) return undefined;
   queue[tail++] = st;
   prev[st] = st;
+  seen[st] = stamp;
   while (head < tail) {
     const p = queue[head++],
       x = p % s.size,
@@ -1024,7 +1331,8 @@ function findStep(
       )
         continue;
       const ni = idx(s, nx, ny);
-      if (prev[ni] !== -1) continue;
+      if (seen[ni] === stamp) continue;
+      seen[ni] = stamp;
       prev[ni] = p;
       if (ni === end) {
         let cur = ni;
@@ -1040,7 +1348,8 @@ export function crossing(
   s: State,
   p: Point,
 ): { cells: Point[]; banks: Point[] } | undefined {
-  if (tile(s, p.x, p.y)?.terrain !== "water") return;
+  if (tile(s, p.x, p.y)?.terrain !== "water" || tile(s, p.x, p.y)?.permanent)
+    return;
   const banks = [
     { x: p.x + 1, y: p.y },
     { x: p.x - 1, y: p.y },
@@ -1048,11 +1357,15 @@ export function crossing(
     { x: p.x, y: p.y - 1 },
   ].filter((b) => {
     const t = tile(s, b.x, b.y);
-    return !!t && !["water", "dam", "barricade"].includes(t.terrain);
+    return (
+      !!t && !t.permanent && !["water", "dam", "barricade"].includes(t.terrain)
+    );
   });
   return banks.length ? { cells: [{ ...p }], banks } : undefined;
 }
 export function structureAt(s: State, p: Point) {
+  const index = spatialIndex(s);
+  if (index) return index.structures.get(idx(s, p.x, p.y));
   return s.structures.find((b) =>
     b.cells.some((c) => c.x === p.x && c.y === p.y),
   );
@@ -1068,6 +1381,7 @@ export function canBarricade(s: State, p: Point) {
   const t = tile(s, p.x, p.y);
   return (
     !!t &&
+    !t.permanent &&
     t.terrain === "grass" &&
     t.house === undefined &&
     t.cave === undefined &&
@@ -1113,6 +1427,7 @@ export function fundConstruction(
       },
     };
     s.structures.push(b);
+    invalidateWorld(s);
   }
   const progress = b.construction!;
   const amount = Math.min(k.gold, progress.total - progress.paid);
@@ -1128,7 +1443,7 @@ export function fundConstruction(
   const t = tile(s, p.x, p.y)!;
   t.terrain = kind;
   t.owner = u.team;
-  supplyFields.delete(s);
+  invalidateWorld(s);
   if (kind === "bridge") {
     s.stats.bridges++;
     if (
@@ -1157,7 +1472,7 @@ export function buildBarricade(s: State, u: Unit, p: Point) {
   k.bridgeSaving = false;
   const t = tile(s, p.x, p.y)!;
   t.terrain = "barricade";
-  supplyFields.delete(s);
+  invalidateWorld(s);
   t.owner = u.team;
   s.structures.push({
     id: s.nextId++,
@@ -1176,7 +1491,7 @@ export function buildBarricade(s: State, u: Unit, p: Point) {
 export function destroyStructure(s: State, b: Structure) {
   if (!s.structures.includes(b)) return;
   s.structures = s.structures.filter((v) => v.id !== b.id);
-  supplyFields.delete(s);
+  invalidateWorld(s);
   for (const p of b.cells) {
     const t = tile(s, p.x, p.y)!;
     t.terrain = b.kind === "bridge" ? "water" : "grass";
@@ -1235,10 +1550,7 @@ function autonomousDestination(s: State, u: Unit, p: Point) {
   )
     return false;
   if (t.castle !== undefined && t.castle !== u.team) return false;
-  if (
-    t.house !== undefined &&
-    s.houses.find((h) => h.id === t.house)?.team !== u.team
-  )
+  if (t.house !== undefined && houseById(s, t.house)?.team !== u.team)
     return false;
   if (s.monsters.some((m) => m.hp > 0 && m.x === p.x && m.y === p.y))
     return false;
@@ -1273,7 +1585,7 @@ export function buildCrossing(s: State, u: Unit, p: Point, dam = false) {
   )
     return false;
   k.gold -= dam ? 32 : bridgeCost(s, p);
-  supplyFields.delete(s);
+  invalidateWorld(s);
   if (conversion)
     s.structures = s.structures.filter((b) => b.id !== existing!.id);
   for (const c of cr.cells) {
@@ -1312,6 +1624,7 @@ export function buildCrossing(s: State, u: Unit, p: Point, dam = false) {
   return true;
 }
 export function command(s: State, ids: number[], order: Order, target?: Point) {
+  if (target && tile(s, target.x, target.y)?.permanent) return;
   const us = s.units.filter(
     (u) =>
       ids.includes(u.id) &&
@@ -1392,7 +1705,7 @@ function destroyKingdom(
   s.ruins.push({ team, ...k.castle, time: s.time });
   for (const t of s.tiles) if (t.castle === team) t.castle = undefined;
   const inherited = s.houses.filter((h) => h.team === team);
-  supplyFields.delete(s);
+  invalidateWorld(s);
   if (captureHouses && attacker !== team && s.kingdoms[attacker]?.alive) {
     for (const h of inherited) h.team = attacker;
     s.turfRevision++;
@@ -1427,10 +1740,7 @@ function peacefulTile(s: State, x: number, y: number, team: number) {
   const turf = territoryAt(s, { x, y });
   if (turf && turf.team !== team) return false;
   if (t.castle !== undefined && t.castle !== team) return false;
-  if (
-    t.house !== undefined &&
-    s.houses.find((h) => h.id === t.house)?.team !== team
-  )
+  if (t.house !== undefined && houseById(s, t.house)?.team !== team)
     return false;
   return true;
 }
@@ -1468,10 +1778,7 @@ function shelterPlan(s: State) {
         t = s.tiles[index];
       if (t.terrain === "tree") w.trees = true;
       else if (canHouse(s, x, y)) w.land = true;
-      const house =
-        t.house === undefined
-          ? undefined
-          : s.houses.find((h) => h.id === t.house);
+      const house = t.house === undefined ? undefined : houseById(s, t.house);
       if (house?.team === 0) hs.push(house);
       for (const [dx, dy] of [
         [1, 0],
@@ -1831,6 +2138,146 @@ function buildingReserve(s: State, team: number) {
     ? 1000
     : 0;
 }
+const bridgeSearchTimes = new WeakMap<State, Map<number, number>>();
+/** Choose a whole shore-to-shore crossing; every paid structure still occupies one cell. */
+export function planAiCrossing(s: State, team: number): Point[] | undefined {
+  const start = s.kingdoms[team].castle,
+    seen = new Uint8Array(s.tiles.length),
+    queue = [idx(s, start.x, start.y)];
+  seen[queue[0]] = 1;
+  const land = (x: number, y: number) => {
+    const t = tile(s, x, y);
+    return (
+      !!t &&
+      !t.permanent &&
+      !["water", "dam", "barricade"].includes(t.terrain) &&
+      t.cave === undefined
+    );
+  };
+  for (let head = 0; head < queue.length; head++) {
+    const i = queue[head],
+      x = i % s.size,
+      y = Math.floor(i / s.size);
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = x + dx,
+        ny = y + dy;
+      if (inside(s, nx, ny) && !seen[idx(s, nx, ny)] && land(nx, ny)) {
+        seen[idx(s, nx, ny)] = 1;
+        queue.push(idx(s, nx, ny));
+      }
+    }
+  }
+  let best: Point[] | undefined,
+    bestScore = Infinity;
+  for (const i of queue) {
+    const x = i % s.size,
+      y = Math.floor(i / s.size);
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const cells: Point[] = [];
+      let nx = x + dx,
+        ny = y + dy;
+      while (
+        cells.length < 8 &&
+        tile(s, nx, ny)?.terrain === "water" &&
+        !tile(s, nx, ny)?.permanent
+      ) {
+        cells.push({ x: nx, y: ny });
+        nx += dx;
+        ny += dy;
+      }
+      if (
+        !cells.length ||
+        !inside(s, nx, ny) ||
+        !land(nx, ny) ||
+        seen[idx(s, nx, ny)]
+      )
+        continue;
+      const foe = Math.min(
+        ...s.kingdoms
+          .filter((k) => k.id !== team && k.alive)
+          .map((k) => distance(k.castle, { x: nx, y: ny })),
+      );
+      const score = cells.length * 100 + distance(start, { x, y }) + foe * 0.2;
+      if (score < bestScore) {
+        bestScore = score;
+        best = cells;
+      }
+    }
+  }
+  return best;
+}
+function updateAiCrossing(s: State, u: Unit) {
+  if (
+    u.team === 0 ||
+    u.royal ||
+    u.hp < 42 ||
+    !["auto", "raid", "rest"].includes(u.order)
+  )
+    return;
+  const k = s.kingdoms[u.team];
+  if (k.crossingPlan?.every((p) => tile(s, p.x, p.y)?.terrain === "bridge"))
+    delete k.crossingPlan;
+  if (!k.crossingPlan) {
+    if (
+      s.time < 65 - Math.min(20, s.level) ||
+      k.gold < 1000 ||
+      landConnected(s, u.team)
+    )
+      return;
+    let times = bridgeSearchTimes.get(s);
+    if (!times) bridgeSearchTimes.set(s, (times = new Map()));
+    if (s.time - (times.get(u.team) ?? -99) < 5) return;
+    times.set(u.team, s.time);
+    k.crossingPlan = planAiCrossing(s, u.team);
+  }
+  const target = k.crossingPlan?.find(
+    (p) => tile(s, p.x, p.y)?.terrain !== "bridge",
+  );
+  if (!target) return;
+  if (
+    tile(s, target.x, target.y)?.permanent ||
+    tile(s, target.x, target.y)?.terrain !== "water"
+  ) {
+    delete k.crossingPlan;
+    return;
+  }
+  // One shared assignment prevents workers from opening parallel expensive projects.
+  if (
+    s.units.some((v) => v.team === u.team && v.hp > 0 && v.order === "bridge")
+  )
+    return;
+  const banks = crossing(s, target)?.banks ?? [];
+  const workers = s.units.filter(
+    (v) =>
+      v.team === u.team &&
+      !v.royal &&
+      v.hp >= 42 &&
+      ["auto", "raid", "rest"].includes(v.order),
+  );
+  workers.sort(
+    (a, b) =>
+      Math.min(...banks.map((p) => distance(a, p))) -
+        Math.min(...banks.map((p) => distance(b, p))) || a.id - b.id,
+  );
+  const worker = workers.find((v) =>
+    banks.some((p) => distance(v, p) === 0 || !!nextStep(s, v, p, v.team)),
+  );
+  if (worker?.id !== u.id) return;
+  u.order = "bridge";
+  u.target = { ...target };
+  delete u.pursue;
+  delete u.defending;
+}
 function aiSettlementTarget(s: State, u: Unit) {
   if (u.team === 0 || u.royal || u.order !== "auto") return;
   if (u.target && !canHouse(s, u.target.x, u.target.y)) delete u.target;
@@ -2036,17 +2483,21 @@ function aiRaidTarget(s: State, u: Unit) {
 function updateDefence(s: State, u: Unit) {
   if (u.royal || !["auto", "rest", "defend", "raid"].includes(u.order)) return;
   const houses = s.houses.filter((h) => h.team === u.team);
+  const danger = spatialIndex(s)?.danger[u.team];
   const threats = [...s.units, ...s.monsters.map((m) => ({ ...m, team: 4 }))]
     .filter(
       (v) =>
         v.team !== u.team &&
         v.hp > 0 &&
+        sameLand(s, u, v) &&
         !("royal" in v && v.royal && sheltered(s, v as Unit)) &&
         (distance(u, v) <= 10 ||
           (u.hp >= 1000 && distance(v, s.kingdoms[u.team].castle) <= 8)) &&
         u.hp > ("royal" in v && v.royal ? combatPower(s, v as Unit) : v.hp) &&
         (distance(v, s.kingdoms[u.team].castle) <= 8 ||
-          houses.some((h) => distance(v, h) <= 5)),
+          (danger
+            ? danger[idx(s, v.x, v.y)]
+            : houses.some((h) => distance(v, h) <= 5))),
     )
     .sort((a, b) => {
       const castle = s.kingdoms[u.team].castle;
@@ -2081,7 +2532,7 @@ function updateDefence(s: State, u: Unit) {
         (ally.order === "attack" && ally.pursue === enemy.id)
       ))
         continue;
-      if (!nextStep(s, ally, enemy, ally.team)) continue;
+      if (!sameLand(s, ally, enemy)) continue;
       committed += ally.hp;
       if (committed >= needed) return true;
     }
@@ -2109,15 +2560,13 @@ function continuousJob(s: State, u: Unit, p: Point) {
   const t = tile(s, p.x, p.y);
   if (
     !t ||
+    t.permanent ||
     t.cave !== undefined ||
     (t.castle !== undefined && t.castle !== u.team)
   )
     return false;
   if (u.order === "build-many") {
-    const house =
-      t.house === undefined
-        ? undefined
-        : s.houses.find((h) => h.id === t.house);
+    const house = t.house === undefined ? undefined : houseById(s, t.house);
     return canHouse(s, p.x, p.y) || (!!house && house.team !== u.team);
   }
   if (u.order === "clear-many")
@@ -2236,6 +2685,7 @@ function act(s: State, u: Unit) {
   }
   aiSettlementTarget(s, u);
   updateDefence(s, u);
+  updateAiCrossing(s, u);
   aiRaidTarget(s, u);
   playerExpansionTarget(s, u);
   updateContinuousWork(s, u);
@@ -2460,21 +2910,6 @@ function act(s: State, u: Unit) {
           (tile(s, p.x, p.y)?.terrain === "barricade" ? 4 : 0),
       }))
       .sort((a, b) => b.score - a.score)[0]?.p;
-    // Only opponents initiate infrastructure work without a direct order.
-    if (
-      u.team !== 0 &&
-      (s.level !== 0 || !landConnected(s, u.team)) &&
-      s.time > 65 - Math.min(20, s.level) &&
-      random(s) < 0.12
-    ) {
-      for (const [dx, dy] of [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-      ])
-        if (buildCrossing(s, u, { x: u.x + dx, y: u.y + dy })) return;
-    }
   }
   if (!dest) {
     if (isContinuousOrder(u.order)) {
@@ -2528,7 +2963,7 @@ function act(s: State, u: Unit) {
     const cost = CLEARING_COSTS[t.terrain];
     // A lower-priority clearing task must not repeatedly consume the savings
     // needed for an already available foundation.
-    if (t.terrain === "tree" && savingForHouse(s, u)) return;
+    if (t.permanent || (t.terrain === "tree" && savingForHouse(s, u))) return;
     if (
       k.gold <
       cost +
@@ -2537,14 +2972,12 @@ function act(s: State, u: Unit) {
       return;
     k.gold -= cost;
     t.terrain = "grass";
-    supplyFields.delete(s);
+    invalidateWorld(s);
     injure(u, 3);
     s.stats.cleared++;
     return;
   }
-  const occupants = s.units.filter(
-    (v) => v.id !== u.id && v.hp > 0 && v.x === dest!.x && v.y === dest!.y,
-  );
+  const occupants = unitsAt(s, dest).filter((v) => v.id !== u.id);
   for (const other of occupants) {
     if (other.hp <= 0) continue;
     if (u.order === "rest" && other.team !== u.team) return;
@@ -2553,7 +2986,7 @@ function act(s: State, u: Unit) {
   }
   injure(u, destroyTurf(s, dest, u.team, u.hp));
   if (u.hp <= 0) return;
-  const house = s.houses.find((h) => h.id === t.house);
+  const house = houseById(s, t.house);
   if (house && house.team !== u.team) {
     razeHouse(s, house);
     injure(u, houseDestructionCost(u.hp));
@@ -2567,6 +3000,7 @@ function act(s: State, u: Unit) {
     if (u.hp <= 0) return;
   }
   u.heading = { x: dest.x - u.x, y: dest.y - u.y };
+  moveInIndex(s, u, dest);
   u.x = dest.x;
   u.y = dest.y;
   if (!u.royal && !resting(s, u)) u.hp -= 0.32;
@@ -2594,8 +3028,12 @@ function mergeStackedAllies(s: State) {
 }
 export function step(s: State, dt = 0.2) {
   if (s.result !== "playing") return;
+  const signature = worldSignature(s);
+  if (worldSignatures.get(s) !== signature) invalidateWorld(s);
+  spatial.delete(s);
+  unitCells.delete(s);
+  simulating.add(s);
   mergeStackedAllies(s);
-  supplyFields.delete(s);
   s.time += dt;
   refreshKings(s);
   for (const k of s.kingdoms) {
@@ -2664,6 +3102,8 @@ export function step(s: State, dt = 0.2) {
   s.units = s.units.filter((u) => u.hp > 0 && s.kingdoms[u.team].alive);
   if (!s.kingdoms[0].alive) s.result = "lost";
   else if (s.kingdoms.slice(1).every((k) => !k.alive)) s.result = "won";
+  simulating.delete(s);
+  worldSignatures.set(s, worldSignature(s));
 }
 export function saveGame(s: State) {
   return JSON.stringify(s);
@@ -2824,6 +3264,7 @@ export function loadGame(data: string): State | undefined {
             "dam",
             "barricade",
           ].includes(t.terrain) &&
+          (t.permanent === undefined || typeof t.permanent === "boolean") &&
           int(t.variant) &&
           t.variant < 8 &&
           (t.owner === undefined || faction(t.owner)) &&
@@ -2846,6 +3287,10 @@ export function loadGame(data: string): State | undefined {
           k.tax <= 30 &&
           typeof k.automatic === "boolean" &&
           typeof k.bridgeSaving === "boolean" &&
+          (k.crossingPlan === undefined ||
+            (Array.isArray(k.crossingPlan) &&
+              k.crossingPlan.length <= 8 &&
+              k.crossingPlan.every(point))) &&
           typeof k.alive === "boolean" &&
           num(k.hp) &&
           num(k.fortification) &&

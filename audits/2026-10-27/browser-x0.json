@@ -1,0 +1,27 @@
+{
+ "elapsed": 47.3,
+ "speed": 0,
+ "units": 246,
+ "houses": 434,
+ "simulation": null,
+ "draw": {
+  "n": 2836,
+  "mean": 1.15,
+  "p95": 1.4,
+  "max": 2
+ },
+ "ui": null,
+ "frameInterval": {
+  "n": 2836,
+  "mean": 16.67,
+  "p95": 17.6,
+  "max": 17.8
+ },
+ "frameWork": {
+  "n": 2836,
+  "mean": 1.15,
+  "p95": 1.4,
+  "max": 2
+ },
+ "longTasks": null
+}
