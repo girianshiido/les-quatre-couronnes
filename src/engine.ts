@@ -2063,8 +2063,35 @@ function updateDefence(s: State, u: Unit) {
     current && distance(current, s.kingdoms[u.team].castle) <= 8
       ? [current, ...threats.filter((v) => v.id !== current.id)]
       : threats;
+  const covered = (enemy: Unit | (Monster & { team: number })) => {
+    const power = "royal" in enemy ? combatPower(s, enemy as Unit) : enemy.hp;
+    const needed = power * 1.25;
+    let committed = 0;
+    for (const ally of s.units) {
+      if (
+        ally.id === u.id ||
+        ally.team !== u.team ||
+        ally.hp <= power ||
+        ally.royal ||
+        distance(ally, enemy) > 10
+      )
+        continue;
+      if (!(
+        (ally.order === "defend" && ally.defending === enemy.id) ||
+        (ally.order === "attack" && ally.pursue === enemy.id)
+      ))
+        continue;
+      if (!nextStep(s, ally, enemy, ally.team)) continue;
+      committed += ally.hp;
+      if (committed >= needed) return true;
+    }
+    return false;
+  };
   const target = candidates.find(
-    (v) => distance(u, v) > 0 && nextStep(s, u, v, u.team),
+    (v) =>
+      distance(u, v) > 0 &&
+      (distance(u, v) <= 1 || !covered(v)) &&
+      nextStep(s, u, v, u.team),
   );
   if (target) {
     u.order = "defend";

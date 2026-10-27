@@ -106,7 +106,7 @@ Le sélecteur propose quatre doctrines : **Bâtisseur** favorise les fondations,
 
 Construire en priorité implique aussi d’épargner : si une parcelle libre est accessible, une coupe de moindre priorité ne doit pas absorber chaque rentrée de 30 or et empêcher d’atteindre les 150 or nécessaires. Les commandes manuelles peuvent utiliser la réserve et gardent la priorité. Les prix de construction restent inchangés.
 
-Les quatre royaumes défendent désormais leurs maisons et leur château. Les unités d’au moins 1 000 PV peuvent réagir à une invasion distante ; une menace près du château prime sur un petit ennemi en bordure. Elles cherchent une cible accessible qu’elles peuvent vaincre. Un roi protégé dans son propre château n’est pas considéré comme un envahisseur. Les ordres manuels, dont Tenir, ne sont pas annulés.
+Les quatre royaumes défendent désormais leurs maisons et leur château. Les unités d’au moins 1 000 PV peuvent réagir à une invasion distante ; une menace près du château prime sur un petit ennemi en bordure. Elles cherchent une cible accessible qu’elles peuvent vaincre. Si des alliés capables de rejoindre une menace sont déjà assez forts pour l’intercepter, les autres habitants poursuivent leur développement. Un ennemi adjacent reste une urgence locale ; plusieurs envahisseurs peuvent mobiliser des défenseurs différents. Un roi protégé dans son propre château n’est pas considéré comme un envahisseur. Les ordres manuels, dont Tenir, ne sont pas annulés.
 
 Une mise à jour disponible ouvre maintenant une confirmation en cours de partie : « Sauvegarder et mettre à jour » ou « Annuler ». Sans validation, le jeu ne recharge pas.
 
