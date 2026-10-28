@@ -158,7 +158,12 @@ export function destinationActions(
   if (enemy) return [action("attack", "Attaquer la cible", 0)];
   const house = s.houses.find((h) => h.id === t.house);
   if (house?.team !== undefined && house.team !== 0)
-    return [action("attack", "Raser la maison · 200 PV + 5 % des PV")];
+    return [
+      action(
+        "attack",
+        `Raser la maison · ${Math.ceil(200 - (house.damage ?? 0))} PV restants + 5 % des PV`,
+      ),
+    ];
   if (t.castle !== undefined && t.castle !== 0)
     return [action("attack", "Attaquer le roi adverse", 0)];
   const ally = s.units.find(

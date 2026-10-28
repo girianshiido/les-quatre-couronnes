@@ -1,0 +1,58 @@
+[
+  {
+    "version": "before",
+    "tax": 0,
+    "elapsed": 300,
+    "result": "playing",
+    "zeroAt": 23.600000000000204,
+    "homes": [
+      34,
+      0,
+      1,
+      0
+    ],
+    "army": 15788
+  },
+  {
+    "version": "before",
+    "tax": 2,
+    "elapsed": 255,
+    "result": "won",
+    "zeroAt": 41.000000000000455,
+    "homes": [
+      36,
+      0,
+      0,
+      0
+    ],
+    "army": 17100
+  },
+  {
+    "version": "after",
+    "tax": 0,
+    "elapsed": 300,
+    "result": "playing",
+    "zeroAt": 16.000000000000096,
+    "homes": [
+      35,
+      84,
+      103,
+      98
+    ],
+    "army": 3663
+  },
+  {
+    "version": "after",
+    "tax": 2,
+    "elapsed": 300,
+    "result": "playing",
+    "zeroAt": 18.600000000000133,
+    "homes": [
+      36,
+      49,
+      116,
+      59
+    ],
+    "army": 4724
+  }
+]

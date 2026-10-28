@@ -208,7 +208,7 @@ test("reordering the doctrine changes a real choice between a free plot and an e
   for (const raidFirst of [false, true]) {
     const s = corridor();
     assert.ok(addHouse(s, 1, 22, 20, false));
-    const u = troop(s, 21, 100);
+    const u = troop(s, 21, 1000);
     setPriorities(
       s,
       raidFirst ? ["raid", "house", "clear"] : ["house", "raid", "clear"],

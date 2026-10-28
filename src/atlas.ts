@@ -30,6 +30,7 @@ export const TERRAIN_FRAMES = [
   "massif-13",
   "massif-14",
   "massif-15",
+  "massif-peak",
 ] as const;
 export type TerrainFrame = (typeof TERRAIN_FRAMES)[number];
 export interface Atlases {

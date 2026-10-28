@@ -73,6 +73,7 @@ export interface House extends Point {
   timer: number;
   interval: number;
   founded: number;
+  damage?: number;
 }
 export interface Kingdom {
   id: number;
@@ -771,6 +772,26 @@ export function destroyTurf(s: State, p: Point, team: number, hp = 0) {
 export function houseDestructionCost(hp: number) {
   return 200 + hp * 0.05;
 }
+/** A weak attacker can damage a house, but cannot erase more resistance than its HP pays for. */
+export function assaultHouse(s: State, house: House, attacker: Unit) {
+  if (
+    attacker.hp <= 0 ||
+    attacker.team === house.team ||
+    !s.houses.includes(house)
+  )
+    return false;
+  const remaining = Math.max(0, 200 - (house.damage ?? 0));
+  const effort = Math.min(remaining, attacker.hp * 0.95);
+  const spent = effort + attacker.hp * 0.05;
+  house.damage = (house.damage ?? 0) + effort;
+  injure(attacker, spent);
+  if (attacker.hp < 1e-8) attacker.hp = 0;
+  if (house.damage >= 200 - 1e-8) {
+    razeHouse(s, house);
+    return true;
+  }
+  return false;
+}
 export function razeHouse(s: State, house: House) {
   s.houses = s.houses.filter((h) => h.id !== house.id);
   delete tile(s, house.x, house.y)!.house;
@@ -1094,9 +1115,10 @@ export function resolveEncounter(s: State, a: Unit, b: Unit) {
   return finishEncounter(s, a, b, b);
 }
 export function unitUpkeep(u: Unit) {
-  return !u.royal && u.hp > 500 ? u.hp * 0.002 : 0;
+  return !u.royal && u.hp > 0 ? u.hp * 0.002 : 0;
 }
 export function suppliedUpkeep(s: State, u: Unit) {
+  if (u.hp <= 500 && resting(s, u)) return 0;
   const base = unitUpkeep(u);
   return base
     ? base * (1 + Math.min(2, Math.max(0, supplyDistance(s, u) - 4) / 8))
@@ -2988,16 +3010,16 @@ function act(s: State, u: Unit) {
   if (u.hp <= 0) return;
   const house = houseById(s, t.house);
   if (house && house.team !== u.team) {
-    razeHouse(s, house);
-    injure(u, houseDestructionCost(u.hp));
-    log(
-      s,
-      u.royal
-        ? "Le roi rase une maison adverse."
-        : "Une maison adverse est détruite.",
-      u.team,
-    );
-    if (u.hp <= 0) return;
+    const destroyed = assaultHouse(s, house, u);
+    if (destroyed)
+      log(
+        s,
+        u.royal
+          ? "Le roi rase une maison adverse."
+          : "Une maison adverse est détruite.",
+        u.team,
+      );
+    if (!destroyed || u.hp <= 0) return;
   }
   u.heading = { x: dest.x - u.x, y: dest.y - u.y };
   moveInIndex(s, u, dest);
@@ -3064,22 +3086,13 @@ export function step(s: State, dt = 0.2) {
       spawn(s, h);
     }
   }
-  const coverage = new Map<number, number>();
   const armies = s.kingdoms.map((k) => armyHP(s, k.id));
-  for (const k of s.kingdoms) {
-    if (!k.alive) continue;
-    const needed = maintenanceCost(s, k.id) * dt,
-      paid = Math.min(k.gold, needed);
-    k.gold -= paid;
-    coverage.set(k.id, needed ? paid / needed : 1);
-  }
+  const maintenance = s.kingdoms.map((k) =>
+    k.alive ? maintenanceCost(s, k.id) * dt : 0,
+  );
   for (const u of s.units) {
     if (u.hp <= 0 || !s.kingdoms[u.team].alive) continue;
     u.age += dt;
-    if (unitUpkeep(u) > 0) {
-      u.hp -= u.hp * 0.03 * (1 - (coverage.get(u.team) ?? 1)) * dt;
-      if (u.hp <= 0) continue;
-    }
     const upkeep = lifeDrain(s, u) + supportDrain(s, u, armies[u.team]);
     if (u.royal) injure(u, dt * upkeep);
     else u.hp -= dt * upkeep;
@@ -3089,6 +3102,17 @@ export function step(s: State, dt = 0.2) {
       act(s, u);
     }
   }
+  // The requested work uses the available treasury before the step's maintenance bill.
+  // This preserves exact construction/clearing prices without making armies free.
+  const coverage = s.kingdoms.map((k, i) => {
+    const needed = maintenance[i],
+      paid = Math.min(k.gold, needed);
+    k.gold -= paid;
+    return needed ? paid / needed : 1;
+  });
+  for (const u of s.units)
+    if (u.hp > 0 && suppliedUpkeep(s, u) > 0)
+      u.hp -= u.hp * 0.08 * (1 - coverage[u.team]) * dt;
   tickMonsters(s, dt);
   for (const k of s.kingdoms) {
     const king = s.units.find((u) => u.team === k.id && u.royal);
@@ -3344,6 +3368,7 @@ export function loadGame(data: string): State | undefined {
           num(h.interval) &&
           h.interval > 0 &&
           num(h.founded) &&
+          (h.damage === undefined || (num(h.damage) && h.damage < 200)) &&
           tile(s, h.x, h.y)?.house === h.id,
       )
     )

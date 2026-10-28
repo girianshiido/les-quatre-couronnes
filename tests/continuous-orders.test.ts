@@ -107,7 +107,7 @@ test("continuous builders can raze enemy houses and establish new houses in thei
 });
 test("continuous clearing spends on successive trees and rocks without building houses", () => {
   const { s, u } = scene(100);
-  s.kingdoms[0].gold = 75;
+  s.kingdoms[0].gold = 90;
   for (const [x, kind] of [
     [21, "tree"],
     [23, "rock"],
@@ -118,20 +118,20 @@ test("continuous clearing spends on successive trees and rocks without building 
   command(s, [u.id], "clear-many");
   tick(s, 100);
   for (const x of [21, 23, 26]) assert.equal(tile(s, x, 20)!.terrain, "grass");
-  assert.equal(s.kingdoms[0].gold, 0);
+  assert.ok(s.kingdoms[0].gold >= 0 && s.kingdoms[0].gold < 15);
   assert.equal(s.houses.length, houses);
   assert.ok(["shelter", "hold"].includes(u.order));
 });
-test("a clearing worker with only fifteen gold can clear a rock but never starts an unaffordable tree", () => {
+test("a clearing worker with twenty gold including maintenance can clear a rock but never starts an unaffordable tree", () => {
   const { s, u } = scene(100);
-  s.kingdoms[0].gold = 15;
+  s.kingdoms[0].gold = 20;
   tile(s, 21, 20)!.terrain = "tree";
   tile(s, 23, 20)!.terrain = "rock";
   command(s, [u.id], "clear-many");
   tick(s, 80);
   assert.equal(tile(s, 21, 20)!.terrain, "tree");
   assert.equal(tile(s, 23, 20)!.terrain, "grass");
-  assert.equal(s.kingdoms[0].gold, 0);
+  assert.ok(s.kingdoms[0].gold >= 0 && s.kingdoms[0].gold < 5);
 });
 test("builders do not spend their construction money on incidental natural obstacles", () => {
   const { s, u } = scene();

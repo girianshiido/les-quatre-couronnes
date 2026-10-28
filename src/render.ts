@@ -121,13 +121,7 @@ export class Renderer {
         if (this.terrainCells[i] === token) continue;
         this.terrainCells[i] = token;
         const draw = (kind: TerrainFrame) => {
-          const f = terrainFrame(
-            biome,
-            kind,
-            t.terrain === "rock" && t.permanent
-              ? (x % 4) + (y % 2) * 4
-              : t.variant,
-          );
+          const f = terrainFrame(biome, kind, t.variant);
           c.drawImage(
             this.atlases!.world,
             f.x,
@@ -155,6 +149,42 @@ export class Renderer {
               draw(
                 ["shore-n", "shore-e", "shore-s", "shore-w"][d] as TerrainFrame,
               );
+      }
+    // A complete larger summit spans a solid 2x2 footprint, never arbitrary image fragments.
+    const covered = new Set<number>();
+    const rock = (x: number, y: number) => {
+      const t = tile(s, x, y);
+      return t?.terrain === "rock" && t.permanent;
+    };
+    for (let y = 1; y < s.size - 2; y++)
+      for (let x = 1; x < s.size - 2; x++) {
+        const cells = [
+          y * s.size + x,
+          y * s.size + x + 1,
+          (y + 1) * s.size + x,
+          (y + 1) * s.size + x + 1,
+        ];
+        if (
+          cells.some((i) => covered.has(i)) ||
+          !rock(x, y) ||
+          !rock(x + 1, y) ||
+          !rock(x, y + 1) ||
+          !rock(x + 1, y + 1)
+        )
+          continue;
+        for (const i of cells) covered.add(i);
+        const f = terrainFrame(biome, "massif-peak", 0);
+        c.drawImage(
+          this.atlases!.world,
+          f.x,
+          f.y,
+          32,
+          32,
+          x * CELL,
+          y * CELL,
+          CELL * 2,
+          CELL * 2,
+        );
       }
     this.cached = `${s.level}-${s.seed}-${s.stats.cleared}-${s.stats.bridges}-${s.stats.dams}-${s.structures.map((b) => `${b.id}${b.construction ? "p" : "b"}`).join(".")}`;
   }
@@ -443,7 +473,13 @@ export class Renderer {
     }
     c.globalAlpha = 1;
   }
-  house(c: CanvasRenderingContext2D, x: number, y: number, team: number) {
+  house(
+    c: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    team: number,
+    damage = 0,
+  ) {
     if (this.atlases) {
       c.drawImage(
         this.atlases.buildings,
@@ -456,6 +492,17 @@ export class Renderer {
         14,
         CELL,
       );
+      if (damage > 0) {
+        c.fillStyle = "#102629";
+        c.fillRect(x * CELL + 2, y * CELL + 14, 12, 2);
+        c.fillStyle = "#e4ae76";
+        c.fillRect(
+          x * CELL + 2,
+          y * CELL + 14,
+          12 * Math.max(0, 1 - damage / 200),
+          1,
+        );
+      }
       return;
     }
     const px = x * CELL,
@@ -831,7 +878,7 @@ export class Renderer {
       c.fillRect(x - 3, y + 19, (24 * cave.hp) / cave.maxHp, 3);
     }
     for (const h of s.houses)
-      if (this.visible(h)) this.house(c, h.x, h.y, h.team);
+      if (this.visible(h)) this.house(c, h.x, h.y, h.team, h.damage);
     for (const ruin of s.ruins) {
       const key = `${s.seed}-${ruin.team}-${ruin.time}`;
       if (!this.collapseTimes.has(key))

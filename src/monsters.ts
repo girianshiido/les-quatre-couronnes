@@ -12,8 +12,7 @@ import {
   log,
   destroyStructure,
   destroyTurf,
-  houseDestructionCost,
-  razeHouse,
+  assaultHouse,
   invalidateWorld,
 } from "./engine";
 const proxy = (m: Monster): Unit => ({
@@ -261,9 +260,13 @@ export function tickMonsters(s: State, dt: number) {
     if (m.hp <= 0) continue;
     if (t.house !== undefined) {
       const house = s.houses.find((h) => h.id === t.house);
-      if (house) razeHouse(s, house);
-      m.hp -= houseDestructionCost(m.hp);
-      log(s, "Un monstre détruit une maison.", 4);
+      if (house) {
+        const attacker = proxy(m);
+        const destroyed = assaultHouse(s, house, attacker);
+        m.hp = attacker.hp;
+        if (destroyed) log(s, "Un monstre détruit une maison.", 4);
+        if (!destroyed) continue;
+      }
     }
     if (m.hp <= 0) continue;
     m.heading = { x: dest.x - m.x, y: dest.y - m.y };

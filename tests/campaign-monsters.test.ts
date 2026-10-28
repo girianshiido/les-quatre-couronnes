@@ -182,5 +182,6 @@ test("monsters also spend HP when destroying turf and houses", () => {
     tile(s, m.x + dx, m.y + dy)!.terrain = "rock";
   tickMonsters(s, 0.2);
   assert.ok(m.hp <= 0);
-  assert.ok(!s.houses.includes(h));
+  assert.ok(s.houses.includes(h));
+  assert.ok((h.damage ?? 0) > 0 && h.damage! < 100);
 });

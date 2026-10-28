@@ -271,7 +271,8 @@ function texture(source: Canvas) {
   c.drawImage(tiny, 0, 0, 32, 32);
   return out;
 }
-const world = createCanvas(256, 4480);
+const mountains = await loadImage(`${root}/mountains.png`);
+const world = createCanvas(256, 4640);
 const bases = ["#64774a", "#c8a567", "#d1dddd", "#4f6653", "#736482"];
 for (let b = 0; b < 5; b++) {
   const cuts = [0, 254, 514, 782, 1066, 1402];
@@ -307,6 +308,7 @@ for (let b = 0; b < 5; b++) {
       "shore-s",
       "shore-w",
       ...Array.from({ length: 16 }, (_, i) => `massif-${i}` as const),
+      "massif-peak",
     ] as const) {
       const f = terrainFrame(b, kind, v),
         ctx = world.getContext("2d");
@@ -330,59 +332,64 @@ for (let b = 0; b < 5; b++) {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(wet ? waterTexture : groundTexture, 0, 0);
       if (kind.startsWith("massif-")) {
-        const mask = Number(kind.slice(7));
-        const small = createCanvas(16, 16),
-          c = small.getContext("2d");
+        const peak = kind === "massif-peak",
+          mask = peak ? 0 : Number(kind.slice(7));
+        const piece = crop(
+          mountains,
+          ((mask % 4) * mountains.width) / 4,
+          (Math.floor(mask / 4) * mountains.height) / 4,
+          mountains.width / 4,
+          mountains.height / 4,
+        );
+        const size = peak ? 32 : 16,
+          native = createCanvas(size, size),
+          c = native.getContext("2d");
         c.imageSmoothingEnabled = false;
-        // Generated stone sampled into a connected foothill; neighbours share its edge.
-        const stone = rock
-          .getContext("2d")
-          .getImageData(
-            Math.floor(rock.width * 0.52),
-            Math.floor(rock.height * 0.53),
-            1,
-            1,
-          ).data;
-        const face = createCanvas(16, 16),
-          fc = face.getContext("2d");
-        fc.imageSmoothingEnabled = false;
-        fc.fillStyle = `rgb(${stone[0]},${stone[1]},${stone[2]})`;
-        fc.fillRect(0, 0, 16, 16);
-        fc.drawImage(
-          rock,
-          rock.width * 0.32,
-          rock.height * 0.4,
-          rock.width * 0.4,
-          rock.height * 0.4,
-          0,
-          0,
-          16,
-          16,
-        );
-        c.fillStyle = c.createPattern(face, "repeat")!;
-        c.beginPath();
-        c.moveTo(mask & 8 ? 0 : 2, mask & 8 ? 6 : 11);
-        c.lineTo(4, mask & 1 ? 0 : 7);
-        c.lineTo(11, mask & 1 ? 0 : 6);
-        c.lineTo(mask & 2 ? 16 : 14, mask & 2 ? 6 : 11);
-        c.lineTo(mask & 2 ? 16 : 13, 14);
-        c.lineTo(12, mask & 4 ? 16 : 15);
-        c.lineTo(3, mask & 4 ? 16 : 15);
-        c.lineTo(mask & 8 ? 0 : 1, 14);
-        c.closePath();
-        c.fill();
-        c.drawImage(
-          rock,
-          0,
-          0,
-          rock.width,
-          rock.height,
-          -(v % 4) * 16,
-          -Math.floor(v / 4) * 16,
-          64,
-          32,
-        );
-        ctx.drawImage(small, 0, 0, 32, 32);
+        c.drawImage(piece, 0, 0, size, size);
+        const p = c.getImageData(0, 0, size, size),
+          d = p.data;
+        const tint = [
+          [0.94, 0.96, 0.9],
+          [0.95, 0.62, 0.34],
+          [1.16, 1.28, 1.4],
+          [0.66, 0.77, 0.66],
+          [1.04, 0.73, 1.28],
+        ][b];
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i + 3] < 64) {
+            d[i + 3] = 0;
+            continue;
+          }
+          const l = d[i] * 0.3 + d[i + 1] * 0.5 + d[i + 2] * 0.2;
+          for (let k = 0; k < 3; k++)
+            d[i + k] = Math.min(255, Math.round((l * tint[k]) / 4) * 4);
+          d[i + 3] = 255;
+        }
+        c.putImageData(p, 0, 0);
+        if (!peak) {
+          const face = createCanvas(16, 16),
+            fc = face.getContext("2d");
+          fc.imageSmoothingEnabled = false;
+          fc.fillStyle = `rgb(${Math.round(120 * tint[0])},${Math.round(120 * tint[1])},${Math.round(120 * tint[2])})`;
+          fc.fillRect(0, 0, 16, 16);
+          fc.drawImage(native, 5, 4, 6, 8, 0, 0, 16, 16);
+          c.save();
+          c.globalCompositeOperation = "destination-over";
+          c.fillStyle = c.createPattern(face, "repeat")!;
+          c.fillRect(2, 2, 12, 12);
+          if (mask & 1) c.fillRect(2, 0, 12, 8);
+          if (mask & 2) c.fillRect(8, 2, 8, 12);
+          if (mask & 4) c.fillRect(2, 8, 12, 8);
+          if (mask & 8) c.fillRect(0, 2, 8, 12);
+          if ((mask & 3) === 3) c.fillRect(14, 0, 2, 2);
+          if ((mask & 6) === 6) c.fillRect(14, 14, 2, 2);
+          if ((mask & 12) === 12) c.fillRect(0, 14, 2, 2);
+          if ((mask & 9) === 9) c.fillRect(0, 0, 2, 2);
+          c.restore();
+        }
+        // Join complete, purpose-drawn mountain pieces; never splice a photograph by map coordinates.
+        if (peak) ctx.clearRect(0, 0, 32, 32);
+        ctx.drawImage(native, 0, 0, 32, 32);
         ctx.restore();
         continue;
       }

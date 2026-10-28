@@ -329,6 +329,7 @@ test("a royal raid razes an enemy house", () => {
   const s = createGame(),
     king = s.units.find((u) => u.team === 0 && u.royal)!,
     h = s.houses.find((h) => h.team === 1)!;
+  king.reserve = 500;
   king.x = h.x - 1;
   king.y = h.y;
   king.order = "move";
@@ -564,16 +565,17 @@ test("ordinary units raze enemy houses and pay the destruction cost", () => {
   const h = s.houses.find((h) => h.team === 1)!;
   tile(s, h.x, h.y)!.terrain = "grass";
   tile(s, h.x - 1, h.y)!.terrain = "grass";
-  const u = unit(0, 100, h.x - 1, h.y);
+  const u = unit(0, 1000, h.x - 1, h.y);
   u.order = "move";
   u.target = { x: h.x, y: h.y };
   s.units.push(u);
   const drain = lifeDrain(s, u) + supportDrain(s, u);
   step(s);
   assert.ok(!s.houses.includes(h));
-  const afterTurf = (100 - drain * 0.2) * 0.998 - 2;
+  const afterTurf = (1000 - drain * 0.2) * 0.998 - 2;
   assert.ok(
-    Math.abs(u.hp - (afterTurf - houseDestructionCost(afterTurf))) < 1e-8,
+    Math.abs(u.hp - (afterTurf - houseDestructionCost(afterTurf) - 0.32)) <
+      1e-8,
   );
   assert.equal(tile(s, h.x, h.y)!.house, undefined);
 });

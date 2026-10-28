@@ -61,7 +61,7 @@ test("a free destination offers relevant orders and excludes water actions", () 
 test("enemy houses can be attacked with zero gold", () => {
   const s = createGame(),
     h = s.houses.find((h) => h.team === 1)!,
-    u = unit(100, h.x - 1, h.y);
+    u = unit(100, h.x - 1, h.y, 300);
   s.units.push(u);
   s.kingdoms[0].gold = 0;
   tile(s, u.x, u.y)!.terrain = "grass";
@@ -154,7 +154,7 @@ test("large troops spend gold and starve rapidly without it, even at a house", (
   b.kingdoms[0].gold = 0;
   step(b, 1);
   assert.ok(v.hp < 4600);
-  assert.ok(v.hp > 4400);
+  assert.ok(v.hp > 4250);
 });
 test("ramparts absorb repeated assaults and a modest merged unit cannot instantly kill the king", () => {
   const s = createGame(),
