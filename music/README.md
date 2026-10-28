@@ -4,17 +4,19 @@ Compositions instrumentales originales, écrites en MIDI puis synthétisées ave
 
 ## Cinq ambiances de carte
 
-Chaque série de cinq niveaux possède sa musique. Les mélodies, les instruments, le rythme et les accords changent entre les décors. Chaque musique comporte un arrangement normal et un arrangement d’essor, lorsque le dernier ennemi est affaibli. Ces variations ne comportent pas de cuivres de fanfare.
+Chaque série de cinq niveaux possède sa musique. Les mélodies, les instruments, le rythme et les accords changent entre les décors. Chaque musique comporte un arrangement normal et un arrangement d’essor, lorsque le dernier ennemi est affaibli. Les nouvelles variations privilégient les instruments propres à chaque décor ; le premier décor reprend désormais le thème original et sa variante avec cuivres.
 
 | Décor | Normal / victoire proche | Couleurs musicales | Mesure, tempo | Boucle |
 | --- | --- | --- | --- | --- |
-| Forêt et montagne | Sous les branches / La futaie en marche | Flûte, guitare nylon, cordes pincées, petites percussions | 6/8, noire = 100 | 57,6 s |
+| Forêt et montagne | Les chemins de la couronne / variation de victoire originale | Flûte, clarinette, harpe, guitare et cordes ; cuivres dans la variante | 4/4, noire = 120 | 64 s |
 | Désert et palmeraies | Sept pas dans les dunes / Les caravanes du soleil | Oud évoqué par une guitare nylon, sitar, dulcimer, flûte et peaux ; mode phrygien dominant | 7/8, noire = 120 | 42 s |
 | Neige | Les flocons voyageurs / La danse des aurores | Valse de célesta, harpe, flûte, glockenspiel et cordes | 3/4, noire = 96 | 45 s |
 | Marais et delta | Au fil des marées / La ronde du delta | Marimba, cor anglais, vibraphone, basse et rythme ondulant | 4/4, noire = 80 | 48 s |
 | Forêt cristalline | Le jardin des prismes / Les cinq éclats | Boîte à musique, célesta, nappes et cristaux | 5/4, noire = 120 | 40 s |
 
-Les dix partitions éditables sont dans ce dossier : `carte-{foret,desert,neige,marais,cristal}-{normal,essor}.mid`. Les dix OGG correspondants se trouvent dans `../public/audio/`. Les anciens fichiers `theme-*.mid` et l’écoute `les-chemins-de-la-couronne.ogg` restent des archives du premier thème ; ils ne sont plus utilisés par le jeu ni téléchargés pour le mode hors connexion.
+Les cartes forêt/montagne (1 à 5) utilisent de nouveau `theme-normal.mid` et `theme-victoire.mid`, avec leurs OGG originaux dans `../public/audio/`. L’écoute `les-chemins-de-la-couronne.ogg` enchaîne ces deux arrangements. Ces fichiers sont repris à l’identique, sans nouvelle synthèse.
+
+Les huit partitions des quatre décors suivants sont `carte-{desert,neige,marais,cristal}-{normal,essor}.mid`, avec les OGG correspondants dans `../public/audio/`. La nouvelle proposition forêt « Sous les branches / La futaie en marche » reste conservée ici en MIDI et OGG `carte-foret-{normal,essor}`, pour une éventuelle réutilisation ; elle n’est plus téléchargée par le jeu.
 
 ## Musiques d’écran
 
@@ -44,6 +46,6 @@ python3 scripts/validate-music-midi.py
 python3 scripts/render-biome-music.py /chemin/MuseScore_General_HQ.sf2
 ```
 
-Le rendu effectue trois répétitions de chaque morceau et prélève la répétition centrale avec les réverbérations déjà établies. Un raccord de 40 ms conserve l’attaque du cycle suivant, sans fondu vers le silence. Deux rendus au maximum sont lancés simultanément. Les rapports `biome-midi-validation.json`, `serialized-midi-validation.json` et `biome-audio-validation.json` vérifient les notes réellement écrites, les durées exactes, la stéréo 44,1 kHz, les niveaux et l’absence d’écrêtage ou de passage silencieux de 50 ms dans les OGG décodés.
+Le rendu effectue trois répétitions de chaque morceau et prélève la répétition centrale avec les réverbérations déjà établies. Un raccord de 40 ms conserve l’attaque du cycle suivant, sans fondu vers le silence. Deux rendus au maximum sont lancés simultanément. Le rendu de la nouvelle proposition forêt est dirigé vers les archives dans `music/`, afin de préserver la paire originale utilisée en jeu. Les rapports `biome-midi-validation.json`, `serialized-midi-validation.json` et `biome-audio-validation.json` vérifient les notes réellement écrites, les durées exactes, la stéréo 44,1 kHz, les niveaux et l’absence d’écrêtage ou de passage silencieux de 50 ms dans les OGG décodés.
 
 Les trois musiques d’écran restent reproductibles avec `compose-screen-music.py`, `validate-music-midi.py`, puis FluidSynth sur les MIDI de travail dans `qa/screen-music/` et `render-screen-music.py`. Toutes les options FluidSynth doivent précéder la SoundFont et le MIDI. Les scripts partagent le petit écrivain MIDI `midi_score.py`, sans dépendance musicale externe.

@@ -29,9 +29,9 @@ export function mapMusicMood(
 export type MusicScene = "silent" | "title" | "map" | "won" | "lost";
 export const BIOME_MUSIC = [
   {
-    files: ["carte-foret-normal", "carte-foret-essor"],
-    seconds: 57.6,
-    barSeconds: 1.8,
+    files: ["theme-normal", "theme-victoire"],
+    seconds: 64,
+    barSeconds: 2,
   },
   {
     files: ["carte-desert-normal", "carte-desert-essor"],

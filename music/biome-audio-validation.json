@@ -1,6 +1,6 @@
 [
   {
-    "file": "public/audio/carte-foret-normal.ogg",
+    "file": "music/carte-foret-normal.ogg",
     "seconds": 57.6,
     "channels": 2,
     "sampleRate": 44100,
@@ -12,7 +12,7 @@
     "clippedSamples": 0
   },
   {
-    "file": "public/audio/carte-foret-essor.ogg",
+    "file": "music/carte-foret-essor.ogg",
     "seconds": 57.6,
     "channels": 2,
     "sampleRate": 44100,

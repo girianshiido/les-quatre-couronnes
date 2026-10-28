@@ -33,7 +33,8 @@ def render(track):
     with wave.open(str(loop),'wb') as w:
         w.setnchannels(2);w.setsampwidth(2);w.setframerate(RATE)
         w.writeframes(np.rint(pcm*32767).astype('<i2').tobytes())
-    ogg=ROOT/f'public/audio/{name}.ogg'
+    # The newer forest pair is archived; the first biome uses the original.
+    ogg=ROOT/(f'music/{name}.ogg' if track['biome']=='foret' else f'public/audio/{name}.ogg')
     subprocess.run(['ffmpeg','-v','error','-y','-i',str(loop),'-c:a','libvorbis','-q:a','5',
         '-metadata',f'title={track["title"]}','-metadata','artist=Les Quatre Couronnes',str(ogg)],check=True)
     info=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries',

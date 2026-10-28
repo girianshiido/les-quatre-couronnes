@@ -99,7 +99,7 @@ class Context {
   async decodeAudioData(data: ArrayBuffer) {
     this.decoded++;
     const code = data.byteLength ? new Uint8Array(data)[0] : 0;
-    return { duration: [57.6, 60, 30, 36, 42, 45, 48, 40][code] ?? 57.6 };
+    return { duration: [64, 60, 30, 36, 42, 45, 48, 40][code] ?? 64 };
   }
   createGain() {
     const g = new Gain();
@@ -161,12 +161,12 @@ test("audio waits for a gesture AND a game, loads once and loops phase-aligned b
   assert.equal(urls.length, 2);
   assert.equal(c.sources.length, 2);
   assert.deepEqual(urls, [
-    "/game/audio/carte-foret-normal.ogg",
-    "/game/audio/carte-foret-essor.ogg",
+    "/game/audio/theme-normal.ogg",
+    "/game/audio/theme-victoire.ogg",
   ]);
   assert.equal(c.sources[0].started, c.sources[1].started);
   assert.ok(
-    c.sources.every((s) => s.loop && s.loopStart === 0 && s.loopEnd === 57.6),
+    c.sources.every((s) => s.loop && s.loopStart === 0 && s.loopEnd === 64),
   );
   assert.equal(c.gains[1].gain.value, 1);
   assert.equal(c.gains[2].gain.value, 0);
@@ -197,14 +197,14 @@ test("mood changes crossfade for a whole bar and interrupted transitions stay co
   ]) {
     const call = c.gains[gain].gain.calls.at(-1)!;
     assert.deepEqual(call.slice(0, 2), ["ramp", value]);
-    assert.ok(Math.abs(call[2]! - 13.65) < 1e-8);
+    assert.ok(Math.abs(call[2]! - 14.05) < 1e-8);
   }
-  c.currentTime = 12.75;
+  c.currentTime = 13.05;
   music.setMood("normal");
   const starts = c.gains[2].gain.calls.filter((x) => x[0] === "set");
   assert.ok(Math.abs(starts.at(-2)![1] - 0.5) < 0.0001);
   assert.equal(c.gains[2].gain.calls.at(-1)![0], "ramp");
-  assert.ok(Math.abs(c.gains[2].gain.calls.at(-1)![2]! - 15.45) < 1e-8);
+  assert.ok(Math.abs(c.gains[2].gain.calls.at(-1)![2]! - 16.05) < 1e-8);
   assert.equal(c.sources.length, 2);
 });
 
@@ -306,7 +306,7 @@ test("title, game, result, title and replay select the right tracks and reuse co
   await music.unlock();
   assert.deepEqual(
     c.sources.map((s) => s.loopEnd),
-    [60, 57.6, 57.6, 30, 60, 57.6, 57.6],
+    [60, 64, 64, 30, 60, 64, 64],
   );
   assert.equal(urls.length, 4); // title + two map arrangements + final victory
   assert.ok(c.decoded > urls.length); // previous screens are not retained as decoded buffers
@@ -348,7 +348,7 @@ test("return to title during a map load never launches stale map loops", async (
     resolve = r;
   });
   const { c, music } = player(async (url) =>
-    url.includes("carte-") ? map : new Uint8Array([1]).buffer,
+    url.includes("theme-") ? map : new Uint8Array([1]).buffer,
   );
   music.begin();
   const loading = music.unlock();
@@ -373,7 +373,7 @@ test("a paused new or loaded map stays silent until explicit playback begins", a
   await music.unlock();
   assert.deepEqual(
     c.sources.slice(1).map((s) => s.loopEnd),
-    [57.6, 57.6],
+    [64, 64],
   );
   music.prepareMap();
   await music.unlock();
@@ -444,7 +444,7 @@ test("changing biome replaces decoded map buffers and reuses only matching compr
   assert.equal(errors(), 0);
   assert.deepEqual(
     c.sources.map((s) => s.loopEnd),
-    [57.6, 57.6, 42, 42, 45, 45, 57.6, 57.6],
+    [64, 64, 42, 42, 45, 45, 64, 64],
   );
   assert.equal(urls.length, 6);
   assert.equal(c.decoded, 8);
@@ -456,7 +456,7 @@ test("a slow earlier biome cannot replace the current map soundtrack", async () 
     resolve = r;
   });
   const { c, music, errors } = player((url) =>
-    url.includes("foret") ? forest : audioFile(url),
+    url.includes("theme-") ? forest : audioFile(url),
   );
   music.begin(0);
   const loading = music.unlock();
