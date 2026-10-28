@@ -1,0 +1,32 @@
+[
+  {
+    "file": "music/ecran-titre.mid",
+    "title": "Sous les quatre bannieres",
+    "tracks": 9,
+    "notes": 447,
+    "bars": 24,
+    "bpm": 96.0,
+    "seconds": 60.0,
+    "samePitchOverlaps": 0
+  },
+  {
+    "file": "music/ecran-victoire-finale.mid",
+    "title": "Une seule couronne",
+    "tracks": 9,
+    "notes": 692,
+    "bars": 16,
+    "bpm": 128.0,
+    "seconds": 30.0,
+    "samePitchOverlaps": 0
+  },
+  {
+    "file": "music/ecran-defaite.mid",
+    "title": "Les braises du royaume",
+    "tracks": 6,
+    "notes": 129,
+    "bars": 12,
+    "bpm": 80.0,
+    "seconds": 36.0,
+    "samePitchOverlaps": 0
+  }
+]

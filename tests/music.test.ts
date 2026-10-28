@@ -96,9 +96,10 @@ class Context {
   async suspend() {
     this.state = "suspended";
   }
-  async decodeAudioData() {
+  async decodeAudioData(data: ArrayBuffer) {
     this.decoded++;
-    return { duration: 64 };
+    const code = data.byteLength ? new Uint8Array(data)[0] : 0;
+    return { duration: [64, 60, 30, 36][code] ?? 64 };
   }
   createGain() {
     const g = new Gain();
@@ -112,8 +113,16 @@ class Context {
   }
 }
 function player(
-  fetchAudio: (url: string) => Promise<ArrayBuffer> = async () =>
-    new ArrayBuffer(0),
+  fetchAudio: (url: string) => Promise<ArrayBuffer> = async (url) => {
+    const code = url.includes("ecran-titre")
+      ? 1
+      : url.includes("victoire-finale")
+        ? 2
+        : url.includes("ecran-defaite")
+          ? 3
+          : 0;
+    return new Uint8Array([code]).buffer;
+  },
 ) {
   const c = new Context();
   const urls: string[] = [];
@@ -162,7 +171,7 @@ test("audio waits for a gesture AND a game, loads once and loops phase-aligned b
   assert.equal(c.sources.length, 4);
 });
 
-test("title screen remains silent after unlocking", async () => {
+test("without a selected scene unlocking alone remains silent", async () => {
   const { c, music, urls } = player();
   await music.unlock();
   assert.equal(urls.length, 0);
@@ -230,4 +239,143 @@ test("audio failure reports once, leaves the game usable and can be retried", as
   failing = false;
   await music.retry();
   assert.equal(c.sources.length, 2);
+});
+
+test("title music starts only after a gesture, loops for 60 seconds and is not duplicated by clicks", async () => {
+  const { c, music, urls, created } = player();
+  music.showTitle();
+  assert.equal(created(), 0);
+  await Promise.all([music.unlock(), music.unlock()]);
+  assert.deepEqual(urls, ["/game/audio/ecran-titre.ogg"]);
+  assert.equal(c.sources.length, 1);
+  assert.equal(c.sources[0].loopEnd, 60);
+  music.showTitle();
+  await music.unlock();
+  assert.equal(c.sources.length, 1);
+});
+
+test("each result replaces map music with its distinct screen loop, without changing mute or volume", async () => {
+  for (const [result, file, seconds] of [
+    ["won", "victoire-finale", 30],
+    ["lost", "defaite", 36],
+  ] as const) {
+    const { c, music, urls } = player();
+    music.begin();
+    await music.unlock();
+    music.setVolume(0.4);
+    music.setMuted(true);
+    music.finish(result);
+    await music.unlock();
+    assert.equal(urls.at(-1), `/game/audio/ecran-${file}.ogg`);
+    assert.equal(c.sources.length, 3);
+    assert.equal(c.sources.at(-1)!.loopEnd, seconds);
+    assert.ok(c.sources.slice(0, 2).every((s) => s.stopped));
+    assert.ok(music.muted);
+    assert.equal(music.volume, 0.4);
+    music.setMood("victory");
+    await music.unlock();
+    assert.equal(c.sources.length, 3);
+  }
+});
+
+test("title, game, result, title and replay select the right tracks and reuse compressed files", async () => {
+  const { c, music, urls } = player();
+  music.showTitle();
+  await music.unlock();
+  music.begin();
+  await music.unlock();
+  music.finish("won");
+  await music.unlock();
+  music.showTitle();
+  await music.unlock();
+  music.begin();
+  await music.unlock();
+  assert.deepEqual(
+    c.sources.map((s) => s.loopEnd),
+    [60, 64, 64, 30, 60, 64, 64],
+  );
+  assert.equal(urls.length, 4); // title + two map arrangements + final victory
+  assert.ok(c.decoded > urls.length); // previous screens are not retained as decoded buffers
+});
+
+test("screen changes fade layers using the audio clock and schedule old sources to stop", async () => {
+  const { c, music } = player();
+  music.showTitle();
+  await music.unlock();
+  music.begin();
+  await music.unlock();
+  // Master, title mix, title layer, two map mixes, map layer.
+  assert.deepEqual(c.gains[2].gain.calls.at(-1), ["ramp", 0, 10.4]);
+  assert.deepEqual(c.gains[5].gain.calls.at(-1), ["ramp", 1, 10.4]);
+  assert.equal(c.sources[1].started, c.sources[2].started);
+});
+
+test("a late title load cannot replace a result selected meanwhile", async () => {
+  let resolve!: (v: ArrayBuffer) => void;
+  const title = new Promise<ArrayBuffer>((r) => {
+    resolve = r;
+  });
+  const { c, music } = player(async (url) =>
+    url.includes("titre") ? title : new Uint8Array([2]).buffer,
+  );
+  music.showTitle();
+  const loading = music.unlock();
+  music.finish("won");
+  await music.unlock();
+  resolve(new Uint8Array([1]).buffer);
+  await loading;
+  assert.equal(c.sources.length, 1);
+  assert.equal(c.sources[0].loopEnd, 30);
+});
+
+test("return to title during a map load never launches stale map loops", async () => {
+  let resolve!: (v: ArrayBuffer) => void;
+  const map = new Promise<ArrayBuffer>((r) => {
+    resolve = r;
+  });
+  const { c, music } = player(async (url) =>
+    url.includes("theme-") ? map : new Uint8Array([1]).buffer,
+  );
+  music.begin();
+  const loading = music.unlock();
+  music.showTitle();
+  await music.unlock();
+  resolve(new Uint8Array([0]).buffer);
+  await loading;
+  assert.equal(c.sources.length, 1);
+  assert.equal(c.sources[0].loopEnd, 60);
+});
+
+test("a paused new or loaded map stays silent until explicit playback begins", async () => {
+  const { c, music, urls } = player();
+  music.showTitle();
+  await music.unlock();
+  music.prepareMap();
+  await music.unlock();
+  assert.equal(c.sources.length, 1);
+  assert.ok(c.sources[0].stopped);
+  assert.deepEqual(urls, ["/game/audio/ecran-titre.ogg"]);
+  music.begin();
+  await music.unlock();
+  assert.deepEqual(
+    c.sources.slice(1).map((s) => s.loopEnd),
+    [64, 64],
+  );
+  music.prepareMap();
+  await music.unlock();
+  assert.equal(c.sources.length, 3);
+  assert.ok(c.sources.every((s) => s.stopped));
+});
+test("a title that finishes loading after a paused map opens cannot start playing", async () => {
+  let resolve!: (v: ArrayBuffer) => void;
+  const pending = new Promise<ArrayBuffer>((r) => {
+    resolve = r;
+  });
+  const { c, music } = player(() => pending);
+  music.showTitle();
+  const loading = music.unlock();
+  music.prepareMap();
+  resolve(new Uint8Array([1]).buffer);
+  await loading;
+  assert.equal(c.sources.length, 0);
 });

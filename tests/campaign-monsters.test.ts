@@ -115,10 +115,11 @@ test("breaking a neutral barricade releases a monster through the newly opened c
     [0, 1],
   ])
     tile(s, m.x + dx, m.y + dy)!.terrain = "rock";
+  const hp = m.hp;
   tickMonsters(s, 0.2);
   assert.equal(m.x, p.x);
   assert.ok(Math.abs(m.x - c.x) > 4);
-  assert.equal(m.hp, c.spawnHp);
+  assert.equal(m.hp, hp);
 });
 test("a one-cell bridge releases monsters without costing them movement HP", () => {
   const s = createGame(8),
@@ -165,11 +166,12 @@ test("victory does not require clearing optional monster areas", () => {
   assert.equal(s.result, "won");
   assert.ok(s.monsters.length > 0);
 });
-test("monsters also spend HP when destroying turf and houses", () => {
+test("weakened monsters also spend HP when destroying turf and houses", () => {
   const s = createGame(3),
     m = s.monsters[0],
     h = s.houses.find((h) => h.team === 1)!;
   s.time = 20;
+  m.hp = 100;
   m.x = h.x - 1;
   m.y = h.y;
   m.wait = 0;

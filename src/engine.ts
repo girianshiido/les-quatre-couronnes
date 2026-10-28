@@ -7,7 +7,13 @@ import {
   validDoctrine,
   type DoctrineId,
 } from "./doctrine";
-import { seedCaves, tickMonsters, attackMonster, attackCave } from "./monsters";
+import {
+  seedCaves,
+  tickMonsters,
+  attackMonster,
+  attackCave,
+  upgradeMonsterBirths,
+} from "./monsters";
 export type Terrain =
   "grass" | "tree" | "rock" | "water" | "bridge" | "dam" | "barricade";
 export type Order =
@@ -3589,6 +3595,7 @@ export function loadGame(data: string): State | undefined {
     s.battleStarted = s.battleStarted === true || s.time > 0;
     updateAlliance(s);
     s.events = [];
+    upgradeMonsterBirths(s);
     mergeStackedAllies(s);
     return s;
   } catch {

@@ -105,6 +105,7 @@ let currentColorTheme = colorTheme(read(THEME_KEY));
 applyColorTheme(currentColorTheme);
 const MUSIC_KEY = "quatre-couronnes-music-v1";
 let musicMood: MusicMood = "normal";
+let mapMusicStarted = false;
 let musicPreference: { muted?: boolean; volume?: number } = {};
 try {
   musicPreference = JSON.parse(read(MUSIC_KEY) ?? "{}");
@@ -142,6 +143,7 @@ $("music-toggle").onclick = () => {
   saveMusicPreference();
 };
 refreshMusicButton();
+music.showTitle();
 document.addEventListener(
   "pointerdown",
   () => {
@@ -232,7 +234,9 @@ async function persist(notify = false) {
     $("save-status").textContent =
       "Sauvegarde impossible : le stockage de ce navigateur est indisponible.";
     if (notify)
-      toast("Le stockage n’a pas pu enregistrer la partie. Libérez de l’espace puis réessayez.");
+      toast(
+        "Le stockage n’a pas pu enregistrer la partie. Libérez de l’espace puis réessayez.",
+      );
     return false;
   }
 }
@@ -479,7 +483,9 @@ function start(s: State, loading = false, autosaveId?: string) {
   state = s;
   inGame = true;
   musicMood = "normal";
-  music.begin();
+  mapMusicStarted = false;
+  if (s.result === "playing") music.prepareMap();
+  else music.finish(s.result);
   paused = true;
   ended = false;
   speed = 1;
@@ -657,13 +663,14 @@ function menu() {
     closeModal();
     state.battleStarted = true;
     paused = false;
+    beginMapMusic();
     updateUI();
   };
   $("back-title").onclick = async () => {
     if (!(await persist(true))) return;
     closeModal();
     inGame = false;
-    music.end();
+    music.showTitle();
     $("title").classList.remove("hidden");
     updateLoad();
   };
@@ -690,8 +697,7 @@ function requestRestart(fromMenu = false) {
 function finish() {
   if (ended) return;
   ended = true;
-  musicMood = mapMusicMood(state, musicMood);
-  music.setMood(musicMood);
+  music.finish(state.result === "won" ? "won" : "lost");
   persist();
   if (state.result === "won") {
     try {
@@ -716,7 +722,7 @@ function finish() {
       if (!(await persist(true))) return;
       closeModal();
       inGame = false;
-      music.end();
+      music.showTitle();
       $("title").classList.remove("hidden");
       updateLoad();
     };
@@ -746,7 +752,7 @@ function updateUI() {
     inGame && !state.battleStarted && state.time === 0 && paused,
   );
 
-  if (inGame) {
+  if (inGame && state.result === "playing") {
     musicMood = mapMusicMood(state, musicMood);
     music.setMood(musicMood);
   }
@@ -961,7 +967,7 @@ $("brand-title").onclick = () => {
   $("confirm-title").onclick = async () => {
     if (!(await persist(true))) return;
     inGame = false;
-    music.end();
+    music.showTitle();
     closeModal();
     $("title").classList.remove("hidden");
     updateLoad();
@@ -978,6 +984,13 @@ $("menu").onclick = () => (inGame ? menu() : undefined);
 $("restart-level").onclick = () => requestRestart();
 $("save").onclick = () => createNamedSave();
 $("sidebar-toggle").onclick = () => $("sidebar").classList.toggle("open");
+function beginMapMusic() {
+  if (mapMusicStarted || !inGame || state.result !== "playing") return;
+  mapMusicStarted = true;
+  music.begin();
+  musicMood = mapMusicMood(state, musicMood);
+  music.setMood(musicMood);
+}
 function togglePause() {
   if (planning) {
     cancelPlanning();
@@ -987,7 +1000,10 @@ function togglePause() {
     speed = 1;
     paused = false;
   } else paused = !paused;
-  if (!paused) state.battleStarted = true;
+  if (!paused) {
+    state.battleStarted = true;
+    beginMapMusic();
+  }
   updateUI();
 }
 $("pause").onclick = togglePause;
@@ -1223,6 +1239,7 @@ function frame(now: number) {
     !document.hidden &&
     state.result === "playing"
   ) {
+    beginMapMusic();
     accumulator += elapsed * speed;
     const simulationStart = performance.now();
     let computed = 0;

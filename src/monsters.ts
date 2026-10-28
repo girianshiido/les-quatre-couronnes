@@ -25,7 +25,16 @@ const proxy = (m: Monster): Unit => ({
   order: "auto",
   heading: m.heading,
 });
-export function spawnMonster(s: State, c: Cave) {
+export function monsterStrength(level: number) {
+  const progression = Math.max(0, level - 3);
+  return { guardian: 2000 + progression * 150, birth: 500 + progression * 50 };
+}
+export function upgradeMonsterBirths(s: State) {
+  const legacy = 100 + LEVELS[s.level].biomeId * 25;
+  for (const cave of s.caves)
+    if (cave.spawnHp === legacy) cave.spawnHp = monsterStrength(s.level).birth;
+}
+export function spawnMonster(s: State, c: Cave, hp = c.spawnHp) {
   if (s.monsters.length >= 100) return;
   const p = [
     { x: c.x + 1, y: c.y },
@@ -38,7 +47,7 @@ export function spawnMonster(s: State, c: Cave) {
   s.monsters.push({
     id: s.nextId++,
     ...at,
-    hp: c.spawnHp,
+    hp,
     wait: random(s),
     heading: { x: 0, y: 0 },
     cave: c.id,
@@ -113,7 +122,7 @@ export function seedCaves(s: State) {
       maxHp: 1500,
       timer: 0,
       interval: 35 - LEVELS[s.level].biomeId * 2.5,
-      spawnHp: 100 + LEVELS[s.level].biomeId * 25,
+      spawnHp: monsterStrength(s.level).birth,
     };
     s.caves.push(c);
     tile(s, x, y)!.cave = c.id;
@@ -131,7 +140,7 @@ export function seedCaves(s: State) {
         cells: [p],
       });
     }
-    spawnMonster(s, c);
+    spawnMonster(s, c, monsterStrength(s.level).guardian);
   }
 }
 export function monsterCanMove(s: State, p: Point) {

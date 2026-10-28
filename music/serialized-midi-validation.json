@@ -1,0 +1,50 @@
+[
+  {
+    "file": "ecran-defaite.mid",
+    "tracks": 6,
+    "notes": 129,
+    "seconds": 36.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "ecran-titre.mid",
+    "tracks": 9,
+    "notes": 447,
+    "seconds": 60.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "ecran-victoire-finale.mid",
+    "tracks": 9,
+    "notes": 692,
+    "seconds": 30.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "les-chemins-de-la-couronne.mid",
+    "tracks": 12,
+    "notes": 3568,
+    "seconds": 128.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "theme-normal.mid",
+    "tracks": 12,
+    "notes": 1400,
+    "seconds": 64.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "theme-victoire.mid",
+    "tracks": 12,
+    "notes": 2168,
+    "seconds": 64.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  }
+]

@@ -26,6 +26,14 @@ export function mapMusicMood(
     : "normal";
 }
 
+export type MusicScene = "silent" | "title" | "map" | "won" | "lost";
+const TRACKS = {
+  title: { files: ["ecran-titre"], seconds: 60 },
+  map: { files: ["theme-normal", "theme-victoire"], seconds: 64 },
+  won: { files: ["ecran-victoire-finale"], seconds: 30 },
+  lost: { files: ["ecran-defaite"], seconds: 36 },
+} as const;
+type AudibleScene = Exclude<MusicScene, "silent">;
 interface MusicOptions {
   baseUrl: string;
   muted?: boolean;
@@ -34,17 +42,24 @@ interface MusicOptions {
   createContext?: () => AudioContext;
   fetchAudio?: (url: string) => Promise<ArrayBuffer>;
 }
-
-/** Two decoded buffers share one clock and one phase. Gain automation performs
- * transitions on a bar boundary; neither looping nor mixing relies on timers. */
+interface Layer {
+  sources: AudioBufferSourceNode[];
+  gains: GainNode[];
+  volume: GainNode;
+}
+/** One audio clock, seamless loops and a shared volume for every screen. Only
+ * the current scene's decoded buffers are cached; compressed files can be reused. */
 export class MapMusic {
   private context?: AudioContext;
   private master?: GainNode;
-  private gains: GainNode[] = [];
-  private sources: AudioBufferSourceNode[] = [];
-  private loading?: Promise<AudioBuffer[]>;
-  private buffers?: AudioBuffer[];
-  private active = false;
+  private layer?: Layer;
+  private retiring = new Set<Layer>();
+  private encoded = new Map<string, Promise<ArrayBuffer>>();
+  private loading = new Map<AudibleScene, Promise<AudioBuffer[]>>();
+  private decoded?: { scene: AudibleScene; buffers: AudioBuffer[] };
+  private scene: MusicScene = "silent";
+  private playing: MusicScene = "silent";
+  private revision = 0;
   private visible = true;
   private failed = false;
   private epoch = 0;
@@ -58,8 +73,7 @@ export class MapMusic {
     this.muted = options.muted ?? false;
     this.volume = Math.max(0, Math.min(1, options.volume ?? 0.65));
   }
-
-  /** Call directly from a user gesture to satisfy browser autoplay rules. */
+  /** Called by the first pointer/key gesture: browsers gate initial audio. */
   async unlock() {
     try {
       if (!this.context) {
@@ -77,64 +91,81 @@ export class MapMusic {
       this.reportError();
     }
   }
-
   begin() {
-    this.active = true;
-    this.failed = false;
     this.setMood("normal");
-    void this.ensurePlaying();
+    this.select("map");
   }
-
-  retry() {
-    this.failed = false;
-    return this.unlock();
-  }
-
-  end() {
-    this.active = false;
-    for (const source of this.sources) {
-      source.stop();
-      source.disconnect();
-    }
-    for (const gain of this.gains) gain.disconnect();
-    this.sources = [];
-    this.gains = [];
+  prepareMap() {
+    this.scene = "silent";
+    this.playing = "silent";
+    this.revision++;
+    if (this.layer && this.context)
+      this.retire(this.layer, this.context.currentTime);
+    this.layer = undefined;
     this.ramp = undefined;
     this.mix = 0;
     this.mood = "normal";
   }
-
+  showTitle() {
+    this.select("title");
+  }
+  finish(result: "won" | "lost") {
+    this.select(result);
+  }
+  retry() {
+    this.failed = false;
+    return this.unlock();
+  }
+  end() {
+    this.scene = "silent";
+    this.playing = "silent";
+    this.revision++;
+    for (const layer of [
+      ...this.retiring,
+      ...(this.layer ? [this.layer] : []),
+    ]) {
+      for (const source of layer.sources) {
+        source.onended = null;
+        source.stop();
+        source.disconnect();
+      }
+      for (const gain of layer.gains) gain.disconnect();
+      layer.volume.disconnect();
+    }
+    this.retiring.clear();
+    this.layer = undefined;
+    this.ramp = undefined;
+    this.mix = 0;
+    this.mood = "normal";
+  }
   setMuted(muted: boolean) {
     this.muted = muted;
     this.updateVolume();
   }
-
   setVolume(volume: number) {
     this.volume = Math.max(0, Math.min(1, volume));
     this.updateVolume();
   }
-
   setVisible(visible: boolean) {
     this.visible = visible;
     if (!this.context) return;
     if (!visible) void this.context.suspend().catch(() => {});
     else void this.unlock();
   }
-
   setMood(mood: MusicMood) {
     if (mood === this.mood) return;
     this.mood = mood;
     const c = this.context;
-    if (!c || !this.sources.length) return;
+    if (!c || this.playing !== "map" || this.scene !== "map" || !this.layer)
+      return;
     const now = c.currentTime;
-    // Preserve the current mix if an earlier transition is interrupted.
     if (this.ramp) {
       const t = Math.max(0, Math.min(1, (now - this.ramp.at) / 2));
       this.mix = this.ramp.from + (this.ramp.to - this.ramp.from) * t;
     }
     const at = this.epoch + Math.ceil(Math.max(0, now - this.epoch) / 2) * 2;
     const target = mood === "victory" ? 1 : 0;
-    this.gains.forEach((node, i) => {
+    this.layer.gains.forEach((node, i) => {
       const value = i === 0 ? 1 - this.mix : this.mix;
       node.gain.cancelScheduledValues(now);
       node.gain.setValueAtTime(value, now);
@@ -143,7 +174,14 @@ export class MapMusic {
     });
     this.ramp = { at, from: this.mix, to: target };
   }
-
+  private select(scene: AudibleScene) {
+    if (this.scene !== scene) {
+      this.scene = scene;
+      this.revision++;
+    }
+    this.failed = false;
+    void this.ensurePlaying();
+  }
   private updateVolume() {
     if (!this.context || !this.master) return;
     this.master.gain.setTargetAtTime(
@@ -152,53 +190,122 @@ export class MapMusic {
       0.035,
     );
   }
-
   private reportError() {
     if (this.failed) return;
     this.failed = true;
     this.options.onError?.();
   }
-
-  private async ensurePlaying() {
-    const c = this.context;
-    if (!this.active || !c || this.failed || this.sources.length) return;
-    try {
-      this.loading ??= Promise.all(
-        ["normal", "victoire"].map(async (name) => {
-          const url = `${this.options.baseUrl}audio/theme-${name}.ogg`;
-          const data = this.options.fetchAudio
-            ? await this.options.fetchAudio(url)
-            : await fetch(url).then((r) => {
-                if (!r.ok) throw new Error(`Music ${r.status}`);
-                return r.arrayBuffer();
-              });
-          return c.decodeAudioData(data);
+  private async load(scene: AudibleScene, c: AudioContext) {
+    if (this.decoded?.scene === scene) return this.decoded.buffers;
+    let pending = this.loading.get(scene);
+    if (!pending) {
+      pending = Promise.all(
+        TRACKS[scene].files.map(async (name) => {
+          const url = `${this.options.baseUrl}audio/${name}.ogg`;
+          let request = this.encoded.get(url);
+          if (!request) {
+            request = this.options.fetchAudio
+              ? this.options.fetchAudio(url)
+              : fetch(url).then((r) => {
+                  if (!r.ok) throw new Error(`Music ${r.status}`);
+                  return r.arrayBuffer();
+                });
+            this.encoded.set(url, request);
+          }
+          try {
+            return await c.decodeAudioData((await request).slice(0));
+          } catch (error) {
+            if (this.encoded.get(url) === request) this.encoded.delete(url);
+            throw error;
+          }
         }),
       );
-      this.buffers ??= await this.loading;
-      // Multiple clicks may await the same load, or return to the title meanwhile.
-      if (!this.active || this.sources.length) return;
-      if (this.buffers.some((b) => Math.abs(b.duration - 64) > 0.02))
+      this.loading.set(scene, pending);
+    }
+    try {
+      return await pending;
+    } finally {
+      if (this.loading.get(scene) === pending) this.loading.delete(scene);
+    }
+  }
+  private retire(layer: Layer, at: number) {
+    this.retiring.add(layer);
+    const gain = layer.volume.gain;
+    if (typeof gain.cancelAndHoldAtTime === "function")
+      gain.cancelAndHoldAtTime(at);
+    else {
+      gain.cancelScheduledValues(at);
+      gain.setValueAtTime(gain.value, at);
+    }
+    gain.linearRampToValueAtTime(0, at + 0.4);
+    let remaining = layer.sources.length;
+    for (const source of layer.sources) {
+      source.onended = () => {
+        source.disconnect();
+        if (--remaining) return;
+        layer.gains.forEach((g) => g.disconnect());
+        layer.volume.disconnect();
+        this.retiring.delete(layer);
+      };
+      source.stop(at + 0.4);
+    }
+  }
+  private async ensurePlaying() {
+    const c = this.context,
+      scene = this.scene,
+      revision = this.revision;
+    if (
+      scene === "silent" ||
+      !c ||
+      this.failed ||
+      (this.layer && this.playing === scene)
+    )
+      return;
+    try {
+      const buffers = await this.load(scene, c);
+      if (
+        revision !== this.revision ||
+        this.scene !== scene ||
+        (this.layer && this.playing === scene)
+      )
+        return;
+      if (
+        buffers.some((b) => Math.abs(b.duration - TRACKS[scene].seconds) > 0.02)
+      )
         throw new Error("Music loop duration mismatch");
-      this.epoch = c.currentTime + 0.05;
-      this.mix = this.mood === "victory" ? 1 : 0;
-      this.buffers.forEach((buffer, i) => {
-        const source = c.createBufferSource(),
-          gain = c.createGain();
+      this.decoded = { scene, buffers };
+      const now = c.currentTime,
+        previous = this.layer;
+      const gains = buffers.map(() => c.createGain()),
+        volume = c.createGain();
+      const crossfade = !!previous || this.retiring.size > 0;
+      volume.gain.value = crossfade ? 0 : 1;
+      volume.connect(this.master!);
+      this.epoch = now + 0.05;
+      this.ramp = undefined;
+      this.mix = scene === "map" && this.mood === "victory" ? 1 : 0;
+      const sources = buffers.map((buffer, i) => {
+        const source = c.createBufferSource();
         source.buffer = buffer;
         source.loop = true;
         source.loopStart = 0;
-        source.loopEnd = 64;
-        gain.gain.value = i === 0 ? 1 - this.mix : this.mix;
-        source.connect(gain);
-        gain.connect(this.master!);
+        source.loopEnd = TRACKS[scene].seconds;
+        gains[i].gain.value =
+          scene !== "map" ? 1 : i === 0 ? 1 - this.mix : this.mix;
+        source.connect(gains[i]);
+        gains[i].connect(volume);
         source.start(this.epoch);
-        this.sources.push(source);
-        this.gains.push(gain);
+        return source;
       });
+      if (crossfade) {
+        volume.gain.setValueAtTime(0, now);
+        volume.gain.linearRampToValueAtTime(1, now + 0.4);
+      }
+      if (previous) this.retire(previous, now);
+      this.layer = { sources, gains, volume };
+      this.playing = scene;
     } catch {
-      this.loading = undefined;
-      this.reportError();
+      if (revision === this.revision) this.reportError();
     }
   }
 }

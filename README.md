@@ -189,3 +189,9 @@ Un pacte crée deux alliances de deux couronnes. Chaque couronne conserve ses co
 Les options ⚙, accessibles aussi depuis le titre et le menu, proposent Forêt, Nuit bleue, Parchemin et Prune. Le choix est mémorisé dans ce navigateur et concerne l’interface, sans modifier les couleurs des quatre armées. Le volume musical reste réglable.
 
 Un pont ou une barricade achevé libère immédiatement tous les bâtisseurs du même camp qui avaient cette destination, même s’ils sont encore loin ou en attente. Ils reprennent leur activité normale ; les autres missions restent intactes. Les « Échos de la vallée » et la production de leur journal ont été supprimés. Les notifications utiles, dont la rupture du pacte et les confirmations de sauvegarde, restent visibles.
+
+## Musiques et grottes renforcées
+
+Le titre possède son morceau « Sous les quatre bannières », les victoires de niveau « Une seule couronne » et les défaites « Les braises du royaume ». Les MIDI éditables sont dans music/, les boucles OGG dans public/audio/. Les deux arrangements existants restent réservés à la carte et à une victoire proche. Une carte nouvellement ouverte, chargée ou redémarrée reste silencieuse jusqu’à ▶ ou Reprendre ; une simple sélection d’unités ou une pause ultérieure ne relance pas la musique. Toutes les scènes partagent le volume et le mode muet. Détails et reproduction : music/README.md.
+
+Les premières grottes commencent avec un gardien de 2 000 PV puis produisent des monstres de 500 PV. Pour chaque niveau de progression après la première carte à grotte, ces valeurs augmentent de 150 et 50 PV respectivement. La cadence de naissance et les enclos restent identiques. Les anciens réglages par défaut (100 à 200 PV) des sauvegardes sont relevés pour les prochaines naissances ; les PV des monstres déjà présents et le temps écoulé dans les grottes sont conservés. Les monstres continuent de fusionner et ne perdent pas de vie simplement avec le temps ou les déplacements.

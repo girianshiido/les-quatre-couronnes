@@ -1,0 +1,38 @@
+[
+  {
+    "file": "public/audio/ecran-titre.ogg",
+    "seconds": 60,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -4.98,
+    "rmsDbFS": -19.98,
+    "quietest50msDbFS": -34.11,
+    "seamJump": 0.0013811823446303606,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/ecran-victoire-finale.ogg",
+    "seconds": 30,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -2.69,
+    "rmsDbFS": -18.78,
+    "quietest50msDbFS": -31.28,
+    "seamJump": 0.005245395470410585,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/ecran-defaite.ogg",
+    "seconds": 36,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -7.32,
+    "rmsDbFS": -21.39,
+    "quietest50msDbFS": -34.54,
+    "seamJump": 0.00033111521042883396,
+    "clippedSamples": 0
+  }
+]
