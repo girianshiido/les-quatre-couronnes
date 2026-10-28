@@ -27,9 +27,35 @@ export function mapMusicMood(
 }
 
 export type MusicScene = "silent" | "title" | "map" | "won" | "lost";
+export const BIOME_MUSIC = [
+  {
+    files: ["carte-foret-normal", "carte-foret-essor"],
+    seconds: 57.6,
+    barSeconds: 1.8,
+  },
+  {
+    files: ["carte-desert-normal", "carte-desert-essor"],
+    seconds: 42,
+    barSeconds: 1.75,
+  },
+  {
+    files: ["carte-neige-normal", "carte-neige-essor"],
+    seconds: 45,
+    barSeconds: 1.875,
+  },
+  {
+    files: ["carte-marais-normal", "carte-marais-essor"],
+    seconds: 48,
+    barSeconds: 3,
+  },
+  {
+    files: ["carte-cristal-normal", "carte-cristal-essor"],
+    seconds: 40,
+    barSeconds: 2.5,
+  },
+] as const;
 const TRACKS = {
   title: { files: ["ecran-titre"], seconds: 60 },
-  map: { files: ["theme-normal", "theme-victoire"], seconds: 64 },
   won: { files: ["ecran-victoire-finale"], seconds: 30 },
   lost: { files: ["ecran-defaite"], seconds: 36 },
 } as const;
@@ -55,8 +81,10 @@ export class MapMusic {
   private layer?: Layer;
   private retiring = new Set<Layer>();
   private encoded = new Map<string, Promise<ArrayBuffer>>();
-  private loading = new Map<AudibleScene, Promise<AudioBuffer[]>>();
-  private decoded?: { scene: AudibleScene; buffers: AudioBuffer[] };
+  private loading = new Map<string, Promise<AudioBuffer[]>>();
+  private decoded?: { key: string; buffers: AudioBuffer[] };
+  private biome = 0;
+  private playingKey = "";
   private scene: MusicScene = "silent";
   private playing: MusicScene = "silent";
   private revision = 0;
@@ -91,11 +119,13 @@ export class MapMusic {
       this.reportError();
     }
   }
-  begin() {
+  begin(biome = this.biome) {
+    this.chooseBiome(biome);
     this.setMood("normal");
     this.select("map");
   }
-  prepareMap() {
+  prepareMap(biome = 0) {
+    this.chooseBiome(biome);
     this.scene = "silent";
     this.playing = "silent";
     this.revision++;
@@ -156,23 +186,49 @@ export class MapMusic {
     if (mood === this.mood) return;
     this.mood = mood;
     const c = this.context;
-    if (!c || this.playing !== "map" || this.scene !== "map" || !this.layer)
+    if (
+      !c ||
+      this.playing !== "map" ||
+      this.scene !== "map" ||
+      this.playingKey !== this.trackKey("map") ||
+      !this.layer
+    )
       return;
     const now = c.currentTime;
+    const bar = BIOME_MUSIC[this.biome].barSeconds;
     if (this.ramp) {
-      const t = Math.max(0, Math.min(1, (now - this.ramp.at) / 2));
+      const t = Math.max(0, Math.min(1, (now - this.ramp.at) / bar));
       this.mix = this.ramp.from + (this.ramp.to - this.ramp.from) * t;
     }
-    const at = this.epoch + Math.ceil(Math.max(0, now - this.epoch) / 2) * 2;
+    const at =
+      this.epoch + Math.ceil(Math.max(0, now - this.epoch) / bar) * bar;
     const target = mood === "victory" ? 1 : 0;
     this.layer.gains.forEach((node, i) => {
       const value = i === 0 ? 1 - this.mix : this.mix;
       node.gain.cancelScheduledValues(now);
       node.gain.setValueAtTime(value, now);
       node.gain.setValueAtTime(value, at);
-      node.gain.linearRampToValueAtTime(i === 0 ? 1 - target : target, at + 2);
+      node.gain.linearRampToValueAtTime(
+        i === 0 ? 1 - target : target,
+        at + bar,
+      );
     });
     this.ramp = { at, from: this.mix, to: target };
+  }
+  private chooseBiome(biome: number) {
+    const next =
+      Number.isInteger(biome) && biome >= 0 && biome < BIOME_MUSIC.length
+        ? biome
+        : 0;
+    if (next === this.biome) return;
+    this.biome = next;
+    this.revision++;
+  }
+  private trackKey(scene: AudibleScene) {
+    return scene === "map" ? `map-${this.biome}` : scene;
+  }
+  private tracks(scene: AudibleScene) {
+    return scene === "map" ? BIOME_MUSIC[this.biome] : TRACKS[scene];
   }
   private select(scene: AudibleScene) {
     if (this.scene !== scene) {
@@ -196,11 +252,12 @@ export class MapMusic {
     this.options.onError?.();
   }
   private async load(scene: AudibleScene, c: AudioContext) {
-    if (this.decoded?.scene === scene) return this.decoded.buffers;
-    let pending = this.loading.get(scene);
+    const key = this.trackKey(scene);
+    if (this.decoded?.key === key) return this.decoded.buffers;
+    let pending = this.loading.get(key);
     if (!pending) {
       pending = Promise.all(
-        TRACKS[scene].files.map(async (name) => {
+        this.tracks(scene).files.map(async (name) => {
           const url = `${this.options.baseUrl}audio/${name}.ogg`;
           let request = this.encoded.get(url);
           if (!request) {
@@ -220,12 +277,12 @@ export class MapMusic {
           }
         }),
       );
-      this.loading.set(scene, pending);
+      this.loading.set(key, pending);
     }
     try {
       return await pending;
     } finally {
-      if (this.loading.get(scene) === pending) this.loading.delete(scene);
+      if (this.loading.get(key) === pending) this.loading.delete(key);
     }
   }
   private retire(layer: Layer, at: number) {
@@ -258,22 +315,22 @@ export class MapMusic {
       scene === "silent" ||
       !c ||
       this.failed ||
-      (this.layer && this.playing === scene)
+      (this.layer && this.playingKey === this.trackKey(scene))
     )
       return;
+    const key = this.trackKey(scene),
+      tracks = this.tracks(scene);
     try {
       const buffers = await this.load(scene, c);
       if (
         revision !== this.revision ||
         this.scene !== scene ||
-        (this.layer && this.playing === scene)
+        (this.layer && this.playingKey === key)
       )
         return;
-      if (
-        buffers.some((b) => Math.abs(b.duration - TRACKS[scene].seconds) > 0.02)
-      )
+      if (buffers.some((b) => Math.abs(b.duration - tracks.seconds) > 0.02))
         throw new Error("Music loop duration mismatch");
-      this.decoded = { scene, buffers };
+      this.decoded = { key, buffers };
       const now = c.currentTime,
         previous = this.layer;
       const gains = buffers.map(() => c.createGain()),
@@ -289,7 +346,7 @@ export class MapMusic {
         source.buffer = buffer;
         source.loop = true;
         source.loopStart = 0;
-        source.loopEnd = TRACKS[scene].seconds;
+        source.loopEnd = tracks.seconds;
         gains[i].gain.value =
           scene !== "map" ? 1 : i === 0 ? 1 - this.mix : this.mix;
         source.connect(gains[i]);
@@ -304,6 +361,7 @@ export class MapMusic {
       if (previous) this.retire(previous, now);
       this.layer = { sources, gains, volume };
       this.playing = scene;
+      this.playingKey = key;
     } catch {
       if (revision === this.revision) this.reportError();
     }

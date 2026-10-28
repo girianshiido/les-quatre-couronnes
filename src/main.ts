@@ -1,5 +1,6 @@
 import { COLOR_THEMES, colorTheme, applyColorTheme } from "./preferences";
 import { MapMusic, mapMusicMood, type MusicMood } from "./music";
+import { BestTimes, recordTime, type RecordResult } from "./records";
 import { loadAtlases } from "./atlas";
 import "./style.css";
 import { SaveLibrary, newSaveId, type SaveEntry } from "./saves";
@@ -52,6 +53,7 @@ const KEY = "quatre-couronnes-save-v2",
   PROGRESS = "quatre-couronnes-campaign-v1",
   CHECKPOINT = "quatre-couronnes-checkpoint-v3";
 const saves = new SaveLibrary();
+const bestTimes = new BestTimes();
 let activeAutosaveId: string | undefined,
   savedEntries: SaveEntry[] = [],
   modalRevision = 0,
@@ -484,7 +486,7 @@ function start(s: State, loading = false, autosaveId?: string) {
   inGame = true;
   musicMood = "normal";
   mapMusicStarted = false;
-  if (s.result === "playing") music.prepareMap();
+  if (s.result === "playing") music.prepareMap(LEVELS[s.level].biomeId);
   else music.finish(s.result);
   paused = true;
   ended = false;
@@ -520,8 +522,19 @@ function newGame() {
     Math.max(0, Number(read(PROGRESS)) || 0),
   );
   showModal(
-    `<span class="eyebrow">Une nouvelle histoire</span><h2>Choisissez votre vallée</h2><p>Vous incarnez la couronne <strong>Émeraude</strong>. Faites tomber les trois royaumes adverses tout en protégeant votre roi et votre peuple.</p><label class="check" for="level-select">Chapitre de la campagne</label><select id="level-select">${LEVELS.map((l, i) => `${i % 5 === 0 ? `<optgroup label="${l.biome}">` : ""}<option value="${i}" ${i > unlock ? "disabled" : ""}>${i + 1}. ${l.name}${i > unlock ? " · verrouillé" : ""}</option>${i % 5 === 4 ? "</optgroup>" : ""}`).join("")}</select><p>Dans la première vallée, votre territoire est plus vaste et isolé par les rivières. Deux ponts relient déjà les trois adversaires entre eux : développez votre royaume avant d’ouvrir votre propre passage.</p><p>Chaque camp commence avec 5 000 pièces. Chaque victoire ouvre la vallée suivante. Les adversaires se développent plus vite au fil des chapitres.</p><p>Vos parties précédentes restent dans la bibliothèque de sauvegardes.</p><div class="close-row"><button id="cancel-new">Retour</button><button class="primary" id="begin">Entrer dans la vallée</button></div>`,
+    `<span class="eyebrow">Une nouvelle histoire</span><h2>Choisissez votre vallée</h2><p>Vous incarnez la couronne <strong>Émeraude</strong>. Faites tomber les trois royaumes adverses tout en protégeant votre roi et votre peuple.</p><label class="check" for="level-select">Chapitre de la campagne</label><select id="level-select">${LEVELS.map((l, i) => `${i % 5 === 0 ? `<optgroup label="${l.biome}">` : ""}<option value="${i}" ${i > unlock ? "disabled" : ""}>${i + 1}. ${l.name}${i > unlock ? " · verrouillé" : ""}</option>${i % 5 === 4 ? "</optgroup>" : ""}`).join("")}</select><p id="level-record" class="level-record" aria-live="polite"></p><p>Dans la première vallée, votre territoire est plus vaste et isolé par les rivières. Deux ponts relient déjà les trois adversaires entre eux : développez votre royaume avant d’ouvrir votre propre passage.</p><p>Chaque camp commence avec 5 000 pièces. Chaque victoire ouvre la vallée suivante. Les adversaires se développent plus vite au fil des chapitres.</p><p>Vos parties précédentes restent dans la bibliothèque de sauvegardes.</p><div class="close-row"><button id="cancel-new">Retour</button><button class="primary" id="begin">Entrer dans la vallée</button></div>`,
   );
+  const showRecord = () => {
+    const best = bestTimes.best(
+      Number($<HTMLSelectElement>("level-select").value),
+    );
+    $("level-record").textContent =
+      best === undefined
+        ? "Aucun meilleur temps pour cette carte. Votre première victoire établira le record."
+        : `Votre meilleur temps : ${recordTime(best)} · Temps de jeu, hors pauses`;
+  };
+  $("level-select").onchange = showRecord;
+  showRecord();
   $("cancel-new").onclick = closeModal;
   $("begin").onclick = () =>
     start(
@@ -694,6 +707,16 @@ function requestRestart(fromMenu = false) {
   };
   $("yes-restart").onclick = () => start(createGame(state.level, state.seed));
 }
+function recordSummary(result: RecordResult) {
+  const label = result.first
+    ? "Premier meilleur temps !"
+    : result.improved
+      ? "Nouveau meilleur temps !"
+      : result.currentMs === result.bestMs
+        ? "Meilleur temps égalé"
+        : "Votre temps sur cette carte";
+  return `<div class="record-card ${result.improved ? "record-new" : ""}" role="status"><span class="eyebrow">${label}</span><strong>${recordTime(result.currentMs)}</strong><p>Meilleur temps : <b>${recordTime(result.bestMs)}</b>${result.improved && result.previousMs !== undefined ? ` · Précédent : ${recordTime(result.previousMs)}` : ""}</p><small>Temps de jeu, hors pauses${result.persisted ? " · Record sauvegardé" : " · Record conservé pour cette session"}</small></div>`;
+}
 function finish() {
   if (ended) return;
   ended = true;
@@ -713,10 +736,15 @@ function finish() {
     } catch {}
   }
   const finishedState = state;
-  window.setTimeout(() => {
+  const record =
+    state.result === "won"
+      ? bestTimes.record(state.level, state.time, state.size)
+      : Promise.resolve(undefined);
+  window.setTimeout(async () => {
+    const result = await record;
     if (!inGame || state !== finishedState) return;
     showModal(
-      `<span class="eyebrow">${state.result === "won" ? "La vallée est réunie" : "Votre roi est tombé"}</span><h2>${state.result === "won" ? "Une seule couronne." : "L’histoire ne s’arrête pas ici."}</h2><p>${state.result === "won" ? "Les trois royaumes adverses ont disparu. La vallée appartient à votre couronne." : "La couronne Émeraude a perdu son roi ou toute sa population et ses maisons. Rassemblez vos forces et protégez les chemins qui mènent au roi."}</p><p>${clock(state.time)} de règne · ${state.kingdoms[0].births} naissances · ${state.stats.merged} fusions dans la vallée</p><div class="close-row"><button id="end-title">Écran titre</button><button class="primary" id="end-next">${state.result === "won" && state.level < LEVELS.length - 1 ? "Vallée suivante" : "Rejouer"}</button></div>`,
+      `<span class="eyebrow">${state.result === "won" ? "La vallée est réunie" : "Votre roi est tombé"}</span><h2>${state.result === "won" ? "Une seule couronne." : "L’histoire ne s’arrête pas ici."}</h2><p>${state.result === "won" ? "Les trois royaumes adverses ont disparu. La vallée appartient à votre couronne." : "La couronne Émeraude a perdu son roi ou toute sa population et ses maisons. Rassemblez vos forces et protégez les chemins qui mènent au roi."}</p>${result ? recordSummary(result) : ""}<p>${clock(state.time)} de règne · ${state.kingdoms[0].births} naissances · ${state.stats.merged} fusions dans la vallée</p><div class="close-row"><button id="end-title">Écran titre</button><button class="primary" id="end-next">${state.result === "won" && state.level < LEVELS.length - 1 ? "Vallée suivante" : "Rejouer"}</button></div>`,
     );
     $("end-title").onclick = async () => {
       if (!(await persist(true))) return;
@@ -987,7 +1015,7 @@ $("sidebar-toggle").onclick = () => $("sidebar").classList.toggle("open");
 function beginMapMusic() {
   if (mapMusicStarted || !inGame || state.result !== "playing") return;
   mapMusicStarted = true;
-  music.begin();
+  music.begin(LEVELS[state.level].biomeId);
   musicMood = mapMusicMood(state, musicMood);
   music.setMood(musicMood);
 }

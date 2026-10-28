@@ -1,5 +1,85 @@
 [
   {
+    "file": "carte-cristal-essor.mid",
+    "tracks": 7,
+    "notes": 504,
+    "seconds": 40.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "carte-cristal-normal.mid",
+    "tracks": 7,
+    "notes": 394,
+    "seconds": 40.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "carte-desert-essor.mid",
+    "tracks": 7,
+    "notes": 735,
+    "seconds": 42.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "carte-desert-normal.mid",
+    "tracks": 7,
+    "notes": 601,
+    "seconds": 42.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "carte-foret-essor.mid",
+    "tracks": 6,
+    "notes": 736,
+    "seconds": 57.6,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "carte-foret-normal.mid",
+    "tracks": 6,
+    "notes": 596,
+    "seconds": 57.6,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "carte-marais-essor.mid",
+    "tracks": 7,
+    "notes": 422,
+    "seconds": 48.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "carte-marais-normal.mid",
+    "tracks": 7,
+    "notes": 357,
+    "seconds": 48.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "carte-neige-essor.mid",
+    "tracks": 7,
+    "notes": 492,
+    "seconds": 45.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
+    "file": "carte-neige-normal.mid",
+    "tracks": 7,
+    "notes": 333,
+    "seconds": 45.0,
+    "overlaps": 0,
+    "hangingNotes": 0
+  },
+  {
     "file": "ecran-defaite.mid",
     "tracks": 6,
     "notes": 129,

@@ -1,0 +1,172 @@
+[
+  {
+    "file": "music/carte-foret-normal.mid",
+    "title": "Sous les branches",
+    "tracks": 6,
+    "notes": 596,
+    "bars": 32,
+    "bpm": 100.0,
+    "seconds": 57.6,
+    "samePitchOverlaps": 0,
+    "biome": "foret",
+    "mood": "normal",
+    "beatsPerBar": 3,
+    "signature": [
+      6,
+      3
+    ]
+  },
+  {
+    "file": "music/carte-foret-essor.mid",
+    "title": "La futaie en marche",
+    "tracks": 6,
+    "notes": 736,
+    "bars": 32,
+    "bpm": 100.0,
+    "seconds": 57.6,
+    "samePitchOverlaps": 0,
+    "biome": "foret",
+    "mood": "essor",
+    "beatsPerBar": 3,
+    "signature": [
+      6,
+      3
+    ]
+  },
+  {
+    "file": "music/carte-desert-normal.mid",
+    "title": "Sept pas dans les dunes",
+    "tracks": 7,
+    "notes": 601,
+    "bars": 24,
+    "bpm": 120.0,
+    "seconds": 42.0,
+    "samePitchOverlaps": 0,
+    "biome": "desert",
+    "mood": "normal",
+    "beatsPerBar": 3.5,
+    "signature": [
+      7,
+      3
+    ]
+  },
+  {
+    "file": "music/carte-desert-essor.mid",
+    "title": "Les caravanes du soleil",
+    "tracks": 7,
+    "notes": 735,
+    "bars": 24,
+    "bpm": 120.0,
+    "seconds": 42.0,
+    "samePitchOverlaps": 0,
+    "biome": "desert",
+    "mood": "essor",
+    "beatsPerBar": 3.5,
+    "signature": [
+      7,
+      3
+    ]
+  },
+  {
+    "file": "music/carte-neige-normal.mid",
+    "title": "Les flocons voyageurs",
+    "tracks": 7,
+    "notes": 333,
+    "bars": 24,
+    "bpm": 96.0,
+    "seconds": 45.0,
+    "samePitchOverlaps": 0,
+    "biome": "neige",
+    "mood": "normal",
+    "beatsPerBar": 3,
+    "signature": [
+      3,
+      2
+    ]
+  },
+  {
+    "file": "music/carte-neige-essor.mid",
+    "title": "La danse des aurores",
+    "tracks": 7,
+    "notes": 492,
+    "bars": 24,
+    "bpm": 96.0,
+    "seconds": 45.0,
+    "samePitchOverlaps": 0,
+    "biome": "neige",
+    "mood": "essor",
+    "beatsPerBar": 3,
+    "signature": [
+      3,
+      2
+    ]
+  },
+  {
+    "file": "music/carte-marais-normal.mid",
+    "title": "Au fil des marees",
+    "tracks": 7,
+    "notes": 357,
+    "bars": 16,
+    "bpm": 80.0,
+    "seconds": 48.0,
+    "samePitchOverlaps": 0,
+    "biome": "marais",
+    "mood": "normal",
+    "beatsPerBar": 4,
+    "signature": [
+      4,
+      2
+    ]
+  },
+  {
+    "file": "music/carte-marais-essor.mid",
+    "title": "La ronde du delta",
+    "tracks": 7,
+    "notes": 422,
+    "bars": 16,
+    "bpm": 80.0,
+    "seconds": 48.0,
+    "samePitchOverlaps": 0,
+    "biome": "marais",
+    "mood": "essor",
+    "beatsPerBar": 4,
+    "signature": [
+      4,
+      2
+    ]
+  },
+  {
+    "file": "music/carte-cristal-normal.mid",
+    "title": "Le jardin des prismes",
+    "tracks": 7,
+    "notes": 394,
+    "bars": 16,
+    "bpm": 120.0,
+    "seconds": 40.0,
+    "samePitchOverlaps": 0,
+    "biome": "cristal",
+    "mood": "normal",
+    "beatsPerBar": 5,
+    "signature": [
+      5,
+      2
+    ]
+  },
+  {
+    "file": "music/carte-cristal-essor.mid",
+    "title": "Les cinq eclats",
+    "tracks": 7,
+    "notes": 504,
+    "bars": 16,
+    "bpm": 120.0,
+    "seconds": 40.0,
+    "samePitchOverlaps": 0,
+    "biome": "cristal",
+    "mood": "essor",
+    "beatsPerBar": 5,
+    "signature": [
+      5,
+      2
+    ]
+  }
+]

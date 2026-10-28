@@ -1252,3 +1252,34 @@ body,
   flex-shrink: 1;
   min-height: 0;
 }
+
+.record-card {
+  margin: 18px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--raised);
+}
+.record-card.record-new {
+  border-color: var(--gold);
+}
+.record-card > strong {
+  display: block;
+  margin: 8px 0;
+  color: var(--heading);
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+}
+.record-card p {
+  margin: 6px 0;
+}
+.record-card small,
+.level-record {
+  color: var(--muted);
+}
+.record-card .eyebrow {
+  color: var(--gold);
+}
+.level-record {
+  min-height: 2.8em;
+}

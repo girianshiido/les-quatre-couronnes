@@ -1,63 +1,49 @@
-# Les chemins de la couronne
+# Musiques des Quatre Couronnes
 
-Thème instrumental original pour **Les Quatre Couronnes**, composé pour cette version du jeu et synthétisé depuis MIDI avec **FluidSynth 2.6.0** et la banque locale **MuseScore General HQ**. Aucun enregistrement musical extérieur ni voix.
+Compositions instrumentales originales, écrites en MIDI puis synthétisées avec **FluidSynth 2.6.0** et la banque personnelle **MuseScore General HQ**. Aucun enregistrement extérieur ni voix. La SoundFont n’est pas redistribuée.
 
-- Ré majeur, 120 BPM, 4/4, 32 mesures et **64 secondes par boucle**.
-- Carte : flûte, clarinette, harpe, guitare nylon, cordes pincées, contrebasse et percussions légères.
-- Victoire en vue : la même mélodie et les mêmes accords, avec trompette, violons, cors et percussions plus présentes.
-- `les-chemins-de-la-couronne.ogg` : écoute de 128 secondes, version normale puis transition de deux secondes vers la victoire à 1:04.
-- `les-chemins-de-la-couronne.mid` : partition éditable des deux versions, douze pistes, repères de sections. Les deux MIDI séparés correspondent aux boucles du jeu.
-- `../public/audio/theme-normal.ogg` et `theme-victoire.ogg` : boucles utilisées par le jeu, Vorbis stéréo 44,1 kHz, sans fondu de fin.
+## Cinq ambiances de carte
 
-## Comportement dans le jeu
+Chaque série de cinq niveaux possède sa musique. Les mélodies, les instruments, le rythme et les accords changent entre les décors. Chaque musique comporte un arrangement normal et un arrangement d’essor, lorsque le dernier ennemi est affaibli. Ces variations ne comportent pas de cuivres de fanfare.
 
-Le thème du titre démarre au premier geste de l’utilisateur. À l’ouverture, au chargement ou au redémarrage d’une carte, la musique attend le premier appui sur ▶ (ou Reprendre). Les deux arrangements restent synchronisés ; leur mélange change sur une limite de mesure avec une transition de deux secondes. Le tempo musical reste identique quelle que soit la vitesse de simulation, et la musique continue pendant une pause ou la préparation d’un ordre.
+| Décor | Normal / victoire proche | Couleurs musicales | Mesure, tempo | Boucle |
+| --- | --- | --- | --- | --- |
+| Forêt et montagne | Sous les branches / La futaie en marche | Flûte, guitare nylon, cordes pincées, petites percussions | 6/8, noire = 100 | 57,6 s |
+| Désert et palmeraies | Sept pas dans les dunes / Les caravanes du soleil | Oud évoqué par une guitare nylon, sitar, dulcimer, flûte et peaux ; mode phrygien dominant | 7/8, noire = 120 | 42 s |
+| Neige | Les flocons voyageurs / La danse des aurores | Valse de célesta, harpe, flûte, glockenspiel et cordes | 3/4, noire = 96 | 45 s |
+| Marais et delta | Au fil des marées / La ronde du delta | Marimba, cor anglais, vibraphone, basse et rythme ondulant | 4/4, noire = 80 | 48 s |
+| Forêt cristalline | Le jardin des prismes / Les cinq éclats | Boîte à musique, célesta, nappes et cristaux | 5/4, noire = 120 | 40 s |
 
-La variation de victoire arrive lorsqu’il reste un seul royaume ennemi vivant, que le joueur possède au moins quatre maisons et 500 PV, et que l’ennemi possède au plus 30 % de ses maisons (ou deux maisons) et 40 % de ses PV totaux, roi compris. Le seuil de retour est volontairement plus large (50 % / 65 %) pour éviter des changements incessants. Une victoire définitive lance le morceau « Une seule couronne », distinct de cette variation. Une défaite lance « Les braises du royaume ». Le bouton ♫ coupe/rétablit la musique ; le menu Conseil règle le volume. Ces préférences sont locales, indépendantes des sauvegardes de parties.
+Les dix partitions éditables sont dans ce dossier : `carte-{foret,desert,neige,marais,cristal}-{normal,essor}.mid`. Les dix OGG correspondants se trouvent dans `../public/audio/`. Les anciens fichiers `theme-*.mid` et l’écoute `les-chemins-de-la-couronne.ogg` restent des archives du premier thème ; ils ne sont plus utilisés par le jeu ni téléchargés pour le mode hors connexion.
 
-## Reproduction
+## Musiques d’écran
 
-La SoundFont personnelle n’est pas copiée dans ce dépôt. Dépendances : Python 3, NumPy, FluidSynth et ffmpeg.
+| Écran | Morceau | Arrangement | Boucle |
+| --- | --- | --- | --- |
+| Titre | Sous les quatre bannières | Piano, clarinette, harpe, cordes, cor discret | 60 s, 96 BPM |
+| Niveau gagné | Une seule couronne | Fanfare de trompette, violons, cors, timbales et percussions | 30 s, 128 BPM |
+| Niveau perdu | Les braises du royaume | Piano, violoncelle, harpe et cordes | 36 s, 80 BPM |
 
-```sh
-mkdir -p qa/music public/audio
-python3 scripts/compose-map-theme.py
-```
+Ces trois morceaux et leurs MIDI sont conservés à l’identique. **La même fanfare termine tous les niveaux**, quel que soit le décor. Elle remplace complètement l’arrangement d’essor de la carte. Fichiers : `ecran-{titre,victoire-finale,defaite}.mid` et les OGG correspondants dans `../public/audio/`.
 
-Rendre les MIDI de travail (trois répétitions) avec toutes les options **avant** les fichiers, en remplaçant le chemin de la SoundFont :
+## Comportement
 
-```sh
-fluidsynth -ni -g 0.55 -R 1 -C 1 -o synth.reverb.room-size=0.35 -o synth.reverb.damp=0.45 -o synth.reverb.level=0.23 -o synth.chorus.level=0.10 -F qa/music/normal-render.wav -r 44100 /chemin/MuseScore_General_HQ.sf2 qa/music/theme-normal-render.mid
-fluidsynth -ni -g 0.55 -R 1 -C 1 -o synth.reverb.room-size=0.35 -o synth.reverb.damp=0.45 -o synth.reverb.level=0.23 -o synth.chorus.level=0.10 -F qa/music/victory-render.wav -r 44100 /chemin/MuseScore_General_HQ.sf2 qa/music/theme-victoire-render.mid
-python3 scripts/render-map-theme.py
-```
+Le titre démarre au premier geste utilisateur. Ouvrir, charger ou recommencer une carte éteint le titre : la musique de carte attend le premier appui sur ▶. Après le lancement, elle continue pendant les pauses et la planification. La vitesse du jeu ne change pas le tempo.
 
-Le montage prélève la répétition centrale, avec les queues de réverbération de la précédente. Un raccord de 40 ms conserve l’attaque du cycle suivant, sans fondu vers le silence. Les rapports JSON vérifient l’absence de chevauchements MIDI de même hauteur, les durées, les niveaux, les raccords et l’absence d’écrêtage des OGG décodés.
+La victoire proche demande un seul royaume ennemi vivant, au moins quatre maisons et 500 PV pour le joueur, et un ennemi à au plus 30 % de ses maisons (ou deux maisons) et 40 % de ses PV. Les seuils de retour sont 50 % / 65 % pour éviter les oscillations. Les deux arrangements d’un décor partagent exactement la même durée, le même tempo et les mêmes accords ; ils restent synchronisés et se mélangent pendant une mesure, à la prochaine limite de mesure. Changer d’écran utilise un fondu de 0,4 s.
 
-## Trois musiques d’écran
+Volume, mode muet et suspension lorsque l’onglet est masqué sont communs à toutes les musiques. Les fichiers compressés peuvent être réutilisés, mais seuls les buffers décodés de la scène courante sont conservés. Une réponse tardive d’un ancien décor ne peut pas remplacer la musique actuelle. Les treize OGG utilisés par le jeu font partie du cache hors connexion.
 
-Toutes trois sont des compositions instrumentales originales, rendues avec la même banque MuseScore General HQ :
+## Reproduire les cartes
 
-| Écran | Morceau | Arrangement | Boucle | MIDI | OGG dans le jeu |
-| --- | --- | --- | --- | --- | --- |
-| Titre | Sous les quatre bannières | Piano, clarinette, harpe, cordes, cor discret | 60 s, 96 BPM | ecran-titre.mid | ../public/audio/ecran-titre.ogg |
-| Niveau gagné | Une seule couronne | Trompette, violons, cors, timbales et percussions | 30 s, 128 BPM | ecran-victoire-finale.mid | ../public/audio/ecran-victoire-finale.ogg |
-| Niveau perdu | Les braises du royaume | Piano, violoncelle, harpe et cordes | 36 s, 80 BPM | ecran-defaite.mid | ../public/audio/ecran-defaite.ogg |
-
-Les trois OGG sont en Vorbis stéréo 44,1 kHz, sans fondu de fin ni pause entre répétitions. Un fondu croisé de 0,4 s accompagne les changements d’écran. Entrer sur une carte en pause éteint le titre progressivement ; la musique de carte commence uniquement lors du premier lancement de la simulation. Ensuite, les pauses de planification gardent la boucle en cours. Volume, mode muet et suspension lorsque l’onglet est masqué sont communs à toutes les musiques.
-
-Le lecteur conserve les fichiers compressés en mémoire pour éviter les téléchargements répétés, et seulement les buffers décodés de la scène courante ; les anciennes sources sont déconnectées après le fondu. Le thème de fin de niveau remplace la variation de victoire proche, qui reste réservée à la carte encore en jeu.
-
-### Reproduire les nouveaux morceaux
+Python 3, NumPy, FluidSynth et ffmpeg sont nécessaires. Valider les MIDI avant le rendu :
 
 ```sh
-mkdir -p qa/screen-music
-python3 scripts/compose-screen-music.py
+python3 scripts/compose-biome-music.py
 python3 scripts/validate-music-midi.py
-for piece in titre victoire-finale defaite; do
-  fluidsynth -ni -g 0.55 -R 1 -C 1 -o synth.reverb.room-size=0.35 -o synth.reverb.damp=0.45 -o synth.reverb.level=0.23 -o synth.chorus.level=0.10 -F "qa/screen-music/$piece-render.wav" -r 44100 /chemin/MuseScore_General_HQ.sf2 "qa/screen-music/$piece-render.mid"
-done
-python3 scripts/render-screen-music.py
+python3 scripts/render-biome-music.py /chemin/MuseScore_General_HQ.sf2
 ```
 
-Les rapports `screen-midi-validation.json`, `serialized-midi-validation.json` et `screen-audio-validation.json` contrôlent les partitions effectivement écrites et les OGG décodés. Ces boucles conservent la réverbération au raccord ; elles ne doivent pas recevoir de fondu vers le silence.
+Le rendu effectue trois répétitions de chaque morceau et prélève la répétition centrale avec les réverbérations déjà établies. Un raccord de 40 ms conserve l’attaque du cycle suivant, sans fondu vers le silence. Deux rendus au maximum sont lancés simultanément. Les rapports `biome-midi-validation.json`, `serialized-midi-validation.json` et `biome-audio-validation.json` vérifient les notes réellement écrites, les durées exactes, la stéréo 44,1 kHz, les niveaux et l’absence d’écrêtage ou de passage silencieux de 50 ms dans les OGG décodés.
+
+Les trois musiques d’écran restent reproductibles avec `compose-screen-music.py`, `validate-music-midi.py`, puis FluidSynth sur les MIDI de travail dans `qa/screen-music/` et `render-screen-music.py`. Toutes les options FluidSynth doivent précéder la SoundFont et le MIDI. Les scripts partagent le petit écrivain MIDI `midi_score.py`, sans dépendance musicale externe.

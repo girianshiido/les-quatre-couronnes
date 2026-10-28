@@ -1,0 +1,122 @@
+[
+  {
+    "file": "public/audio/carte-foret-normal.ogg",
+    "seconds": 57.6,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -5.75,
+    "rmsDbFS": -20.42,
+    "quietest50msDbFS": -37.57,
+    "seamJump": 0.0010136039927601814,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/carte-foret-essor.ogg",
+    "seconds": 57.6,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -4.94,
+    "rmsDbFS": -19.3,
+    "quietest50msDbFS": -34.19,
+    "seamJump": 0.0004956219345331192,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/carte-desert-normal.ogg",
+    "seconds": 42.0,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -4.61,
+    "rmsDbFS": -20.43,
+    "quietest50msDbFS": -38.39,
+    "seamJump": 0.0008251909166574478,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/carte-desert-essor.ogg",
+    "seconds": 42.0,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -3.93,
+    "rmsDbFS": -19.31,
+    "quietest50msDbFS": -36.16,
+    "seamJump": 0.002776714973151684,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/carte-neige-normal.ogg",
+    "seconds": 45.0,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -4.29,
+    "rmsDbFS": -20.42,
+    "quietest50msDbFS": -33.99,
+    "seamJump": 0.0016366690397262573,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/carte-neige-essor.ogg",
+    "seconds": 45.0,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -4.81,
+    "rmsDbFS": -19.32,
+    "quietest50msDbFS": -31.67,
+    "seamJump": 0.0027881264686584473,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/carte-marais-normal.ogg",
+    "seconds": 48.0,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -2.66,
+    "rmsDbFS": -20.41,
+    "quietest50msDbFS": -44.07,
+    "seamJump": 0.002808808349072933,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/carte-marais-essor.ogg",
+    "seconds": 48.0,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -2.09,
+    "rmsDbFS": -19.72,
+    "quietest50msDbFS": -43.69,
+    "seamJump": 0.0020968541502952576,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/carte-cristal-normal.ogg",
+    "seconds": 40.0,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -5.96,
+    "rmsDbFS": -20.43,
+    "quietest50msDbFS": -35.09,
+    "seamJump": 0.0019069137051701546,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/carte-cristal-essor.ogg",
+    "seconds": 40.0,
+    "channels": 2,
+    "sampleRate": 44100,
+    "codec": "vorbis",
+    "peakDbFS": -3.99,
+    "rmsDbFS": -19.32,
+    "quietest50msDbFS": -36.42,
+    "seamJump": 0.0011474676430225372,
+    "clippedSamples": 0
+  }
+]
