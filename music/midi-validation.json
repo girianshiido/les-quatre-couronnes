@@ -1,0 +1,29 @@
+{
+  "bpm": 120,
+  "barsPerLoop": 32,
+  "loopSeconds": 64.0,
+  "key": "D major",
+  "reports": [
+    {
+      "file": "music/theme-normal.mid",
+      "tracks": 12,
+      "notes": 1400,
+      "durationSeconds": 64.0,
+      "samePitchOverlaps": 0
+    },
+    {
+      "file": "music/theme-victoire.mid",
+      "tracks": 12,
+      "notes": 2168,
+      "durationSeconds": 64.0,
+      "samePitchOverlaps": 0
+    },
+    {
+      "file": "music/les-chemins-de-la-couronne.mid",
+      "tracks": 12,
+      "notes": 3568,
+      "durationSeconds": 128.0,
+      "samePitchOverlaps": 0
+    }
+  ]
+}

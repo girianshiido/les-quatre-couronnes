@@ -1044,3 +1044,26 @@ body,
     min-width: 28px;
   }
 }
+
+.music-volume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 18px 0;
+}
+.music-volume input {
+  flex: 1;
+  min-width: 70px;
+}
+.music-volume output {
+  min-width: 42px;
+  font-variant-numeric: tabular-nums;
+}
+#music-toggle {
+  font-size: 18px;
+}
+#music-toggle[aria-pressed="true"] {
+  color: var(--muted);
+}

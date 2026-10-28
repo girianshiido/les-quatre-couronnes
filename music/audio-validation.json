@@ -1,0 +1,26 @@
+[
+  {
+    "file": "public/audio/theme-normal.ogg",
+    "seconds": 64.0,
+    "codec": "vorbis",
+    "sampleRate": 44100,
+    "channels": 2,
+    "peakDbFS": -6.97,
+    "rmsDbFS": -19.98,
+    "quietest50msDbFS": -35.84,
+    "seamJump": 0.0013554338365793228,
+    "clippedSamples": 0
+  },
+  {
+    "file": "public/audio/theme-victoire.ogg",
+    "seconds": 64.0,
+    "codec": "vorbis",
+    "sampleRate": 44100,
+    "channels": 2,
+    "peakDbFS": -2.89,
+    "rmsDbFS": -18.78,
+    "quietest50msDbFS": -26.37,
+    "seamJump": 0.0041088564321398735,
+    "clippedSamples": 0
+  }
+]

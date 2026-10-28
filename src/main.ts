@@ -1,3 +1,4 @@
+import { MapMusic, mapMusicMood, type MusicMood } from "./music";
 import { loadAtlases } from "./atlas";
 import "./style.css";
 import { SaveLibrary, newSaveId, type SaveEntry } from "./saves";
@@ -93,11 +94,65 @@ let state = createGame(),
   accumulator = 0,
   ended = false;
 const app = $("app");
-app.innerHTML = `<header><button id="brand-title" class="brand" aria-label="Revenir à l’écran titre"><span class="crown">♛</span><div><h1>Les Quatre Couronnes</h1><p class="eyebrow">Des royaumes qui prennent vie</p></div></button><div class="top-resources"><div class="resource"><i>◈</i><div><b id="gold">5 000</b><small>Or</small></div></div><div class="resource"><i>⚑</i><div><b id="population">100</b><small>PV totaux</small></div></div></div><div class="header-actions"><button data-pwa class="pwa-button" title="Installer le jeu" aria-label="Installer le jeu">⇩</button><button id="help" title="Règles et commandes">?</button><button id="save" title="Sauvegarder">↓<span class="wide-label"> Sauver</span></button><button id="restart-level" title="Recommencer le niveau" aria-label="Recommencer le niveau">↶</button><button id="menu" title="Écran titre">☰</button></div><button class="mobile-tab" id="sidebar-toggle">Conseil</button></header>
+app.innerHTML = `<header><button id="brand-title" class="brand" aria-label="Revenir à l’écran titre"><span class="crown">♛</span><div><h1>Les Quatre Couronnes</h1><p class="eyebrow">Des royaumes qui prennent vie</p></div></button><div class="top-resources"><div class="resource"><i>◈</i><div><b id="gold">5 000</b><small>Or</small></div></div><div class="resource"><i>⚑</i><div><b id="population">100</b><small>PV totaux</small></div></div></div><div class="header-actions"><button id="music-toggle" title="Couper la musique" aria-label="Couper la musique" aria-pressed="false">♫</button><button data-pwa class="pwa-button" title="Installer le jeu" aria-label="Installer le jeu">⇩</button><button id="help" title="Règles et commandes">?</button><button id="save" title="Sauvegarder">↓<span class="wide-label"> Sauver</span></button><button id="restart-level" title="Recommencer le niveau" aria-label="Recommencer le niveau">↶</button><button id="menu" title="Écran titre">☰</button></div><button class="mobile-tab" id="sidebar-toggle">Conseil</button></header>
 <main class="layout"><section class="battlefield" aria-label="Carte du jeu"><canvas id="map" tabindex="0" aria-label="Carte. Cliquez une unité verte ou tracez un rectangle pour sélectionner. Les ordres sont dans le conseil à droite."></canvas><div class="map-head"><span class="eyebrow" id="chapter">Chapitre I · Forêt & montagne</span><h2 id="level-name">La vallée des premiers jours</h2><p id="map-sub">48 × 48 · Quatre royaumes · Aucune frontière</p></div><span class="time" id="time">☀ 00:00</span><div class="map-controls"><button id="pause" title="Pause (Espace)">Ⅱ</button><label class="speed-control"><span class="speed-caption">Vitesse</span><input id="speed" type="range" min="0" max="5" step="0.25" value="1" aria-label="Vitesse du jeu de 0 à 5"><output id="speed-value" for="speed">×1</output></label><button id="zoom-out" title="Dézoomer">−</button><button id="zoom-in" title="Zoomer">+</button><button id="fit" title="Voir toute la carte">⊡</button></div><div id="selection-menu" class="selection-menu hidden" aria-label="Actions pour la destination"></div><div id="target-banner" class="status-banner hidden"></div><div id="paused-label" class="paused-label hidden">Ⅱ Partie en pause</div></section>
 <aside class="sidebar" id="sidebar"><span class="eyebrow">Votre royaume</span><h2>La couronne Émeraude</h2><p class="subtitle">Laissez vivre. Choisissez quand agir.</p><div class="section"><div class="label-row"><h3>Les quatre couronnes</h3><span class="badge" id="alive">4 en lice</span></div><div id="kingdoms"></div></div><div class="section"><div class="label-row"><h3>Votre roi</h3><span class="badge" id="king-hp">100 PV</span></div><p class="selection-info" id="king-info">À l’abri du château</p><button id="select-king" class="small">♛ Voir le roi</button></div><div class="section"><div class="label-row"><h3>Impôts du royaume</h3><span class="tax-number" id="tax-value">12<span>%</span></span></div><input id="tax" type="range" min="0" max="30" value="12" aria-label="Taux des impôts de 0 à 30 pour cent"><div class="range-labels"><span>0 % · Plus de naissances</span><span>30 % · Plus d’or</span></div><label class="check"><input id="auto-tax" type="checkbox" checked> Ajustement automatique</label><label class="check"><input id="save-gold" type="checkbox"> Épargner 1 000 pièces pour un chantier</label><p class="tax-hint" id="tax-hint"></p></div><div class="section"><div class="label-row"><h3>Vos ordres</h3><span class="badge" id="selection-count">0 unité</span></div><p class="selection-info" id="selection-info">Sélectionnez vos habitants verts, puis cliquez une destination. Le jeu attend votre ordre.</p><p id="command-help" class="selection-info">Sélectionnez, puis cliquez une destination.</p><button id="cancel-selection" class="small hidden">Annuler la sélection</button><div id="inspect" class="inspect"></div></div><div class="section"><h3>Doctrine du royaume</h3><label class="sr-only" for="doctrine-profile">Doctrine du royaume</label><select id="doctrine-profile" class="doctrine-profile"></select><p id="doctrine-description" class="tax-hint"></p><ol id="doctrine" class="doctrine"></ol><p class="tax-hint">Sans travail : abri sur une maison. Les unités affaiblies cherchent un abri. Ponts et barricades restent sur ordre.</p></div><div class="section"><div class="label-row"><h3>Échos de la vallée</h3><span style="color:var(--gold)">✧</span></div><p id="monster-status" class="tax-hint hidden"></p><div id="events"></div></div><p class="save-status" id="save-status">Sauvegarde automatique toutes les 10 s</p></aside></main>
 <div class="overlay" id="title"><div class="title-panel"><p class="eyebrow">Un jeu de stratégie vivant</p><div class="crest">♛</div><h1>Les Quatre<br>Couronnes</h1><div class="title-colors">${COLORS.map((c) => `<span style="background:${c}"></span>`).join("")}</div><p class="intro">Dans la vallée, chaque habitant suit son chemin.<br>Les royaumes grandissent, se croisent et s’affrontent.<br>Votre couronne. Leur histoire.</p><div class="title-buttons"><button class="primary" id="new-game">New game</button><button id="load-game" disabled>Load game</button></div><p class="load-note" id="load-note"></p><div class="title-detail"><span>4 royaumes</span><span>48 × 48 cases</span><span>25 vallées</span></div><div class="title-utilities"><button data-pwa class="pwa-button small">Installer le jeu</button><button class="small" id="title-help">Découvrir les règles</button></div><p class="title-foot">Observez la vie. Prenez le commandement.</p></div></div>
 <div class="overlay hidden" id="modal"><div class="dialog" id="dialog" role="dialog" aria-modal="true" aria-label="Conseil des couronnes"></div></div><div class="toast hidden" id="toast" role="status"></div>`;
+const MUSIC_KEY = "quatre-couronnes-music-v1";
+let musicMood: MusicMood = "normal";
+let musicPreference: { muted?: boolean; volume?: number } = {};
+try {
+  musicPreference = JSON.parse(read(MUSIC_KEY) ?? "{}");
+} catch {}
+const music = new MapMusic({
+  baseUrl: import.meta.env.BASE_URL,
+  muted: musicPreference?.muted === true,
+  volume:
+    typeof musicPreference?.volume === "number" &&
+    Number.isFinite(musicPreference.volume)
+      ? musicPreference.volume
+      : 0.65,
+  onError: () =>
+    toast("La musique n’a pas pu démarrer. Le bouton ♫ permet de réessayer."),
+});
+function refreshMusicButton() {
+  const button = $("music-toggle");
+  button.textContent = music.muted ? "♫̸" : "♫";
+  button.title = music.muted ? "Activer la musique" : "Couper la musique";
+  button.setAttribute("aria-label", button.title);
+  button.setAttribute("aria-pressed", String(music.muted));
+}
+function saveMusicPreference() {
+  try {
+    localStorage.setItem(
+      MUSIC_KEY,
+      JSON.stringify({ muted: music.muted, volume: music.volume }),
+    );
+  } catch {}
+  refreshMusicButton();
+}
+$("music-toggle").onclick = () => {
+  music.setMuted(!music.muted);
+  if (!music.muted) void music.retry();
+  saveMusicPreference();
+};
+refreshMusicButton();
+document.addEventListener(
+  "pointerdown",
+  () => {
+    void music.unlock();
+  },
+  { capture: true },
+);
+document.addEventListener(
+  "keydown",
+  () => {
+    void music.unlock();
+  },
+  { capture: true },
+);
+
 const renderer = new Renderer($<HTMLCanvasElement>("map"));
 void loadAtlases()
   .then((atlases) => {
@@ -374,6 +429,8 @@ function start(s: State, loading = false, autosaveId?: string) {
   }
   state = s;
   inGame = true;
+  musicMood = "normal";
+  music.begin();
   paused = loading;
   ended = false;
   speed = 1;
@@ -442,7 +499,7 @@ function menu() {
   paused = true;
   updateUI();
   showModal(
-    `<span class="eyebrow">La vallée vous attend</span><h2>Conseil du royaume</h2><p>Partie en pause. Sauvegarde locale dans ce navigateur ; exportez-la pour la conserver ou la transférer.</p><div class="orders"><button id="menu-save">Nouvelle sauvegarde</button><button id="menu-load">Charger une sauvegarde</button><button id="export">Exporter</button><button id="import">Importer</button><button id="back-title">Écran titre</button></div><label class="check"><input type="checkbox" id="show-unit-hp" ${renderer.showUnitHP ? "checked" : ""}> Toujours afficher les PV des unités</label><p class="tax-hint">Sinon, survolez une unité, un roi ou un monstre pour voir ses PV.</p><input type="file" accept=".json,application/json" id="import-file" class="hidden"><div class="close-row"><button id="restart">Recommencer la carte</button><button class="primary" id="resume">Reprendre</button></div>`,
+    `<span class="eyebrow">La vallée vous attend</span><h2>Conseil du royaume</h2><p>Partie en pause. Sauvegarde locale dans ce navigateur ; exportez-la pour la conserver ou la transférer.</p><div class="orders"><button id="menu-save">Nouvelle sauvegarde</button><button id="menu-load">Charger une sauvegarde</button><button id="export">Exporter</button><button id="import">Importer</button><button id="back-title">Écran titre</button></div><label class="check"><input type="checkbox" id="show-unit-hp" ${renderer.showUnitHP ? "checked" : ""}> Toujours afficher les PV des unités</label><p class="tax-hint">Sinon, survolez une unité, un roi ou un monstre pour voir ses PV.</p><label class="music-volume">Volume de la musique <input type="range" id="music-volume" min="0" max="100" value="${Math.round(music.volume * 100)}" aria-label="Volume de la musique"><output id="music-volume-value">${Math.round(music.volume * 100)} %</output></label><input type="file" accept=".json,application/json" id="import-file" class="hidden"><div class="close-row"><button id="restart">Recommencer la carte</button><button class="primary" id="resume">Reprendre</button></div>`,
   );
   $<HTMLInputElement>("show-unit-hp").onchange = (e) => {
     renderer.showUnitHP = (e.target as HTMLInputElement).checked;
@@ -451,6 +508,12 @@ function menu() {
     } catch {
       /* The display preference remains available during this session. */
     }
+  };
+  $<HTMLInputElement>("music-volume").oninput = (e) => {
+    const value = Number((e.target as HTMLInputElement).value);
+    music.setVolume(value / 100);
+    $("music-volume-value").textContent = `${value} %`;
+    saveMusicPreference();
   };
   $("menu-save").onclick = () => createNamedSave(true);
   $("menu-load").onclick = () => showSavedGames(true);
@@ -463,6 +526,7 @@ function menu() {
     if (!(await persist(true))) return;
     closeModal();
     inGame = false;
+    music.end();
     $("title").classList.remove("hidden");
     updateLoad();
   };
@@ -507,6 +571,8 @@ function requestRestart(fromMenu = false) {
 function finish() {
   if (ended) return;
   ended = true;
+  musicMood = mapMusicMood(state, musicMood);
+  music.setMood(musicMood);
   persist();
   if (state.result === "won") {
     try {
@@ -531,6 +597,7 @@ function finish() {
       if (!(await persist(true))) return;
       closeModal();
       inGame = false;
+      music.end();
       $("title").classList.remove("hidden");
       updateLoad();
     };
@@ -544,6 +611,10 @@ function finish() {
   }, 1500);
 }
 function updateUI() {
+  if (inGame) {
+    musicMood = mapMusicMood(state, musicMood);
+    music.setMood(musicMood);
+  }
   renderDoctrine();
   $<HTMLButtonElement>("restart-level").disabled = !inGame;
   const k = state.kingdoms[0],
@@ -768,6 +839,7 @@ $("brand-title").onclick = () => {
   $("confirm-title").onclick = async () => {
     if (!(await persist(true))) return;
     inGame = false;
+    music.end();
     closeModal();
     $("title").classList.remove("hidden");
     updateLoad();
@@ -997,6 +1069,7 @@ window.addEventListener("pagehide", () => {
   void persist();
 });
 document.addEventListener("visibilitychange", () => {
+  music.setVisible(!document.hidden);
   if (document.hidden) {
     checkpoint();
     void persist();
