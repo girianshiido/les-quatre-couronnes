@@ -912,7 +912,7 @@ export function spawn(s: State, h: House) {
     { x: h.x + 1, y: h.y },
     { x: h.x, y: h.y - 1 },
     { x: h.x - 1, y: h.y },
-  ].filter((p) => walkable(s, p.x, p.y, h.team));
+  ].filter((p) => canSpawnAt(s, p, h.team));
   if (!candidates.length) return;
   const p = candidates[Math.floor(random(s) * candidates.length)];
   s.units.push({
@@ -927,6 +927,18 @@ export function spawn(s: State, h: House) {
   });
   s.kingdoms[h.team].births++;
   mergeStackedAllies(s);
+}
+/** Pathfinding may approach an obstacle to attack/clear it. Births cannot skip
+ * that interaction by placing an actor inside the obstacle itself. */
+export function canSpawnAt(s: State, p: Point, team: number) {
+  const t = tile(s, p.x, p.y);
+  return (
+    !!t &&
+    !t.permanent &&
+    (t.terrain === "grass" || t.terrain === "bridge") &&
+    t.cave === undefined &&
+    (t.castle === undefined || areAllied(s, t.castle, team))
+  );
 }
 export function walkable(s: State, x: number, y: number, team: number) {
   const t = tile(s, x, y);
@@ -1470,7 +1482,8 @@ export function canBarricade(s: State, p: Point) {
     t.cave === undefined &&
     t.castle === undefined &&
     !structureAt(s, p) &&
-    !s.units.some((u) => u.hp > 0 && u.x === p.x && u.y === p.y)
+    !s.units.some((u) => u.hp > 0 && u.x === p.x && u.y === p.y) &&
+    !s.monsters.some((m) => m.hp > 0 && m.x === p.x && m.y === p.y)
   );
 }
 function finishConstructionOrders(
@@ -1504,7 +1517,8 @@ export function fundConstruction(
     return false;
   if (
     kind === "barricade" &&
-    s.units.some((v) => v.hp > 0 && v.x === p.x && v.y === p.y)
+    (s.units.some((v) => v.hp > 0 && v.x === p.x && v.y === p.y) ||
+      s.monsters.some((m) => m.hp > 0 && m.x === p.x && m.y === p.y))
   )
     return true;
   if (kind === "bridge" && !crossing(s, p)) return false;
@@ -2752,6 +2766,19 @@ function act(s: State, u: Unit) {
   const k = s.kingdoms[u.team];
   if (!k.alive || u.hp <= 0) return;
   if (u.order === "hold" || (u.royal && u.order === "auto")) return;
+  // Old saves can contain a newborn placed on a closed barricade. It must not
+  // escape through the wall; hostile obstacles still require an actual fight.
+  if (tile(s, u.x, u.y)?.terrain === "barricade") {
+    const barrier = structureAt(s, u);
+    if (
+      barrier &&
+      (u.order === "attack" ||
+        u.order === "demolish-many" ||
+        !areAllied(s, barrier.team, u.team))
+    )
+      attackStructure(s, u, barrier);
+    return;
+  }
   if (u.pursue !== undefined && ["attack", "merge", "raid"].includes(u.order)) {
     let entity =
       s.units.find((v) => v.id === u.pursue && v.hp > 0) ??

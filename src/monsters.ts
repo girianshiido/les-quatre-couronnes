@@ -9,10 +9,12 @@ import {
   random,
   distance,
   resolveEncounter,
-  destroyStructure,
+  attackStructure,
+  structureAt,
   destroyTurf,
   assaultHouse,
   invalidateWorld,
+  canSpawnAt,
 } from "./engine";
 const proxy = (m: Monster): Unit => ({
   id: m.id,
@@ -41,7 +43,7 @@ export function spawnMonster(s: State, c: Cave, hp = c.spawnHp) {
     { x: c.x - 1, y: c.y },
     { x: c.x, y: c.y + 1 },
     { x: c.x, y: c.y - 1 },
-  ].filter((p) => monsterCanMove(s, p));
+  ].filter((p) => canSpawnAt(s, p, 4));
   if (!p.length) return;
   const at = p[Math.floor(random(s) * p.length)];
   s.monsters.push({
@@ -203,6 +205,13 @@ function contact(s: State, m: Monster, p: Point) {
     }
   return true;
 }
+function strikeBarricade(s: State, m: Monster, p: Point) {
+  const barrier = structureAt(s, p);
+  if (!barrier || barrier.team === 4) return;
+  const attacker = proxy(m);
+  attackStructure(s, attacker, barrier);
+  m.hp = attacker.hp;
+}
 export function tickMonsters(s: State, dt: number) {
   for (const c of s.caves) {
     c.timer += dt;
@@ -216,6 +225,10 @@ export function tickMonsters(s: State, dt: number) {
     m.wait -= dt;
     if (m.wait > 0) continue;
     m.wait = 0.6 + random(s) * 0.35;
+    if (tile(s, m.x, m.y)?.terrain === "barricade") {
+      strikeBarricade(s, m, m);
+      continue;
+    }
     if (!contact(s, m, m)) continue;
     const options = [
       { x: m.x + 1, y: m.y },
@@ -235,26 +248,7 @@ export function tickMonsters(s: State, dt: number) {
     if (!dest) continue;
     const t = tile(s, dest.x, dest.y)!;
     if (t.terrain === "barricade") {
-      const b = s.structures.find((b) =>
-        b.cells.some((p) => p.x === dest.x && p.y === dest.y),
-      );
-      if (!b) continue;
-      const attacker = proxy(m),
-        defender: Unit = {
-          id: -b.id,
-          team: b.team,
-          hp: b.hp,
-          x: dest.x,
-          y: dest.y,
-          age: 0,
-          wait: 0,
-          order: "hold",
-          heading: { x: 0, y: 0 },
-        };
-      resolveEncounter(s, attacker, defender);
-      m.hp = attacker.hp;
-      b.hp = defender.hp;
-      if (b.hp <= 0) destroyStructure(s, b);
+      strikeBarricade(s, m, dest);
       continue;
     }
     if (!contact(s, m, dest)) continue;

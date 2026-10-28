@@ -1,6 +1,6 @@
 // Generated from the complete production build. Do not edit by hand.
-const CACHE = 'quatre-couronnes-b504ae8d1bcc4fb5';
-const FILES = ["art/actors.png","art/buildings.png","art/world.png","assets/index-2nreJC5R.js","assets/index-DjvgAMGl.css","audio/ecran-defaite.ogg","audio/ecran-titre.ogg","audio/ecran-victoire-finale.ogg","audio/theme-normal.ogg","audio/theme-victoire.ogg","biomes.png","crown.svg","icons/crown-192.png","icons/crown-512.png","index.html","kings-atlas.png","manifest.webmanifest","sprites-atlas.png"];
+const CACHE = 'quatre-couronnes-8fd7dc993c1d1240';
+const FILES = ["art/actors.png","art/buildings.png","art/world.png","assets/index-BKIoU6bM.js","assets/index-DjvgAMGl.css","audio/ecran-defaite.ogg","audio/ecran-titre.ogg","audio/ecran-victoire-finale.ogg","audio/theme-normal.ogg","audio/theme-victoire.ogg","biomes.png","crown.svg","icons/crown-192.png","icons/crown-512.png","index.html","kings-atlas.png","manifest.webmanifest","sprites-atlas.png"];
 const INDEX = new URL('index.html', self.registration.scope).href;
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES.map(p => new Request(new URL(p, self.registration.scope).href, {cache: "reload"})))));
