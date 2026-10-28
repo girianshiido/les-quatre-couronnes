@@ -14,6 +14,7 @@ import {
   combatPower,
   distance,
   CLEARING_COSTS,
+  areAllied,
 } from "./engine";
 export interface DestinationAction {
   order: Order;
@@ -41,6 +42,7 @@ export function destinationActions(
   ): DestinationAction => ({ order, label, disabled: gold < cost, workerId });
   const site = structureAt(s, p);
   if (site?.construction) {
+    if (site.team !== 0 && areAllied(s, site.team, 0)) return [];
     if (site.team !== 0)
       return [
         action("attack", "Détruire le chantier"),
@@ -97,6 +99,10 @@ export function destinationActions(
   }
   const structure = structureAt(s, p);
   if (structure) {
+    if (structure.team !== 0 && areAllied(s, structure.team, 0))
+      return structure.kind === "bridge"
+        ? [action("move", "Traverser le pont allié")]
+        : [];
     if (structure.kind === "barricade")
       return [
         action(
@@ -142,7 +148,7 @@ export function destinationActions(
             : []),
         ]
       : [];
-  if (t.castle !== undefined && t.castle !== 0) {
+  if (t.castle !== undefined && !areAllied(s, t.castle, 0)) {
     const king = s.units.find((u) => u.royal && u.team === t.castle);
     return [
       action(
@@ -153,18 +159,18 @@ export function destinationActions(
   }
   const enemy =
     s.units.some(
-      (u) => u.team !== 0 && u.hp > 0 && u.x === p.x && u.y === p.y,
+      (u) => !areAllied(s, u.team, 0) && u.hp > 0 && u.x === p.x && u.y === p.y,
     ) || s.monsters.some((m) => m.hp > 0 && m.x === p.x && m.y === p.y);
   if (enemy) return [action("attack", "Attaquer la cible", 0)];
   const house = s.houses.find((h) => h.id === t.house);
-  if (house?.team !== undefined && house.team !== 0)
+  if (house?.team !== undefined && !areAllied(s, house.team, 0))
     return [
       action(
         "attack",
         `Raser la maison · ${Math.ceil(200 - (house.damage ?? 0))} PV restants + 5 % des PV`,
       ),
     ];
-  if (t.castle !== undefined && t.castle !== 0)
+  if (t.castle !== undefined && !areAllied(s, t.castle, 0))
     return [action("attack", "Attaquer le roi adverse", 0)];
   const ally = s.units.find(
     (u) =>
@@ -174,6 +180,8 @@ export function destinationActions(
       u.y === p.y,
   );
   if (ally?.royal) return [action("merge", "Fusionner avec le roi")];
+  if (t.castle !== undefined && t.castle !== 0 && areAllied(s, t.castle, 0))
+    return [action("move", "Se déplacer chez l’allié")];
   if (house) {
     const a = [
       action("shelter", "S’abriter sur cette maison"),

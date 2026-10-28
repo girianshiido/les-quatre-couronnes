@@ -119,6 +119,8 @@ export interface Monster extends Point {
   cave: number;
 }
 export interface State {
+  battleStarted?: boolean;
+  alliance?: { partner: 1 | 2 | 3; broken: boolean };
   version: 2;
   campaignVersion: 2;
   priorities: Priority[];
@@ -143,6 +145,61 @@ export interface State {
   ruins: { team: number; x: number; y: number; time: number }[];
   result: "playing" | "won" | "lost";
   stats: { cleared: number; bridges: number; dams: number; merged: number };
+}
+export function areAllied(
+  s: State,
+  a: number | undefined,
+  b: number | undefined,
+) {
+  if (a === undefined || b === undefined) return false;
+  if (a === b) return true;
+  if (!s.alliance || s.alliance.broken || a > 3 || b > 3) return false;
+  const partner = s.alliance.partner;
+  return (a === 0 || a === partner) === (b === 0 || b === partner);
+}
+export function chooseAlliance(s: State, partner?: number) {
+  if (s.battleStarted || s.time > 0 || s.result !== "playing") return false;
+  if (
+    partner !== undefined &&
+    (![1, 2, 3].includes(partner) || !s.kingdoms[partner]?.alive)
+  )
+    return false;
+  s.alliance =
+    partner === undefined
+      ? undefined
+      : { partner: partner as 1 | 2 | 3, broken: false };
+  invalidateWorld(s);
+  return true;
+}
+function updateAlliance(s: State) {
+  if (!s.alliance || s.alliance.broken) return;
+  const alive = s.kingdoms.filter((k) => k.alive);
+  if (
+    alive.length > 2 ||
+    alive.length < 2 ||
+    !areAllied(s, alive[0].id, alive[1].id)
+  )
+    return;
+  s.alliance.broken = true;
+  // Diplomacy affects pathfinding, shelter and AI targets as well as combat.
+  invalidateWorld(s);
+  for (const k of s.kingdoms) delete k.crossingPlan;
+  for (const u of s.units)
+    if (["auto", "rest", "defend", "raid"].includes(u.order)) finishTravel(u);
+  const cells = new Map<number, Unit[]>();
+  for (const u of s.units) {
+    if (u.hp <= 0) continue;
+    const key = u.y * s.size + u.x;
+    for (const other of cells.get(key) ?? []) {
+      if (other.hp > 0 && u.hp > 0 && !areAllied(s, u.team, other.team))
+        resolveEncounter(s, u, other);
+    }
+    const stack = cells.get(key) ?? [];
+    stack.push(u);
+    cells.set(key, stack);
+  }
+  s.units = s.units.filter((u) => u.hp > 0 && s.kingdoms[u.team].alive);
+  refreshKings(s);
 }
 interface SpatialIndex {
   houses: Map<number, House>;
@@ -375,10 +432,6 @@ export const tile = (s: State, x: number, y: number) =>
   inside(s, x, y) ? s.tiles[idx(s, x, y)] : undefined;
 export const distance = (a: Point, b: Point) =>
   Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-export function log(s: State, text: string, team = 0) {
-  s.events.unshift({ time: s.time, text, team });
-  s.events.length = Math.min(30, s.events.length);
-}
 /** A campaign map is literal data; only the simulation random stream uses the caller's seed. */
 export function createGame(level = 0, seed = 14243): State {
   level = Math.max(0, Math.min(LEVELS.length - 1, Math.floor(level)));
@@ -474,7 +527,7 @@ export function createGame(level = 0, seed = 14243): State {
   }
   seedCaves(s);
   invalidateWorld(s);
-  log(s, "Quatre couronnes. Une vallée dont chaque passage compte.");
+
   return s;
 }
 function createGeneratedGame(level = 0, seed = 14243): State {
@@ -495,6 +548,7 @@ function createGeneratedGame(level = 0, seed = 14243): State {
     seed,
     rng: seed >>> 0,
     time: 0,
+    battleStarted: false,
     nextId: 1,
     tiles: [],
     units: [],
@@ -664,7 +718,7 @@ function createGeneratedGame(level = 0, seed = 14243): State {
   }
   if (level === 0) connectTutorialOpponents(s, phase);
   seedCaves(s);
-  log(s, "Quatre couronnes. Une seule vallée. L’histoire commence.");
+
   return s;
 }
 function tutorialRiverX(size: number, y: number, phase: number) {
@@ -764,7 +818,7 @@ export function territoryAt(s: State, p: Point) {
 }
 export function destroyTurf(s: State, p: Point, team: number, hp = 0) {
   const turf = territoryAt(s, p);
-  if (!turf || turf.team === team) return 0;
+  if (!turf || areAllied(s, turf.team, team)) return 0;
   s.clearedTurf[idx(s, p.x, p.y)] = turf.house;
   s.turfRevision++;
   return 2 + hp * 0.002;
@@ -776,7 +830,7 @@ export function houseDestructionCost(hp: number) {
 export function assaultHouse(s: State, house: House, attacker: Unit) {
   if (
     attacker.hp <= 0 ||
-    attacker.team === house.team ||
+    areAllied(s, attacker.team, house.team) ||
     !s.houses.includes(house)
   )
     return false;
@@ -888,7 +942,7 @@ export function totalHP(s: State, team: number) {
 }
 export function resting(s: State, u: Unit) {
   const h = houseById(s, tile(s, u.x, u.y)?.house);
-  return !!h && h.team === u.team;
+  return !!h && areAllied(s, h.team, u.team);
 }
 export function lifeDrain(s: State, u: Unit) {
   if (resting(s, u) || (u.royal && sheltered(s, u))) return 0;
@@ -911,7 +965,7 @@ export function supplyDistance(s: State, u: Unit) {
     field = new Int16Array(s.tiles.length).fill(-1);
     const queue: number[] = [];
     for (const h of s.houses) {
-      if (h.team !== u.team) continue;
+      if (!areAllied(s, h.team, u.team)) continue;
       const i = idx(s, h.x, h.y);
       field[i] = 0;
       queue.push(i);
@@ -937,7 +991,7 @@ export function supplyDistance(s: State, u: Unit) {
           t.permanent ||
           ["water", "dam", "rock", "tree", "barricade"].includes(t.terrain) ||
           t.cave !== undefined ||
-          (t.castle !== undefined && t.castle !== u.team)
+          (t.castle !== undefined && !areAllied(s, t.castle, u.team))
         )
           continue;
         field[n] = field[i] + 1;
@@ -1052,6 +1106,7 @@ function finishEncounter(s: State, a: Unit, b: Unit, winner: Unit | null) {
   return winner;
 }
 export function resolveEncounter(s: State, a: Unit, b: Unit) {
+  if (a.team !== b.team && areAllied(s, a.team, b.team)) return a;
   if (a.team === b.team) {
     const win = b.royal || (!a.royal && b.order === "hold") ? b : a,
       lose = win === a ? b : a;
@@ -1178,7 +1233,7 @@ function formationStep(
       (!["rock", "barricade"].includes(tile(s, x, y)!.terrain) &&
         tile(s, x, y)!.cave === undefined &&
         (tile(s, x, y)!.castle === undefined ||
-          tile(s, x, y)!.castle === team))) &&
+          areAllied(s, tile(s, x, y)!.castle, team)))) &&
     ((walkable(s, x, y, team) && tile(s, x, y)?.terrain !== "barricade") ||
       (x === goal.x &&
         y === goal.y &&
@@ -1324,7 +1379,7 @@ function findStep(
         isContinuousOrder((start as Unit).order) &&
         (tile(s, nx, ny)!.cave !== undefined ||
           (tile(s, nx, ny)!.castle !== undefined &&
-            tile(s, nx, ny)!.castle !== team))
+            !areAllied(s, tile(s, nx, ny)!.castle, team)))
       )
         continue;
       if (
@@ -1337,7 +1392,7 @@ function findStep(
         (["rock", "barricade"].includes(tile(s, nx, ny)!.terrain) ||
           tile(s, nx, ny)!.cave !== undefined ||
           (tile(s, nx, ny)!.castle !== undefined &&
-            tile(s, nx, ny)!.castle !== team))
+            !areAllied(s, tile(s, nx, ny)!.castle, team)))
       )
         continue;
       if (
@@ -1412,6 +1467,21 @@ export function canBarricade(s: State, p: Point) {
     !s.units.some((u) => u.hp > 0 && u.x === p.x && u.y === p.y)
   );
 }
+function finishConstructionOrders(
+  s: State,
+  team: number,
+  p: Point,
+  kind: "bridge" | "barricade",
+) {
+  for (const worker of s.units)
+    if (
+      worker.team === team &&
+      worker.order === kind &&
+      worker.target?.x === p.x &&
+      worker.target?.y === p.y
+    )
+      finishTravel(worker);
+}
 export function fundConstruction(
   s: State,
   u: Unit,
@@ -1476,14 +1546,9 @@ export function fundConstruction(
       s.bridgeSites.push([{ ...p }]);
   }
   k.bridgeSaving = false;
+  finishConstructionOrders(s, u.team, p, kind);
   finishTravel(u);
-  log(
-    s,
-    kind === "bridge"
-      ? "Le chantier du pont est terminé."
-      : "Le chantier de la barricade est terminé.",
-    u.team,
-  );
+
   return true;
 }
 export function buildBarricade(s: State, u: Unit, p: Point) {
@@ -1504,10 +1569,11 @@ export function buildBarricade(s: State, u: Unit, p: Point) {
     maxHp: 1500,
     cells: [{ ...p }],
   });
+  finishConstructionOrders(s, u.team, p, "barricade");
   u.order = "auto";
   delete u.target;
   u.hp -= 5;
-  log(s, "Une barricade ferme le passage.", u.team);
+
   return true;
 }
 export function destroyStructure(s: State, b: Structure) {
@@ -1522,17 +1588,9 @@ export function destroyStructure(s: State, b: Structure) {
       for (const u of s.units)
         if (u.x === p.x && u.y === p.y && u.hp > 0) injure(u, u.hp);
   }
-  log(
-    s,
-    b.construction
-      ? "Un chantier est détruit."
-      : b.kind === "bridge"
-        ? "Un pont s’écroule. Il pourra être reconstruit pour 500 pièces."
-        : "Une barricade est détruite.",
-    b.team,
-  );
 }
 export function attackStructure(s: State, u: Unit, b: Structure) {
+  if (b.team !== u.team && areAllied(s, b.team, u.team)) return false;
   const proxy: Unit = {
     id: -b.id,
     team: b.team === u.team ? 4 : b.team,
@@ -1555,7 +1613,7 @@ function autonomousDestination(s: State, u: Unit, p: Point) {
     const castle = tile(s, p.x, p.y)?.castle;
     const king =
       castle !== undefined &&
-      castle !== u.team &&
+      !areAllied(s, castle, u.team) &&
       s.units.find((v) => v.royal && v.team === castle && v.hp > 0);
     return !king || u.hp > combatPower(s, king) * 1.25;
   }
@@ -1563,21 +1621,25 @@ function autonomousDestination(s: State, u: Unit, p: Point) {
   if (t.terrain === "rock" || t.terrain === "barricade" || t.cave !== undefined)
     return false;
   const turf = territoryAt(s, p);
-  if (turf && turf.team !== u.team) return false;
+  if (turf && !areAllied(s, turf.team, u.team)) return false;
   const building = structureAt(s, p);
   if (
     building?.kind === "barricade" &&
     !building.construction &&
-    building.team !== u.team
+    !areAllied(s, building.team, u.team)
   )
     return false;
-  if (t.castle !== undefined && t.castle !== u.team) return false;
-  if (t.house !== undefined && houseById(s, t.house)?.team !== u.team)
+  if (t.castle !== undefined && !areAllied(s, t.castle, u.team)) return false;
+  if (
+    t.house !== undefined &&
+    !areAllied(s, houseById(s, t.house)?.team, u.team)
+  )
     return false;
   if (s.monsters.some((m) => m.hp > 0 && m.x === p.x && m.y === p.y))
     return false;
   return !s.units.some(
-    (v) => v.hp > 0 && v.team !== u.team && v.x === p.x && v.y === p.y,
+    (v) =>
+      v.hp > 0 && !areAllied(s, v.team, u.team) && v.x === p.x && v.y === p.y,
   );
 }
 export function buildCrossing(s: State, u: Unit, p: Point, dam = false) {
@@ -1632,17 +1694,12 @@ export function buildCrossing(s: State, u: Unit, p: Point, dam = false) {
       s.bridgeSites.push(cr.cells.map((c) => ({ ...c })));
     k.bridgeSaving = false;
   }
+  if (!dam) finishConstructionOrders(s, u.team, p, "bridge");
   s.stats[dam ? "dams" : "bridges"]++;
   u.hp -= 8;
   u.order = "auto";
   u.target = undefined;
-  log(
-    s,
-    dam
-      ? "Un barrage fournit de nouveaux revenus."
-      : "Un pont ouvre un passage entre les royaumes.",
-    u.team,
-  );
+
   return true;
 }
 export function command(s: State, ids: number[], order: Order, target?: Point) {
@@ -1667,7 +1724,7 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
             u.x === target.x &&
             u.y === target.y &&
             !ids.includes(u.id) &&
-            (order === "merge" ? u.team === 0 : u.team !== 0),
+            (order === "merge" ? u.team === 0 : !areAllied(s, u.team, 0)),
         ) ??
         (order === "attack"
           ? s.monsters.find(
@@ -1685,9 +1742,14 @@ export function command(s: State, ids: number[], order: Order, target?: Point) {
       !!target &&
       ["move", "attack"].includes(order) &&
       (!!territoryAt(s, target)?.team ||
-        s.houses.some((h) => h.team !== u.team && distance(h, target) <= 10) ||
+        s.houses.some(
+          (h) => !areAllied(s, h.team, u.team) && distance(h, target) <= 10,
+        ) ||
         s.kingdoms.some(
-          (k) => k.alive && k.id !== u.team && distance(k.castle, target) <= 10,
+          (k) =>
+            k.alive &&
+            !areAllied(s, k.id, u.team) &&
+            distance(k.castle, target) <= 10,
         ));
     u.formation =
       us.length >= 8 &&
@@ -1731,11 +1793,6 @@ function destroyKingdom(
   if (captureHouses && attacker !== team && s.kingdoms[attacker]?.alive) {
     for (const h of inherited) h.team = attacker;
     s.turfRevision++;
-    log(
-      s,
-      `${inherited.length} maison${inherited.length > 1 ? "s" : ""} de la couronne ${TEAM_NAMES[team]} passe${inherited.length > 1 ? "nt" : ""} sous la couronne ${TEAM_NAMES[attacker]}.`,
-      attacker,
-    );
   } else {
     for (const h of inherited) delete tile(s, h.x, h.y)!.house;
     s.houses = s.houses.filter((h) => h.team !== team);
@@ -1743,11 +1800,6 @@ function destroyKingdom(
   s.units.forEach((u) => {
     if (u.team === team) u.hp = 0;
   });
-  log(
-    s,
-    `La couronne ${TEAM_NAMES[team]} est tombée. Son château s’effondre.`,
-    attacker,
-  );
 }
 function peacefulTile(s: State, x: number, y: number, team: number) {
   const t = tile(s, x, y);
@@ -1760,9 +1812,9 @@ function peacefulTile(s: State, x: number, y: number, team: number) {
   )
     return false;
   const turf = territoryAt(s, { x, y });
-  if (turf && turf.team !== team) return false;
-  if (t.castle !== undefined && t.castle !== team) return false;
-  if (t.house !== undefined && houseById(s, t.house)?.team !== team)
+  if (turf && !areAllied(s, turf.team, team)) return false;
+  if (t.castle !== undefined && !areAllied(s, t.castle, team)) return false;
+  if (t.house !== undefined && !areAllied(s, houseById(s, t.house)?.team, team))
     return false;
   return true;
 }
@@ -1910,7 +1962,7 @@ function guardPost(s: State, u: Unit) {
     .filter((b) => b.kind === "bridge" && !b.construction)
     .flatMap((b) => b.cells);
   const enemies = s.kingdoms
-    .filter((k) => k.id !== 0 && k.alive)
+    .filter((k) => !areAllied(s, k.id, 0) && k.alive)
     .map((k) => k.castle);
   const approaches = bridges.length ? bridges : enemies;
   return s.houses
@@ -2004,14 +2056,15 @@ function playerExpansionTarget(s: State, u: Unit) {
         !["rock", "barricade"].includes(tile(s, p.x, p.y)!.terrain) &&
         tile(s, p.x, p.y)!.cave === undefined &&
         (tile(s, p.x, p.y)!.castle === undefined ||
-          tile(s, p.x, p.y)!.castle === 0)
+          areAllied(s, tile(s, p.x, p.y)!.castle, 0))
       : peacefulTile(s, p.x, p.y, 0) && autonomousDestination(s, u, p);
   const available = (p: Point) =>
     !reserved.has(idx(s, p.x, p.y)) && permitted(p);
   const task = (p: Point): Priority | undefined => {
     if (!available(p)) return;
     const house = tile(s, p.x, p.y)?.house;
-    if (house !== undefined && houseTeams.get(house) !== 0) return "raid";
+    if (house !== undefined && !areAllied(s, houseTeams.get(house), 0))
+      return "raid";
     if (canFound && canHouse(s, p.x, p.y)) return "house";
     if (canClear && tile(s, p.x, p.y)?.terrain === "tree") return "clear";
   };
@@ -2117,7 +2170,7 @@ function landConnected(s: State, team: number) {
       t = s.tiles[index];
     if (
       t.castle !== undefined &&
-      t.castle !== team &&
+      !areAllied(s, t.castle, team) &&
       s.kingdoms[t.castle].alive
     ) {
       connected = true;
@@ -2226,7 +2279,7 @@ export function planAiCrossing(s: State, team: number): Point[] | undefined {
         continue;
       const foe = Math.min(
         ...s.kingdoms
-          .filter((k) => k.id !== team && k.alive)
+          .filter((k) => !areAllied(s, k.id, team) && k.alive)
           .map((k) => distance(k.castle, { x: nx, y: ny })),
       );
       const score = cells.length * 100 + distance(start, { x, y }) + foe * 0.2;
@@ -2320,7 +2373,11 @@ function aiSettlementTarget(s: State, u: Unit) {
     if (
       canHouse(s, p.x, p.y) &&
       !s.units.some(
-        (v) => v.hp > 0 && v.team !== u.team && v.x === p.x && v.y === p.y,
+        (v) =>
+          v.hp > 0 &&
+          !areAllied(s, v.team, u.team) &&
+          v.x === p.x &&
+          v.y === p.y,
       ) &&
       !s.monsters.some((m) => m.hp > 0 && m.x === p.x && m.y === p.y)
     ) {
@@ -2357,7 +2414,9 @@ function raidBlockers(s: State, u: Unit) {
         (v) =>
           v.hp > 0 &&
           v.id !== u.id &&
-          (v.royal || (v.team !== u.team && v.hp >= u.hp)),
+          (v.team === u.team
+            ? !!v.royal
+            : !areAllied(s, v.team, u.team) && (v.royal || v.hp >= u.hp)),
       ),
       ...s.monsters.filter((m) => m.hp >= u.hp),
     ].map((v) => idx(s, v.x, v.y)),
@@ -2375,7 +2434,7 @@ function aiRaidTarget(s: State, u: Unit) {
   const exposedKing = s.units.find((v) => {
     if (
       !v.royal ||
-      v.team === u.team ||
+      areAllied(s, v.team, u.team) ||
       v.hp <= 0 ||
       distance(u, v) > 2 ||
       u.hp <= combatPower(s, v) * 1.5
@@ -2392,9 +2451,8 @@ function aiRaidTarget(s: State, u: Unit) {
           other.hp > 0 &&
           other.x === first.x &&
           other.y === first.y &&
-          (other.royal ||
-            (other.team !== u.team &&
-              u.hp - other.hp * 0.7 <= combatPower(s, v) * 1.5)),
+          !areAllied(s, other.team, u.team) &&
+          (other.royal || u.hp - other.hp * 0.7 <= combatPower(s, v) * 1.5),
       )
     );
   });
@@ -2408,7 +2466,10 @@ function aiRaidTarget(s: State, u: Unit) {
   const previous =
     u.target &&
     (s.houses.some(
-      (h) => h.x === u.target!.x && h.y === u.target!.y && h.team !== u.team,
+      (h) =>
+        h.x === u.target!.x &&
+        h.y === u.target!.y &&
+        !areAllied(s, h.team, u.team),
     ) ||
       (canFound && canHouse(s, u.target.x, u.target.y)));
   if (u.order === "raid" && (previous || u.pursue !== undefined)) return;
@@ -2419,12 +2480,15 @@ function aiRaidTarget(s: State, u: Unit) {
   const blocked = raidBlockers(s, u);
   const enemyHomes = new Map(
     s.houses
-      .filter((h) => h.team !== u.team && s.kingdoms[h.team].alive)
+      .filter((h) => !areAllied(s, h.team, u.team) && s.kingdoms[h.team].alive)
       .map((h) => [idx(s, h.x, h.y), h]),
   );
   const targets = new Map(
     s.units
-      .filter((v) => v.hp > 0 && !v.royal && v.team !== u.team && v.hp < u.hp)
+      .filter(
+        (v) =>
+          v.hp > 0 && !v.royal && !areAllied(s, v.team, u.team) && v.hp < u.hp,
+      )
       .map((v) => [idx(s, v.x, v.y), v]),
   );
   const reserved = new Set(
@@ -2491,7 +2555,7 @@ function aiRaidTarget(s: State, u: Unit) {
         !walkable(s, x, y, u.team) ||
         ["rock", "barricade"].includes(t.terrain) ||
         t.cave !== undefined ||
-        (t.castle !== undefined && t.castle !== u.team) ||
+        (t.castle !== undefined && !areAllied(s, t.castle, u.team)) ||
         (t.terrain === "tree" && s.kingdoms[u.team].gold < 30)
       )
         continue;
@@ -2504,12 +2568,12 @@ function aiRaidTarget(s: State, u: Unit) {
 }
 function updateDefence(s: State, u: Unit) {
   if (u.royal || !["auto", "rest", "defend", "raid"].includes(u.order)) return;
-  const houses = s.houses.filter((h) => h.team === u.team);
-  const danger = spatialIndex(s)?.danger[u.team];
+  const houses = s.houses.filter((h) => areAllied(s, h.team, u.team));
+  const danger = spatialIndex(s)?.danger;
   const threats = [...s.units, ...s.monsters.map((m) => ({ ...m, team: 4 }))]
     .filter(
       (v) =>
-        v.team !== u.team &&
+        !areAllied(s, v.team, u.team) &&
         v.hp > 0 &&
         sameLand(s, u, v) &&
         !("royal" in v && v.royal && sheltered(s, v as Unit)) &&
@@ -2518,7 +2582,10 @@ function updateDefence(s: State, u: Unit) {
         u.hp > ("royal" in v && v.royal ? combatPower(s, v as Unit) : v.hp) &&
         (distance(v, s.kingdoms[u.team].castle) <= 8 ||
           (danger
-            ? danger[idx(s, v.x, v.y)]
+            ? s.kingdoms.some(
+                (k) =>
+                  areAllied(s, k.id, u.team) && danger[k.id][idx(s, v.x, v.y)],
+              )
             : houses.some((h) => distance(v, h) <= 5))),
     )
     .sort((a, b) => {
@@ -2543,7 +2610,7 @@ function updateDefence(s: State, u: Unit) {
     for (const ally of s.units) {
       if (
         ally.id === u.id ||
-        ally.team !== u.team ||
+        !areAllied(s, ally.team, u.team) ||
         ally.hp <= power ||
         ally.royal ||
         distance(ally, enemy) > 10
@@ -2584,19 +2651,26 @@ function continuousJob(s: State, u: Unit, p: Point) {
     !t ||
     t.permanent ||
     t.cave !== undefined ||
-    (t.castle !== undefined && t.castle !== u.team)
+    (t.castle !== undefined && !areAllied(s, t.castle, u.team))
   )
     return false;
   if (u.order === "build-many") {
     const house = t.house === undefined ? undefined : houseById(s, t.house);
-    return canHouse(s, p.x, p.y) || (!!house && house.team !== u.team);
+    return (
+      canHouse(s, p.x, p.y) || (!!house && !areAllied(s, house.team, u.team))
+    );
   }
   if (u.order === "clear-many")
     return (
       (t.terrain === "tree" && s.kingdoms[u.team].gold >= 30) ||
       (t.terrain === "rock" && s.kingdoms[u.team].gold >= CLEARING_COSTS.rock)
     );
-  return u.order === "demolish-many" && structureAt(s, p)?.kind === "barricade";
+  const structure = structureAt(s, p);
+  return (
+    u.order === "demolish-many" &&
+    structure?.kind === "barricade" &&
+    (structure.team === u.team || !areAllied(s, structure.team, u.team))
+  );
 }
 function nearestWork(s: State, u: Unit, shelter = false): Point | undefined {
   const houses = new Set(
@@ -2629,7 +2703,7 @@ function nearestWork(s: State, u: Unit, shelter = false): Point | undefined {
       if (
         seen[i] ||
         v.cave !== undefined ||
-        (v.castle !== undefined && v.castle !== u.team)
+        (v.castle !== undefined && !areAllied(s, v.castle, u.team))
       )
         continue;
       const job = !shelter && continuousJob(s, u, { x, y });
@@ -2645,11 +2719,6 @@ function stopContinuousWork(s: State, u: Unit) {
   finishTravel(u);
   u.order = home ? "shelter" : "hold";
   u.target = home;
-  log(
-    s,
-    "Le travail en continu est terminé : fonds insuffisants ou plus de tâche accessible.",
-    u.team,
-  );
 }
 function updateContinuousWork(s: State, u: Unit) {
   if (!isContinuousOrder(u.order)) return;
@@ -2727,7 +2796,10 @@ function act(s: State, u: Unit) {
       !existing.construction &&
       existing.team === u.team &&
       existing.kind === kind;
-    if (existing && (existing.team !== u.team || existing.kind !== kind)) {
+    if (
+      finished ||
+      (existing && (existing.team !== u.team || existing.kind !== kind))
+    ) {
       finishTravel(u);
       return;
     }
@@ -2832,7 +2904,6 @@ function act(s: State, u: Unit) {
       injure(u, Math.min(100, u.hp));
       if (u.order !== "build-many") u.order = "auto";
       delete u.target;
-      log(s, "Une nouvelle maison rejoint le royaume.", u.team);
     } else {
       if (u.order !== "build-many") u.order = "auto";
       u.target = undefined;
@@ -2907,7 +2978,7 @@ function act(s: State, u: Unit) {
   if (!target) {
     if (u.team === 0 && u.order === "auto") return;
     const enemies = s.kingdoms
-      .filter((v) => v.alive && v.id !== u.team)
+      .filter((v) => v.alive && !areAllied(s, v.id, u.team))
       .sort((a, b) => distance(u, a.castle) - distance(u, b.castle));
     const enemy = enemies[0]?.castle;
     const nearCastle = enemy && distance(u, enemy) < 12;
@@ -2966,7 +3037,7 @@ function act(s: State, u: Unit) {
         (target?.x === dest.x && target?.y === dest.y))) ||
       (structure.kind === "barricade" &&
         !structure.construction &&
-        structure.team !== u.team))
+        !areAllied(s, structure.team, u.team)))
   ) {
     attackStructure(s, u, structure);
     if (
@@ -3001,24 +3072,20 @@ function act(s: State, u: Unit) {
   }
   const occupants = unitsAt(s, dest).filter((v) => v.id !== u.id);
   for (const other of occupants) {
-    if (other.hp <= 0) continue;
-    if (u.order === "rest" && other.team !== u.team) return;
+    if (
+      other.hp <= 0 ||
+      (other.team !== u.team && areAllied(s, other.team, u.team))
+    )
+      continue;
+    if (u.order === "rest" && !areAllied(s, other.team, u.team)) return;
     const winner = resolveEncounter(s, u, other);
     if (winner !== u || u.hp <= 0) return;
   }
   injure(u, destroyTurf(s, dest, u.team, u.hp));
   if (u.hp <= 0) return;
   const house = houseById(s, t.house);
-  if (house && house.team !== u.team) {
+  if (house && !areAllied(s, house.team, u.team)) {
     const destroyed = assaultHouse(s, house, u);
-    if (destroyed)
-      log(
-        s,
-        u.royal
-          ? "Le roi rase une maison adverse."
-          : "Une maison adverse est détruite.",
-        u.team,
-      );
     if (!destroyed || u.hp <= 0) return;
   }
   u.heading = { x: dest.x - u.x, y: dest.y - u.y };
@@ -3050,6 +3117,7 @@ function mergeStackedAllies(s: State) {
 }
 export function step(s: State, dt = 0.2) {
   if (s.result !== "playing") return;
+  if (dt > 0) s.battleStarted = true;
   const signature = worldSignature(s);
   if (worldSignatures.get(s) !== signature) invalidateWorld(s);
   spatial.delete(s);
@@ -3124,6 +3192,7 @@ export function step(s: State, dt = 0.2) {
     if (k.alive && !s.houses.some((h) => h.team === k.id))
       destroyKingdom(s, k.id, k.id);
   s.units = s.units.filter((u) => u.hp > 0 && s.kingdoms[u.team].alive);
+  updateAlliance(s);
   if (!s.kingdoms[0].alive) s.result = "lost";
   else if (s.kingdoms.slice(1).every((k) => !k.alive)) s.result = "won";
   simulating.delete(s);
@@ -3507,6 +3576,19 @@ export function loadGame(data: string): State | undefined {
       )
     )
       return;
+    if (s.battleStarted !== undefined && typeof s.battleStarted !== "boolean")
+      return;
+    if (
+      s.alliance !== undefined &&
+      (!s.alliance ||
+        typeof s.alliance !== "object" ||
+        ![1, 2, 3].includes(s.alliance.partner) ||
+        typeof s.alliance.broken !== "boolean")
+    )
+      return;
+    s.battleStarted = s.battleStarted === true || s.time > 0;
+    updateAlliance(s);
+    s.events = [];
     mergeStackedAllies(s);
     return s;
   } catch {

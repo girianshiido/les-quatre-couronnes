@@ -17,6 +17,7 @@ export interface SaveBackend {
   put(entry: SaveEntry, data: string): Promise<void>;
   rename(id: string, name: string): Promise<void>;
   remove(id: string): Promise<void>;
+  removeMany(ids: string[]): Promise<void>;
 }
 export function newSaveId(kind: "auto" | "manual") {
   return `${kind}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
@@ -103,9 +104,14 @@ export class IndexedSaveBackend implements SaveBackend {
     });
   }
   remove(id: string) {
+    return this.removeMany([id]);
+  }
+  removeMany(ids: string[]) {
     return this.change(["entries", "games"], (tx) => {
-      tx.objectStore("entries").delete(id);
-      tx.objectStore("games").delete(id);
+      for (const id of new Set(ids)) {
+        tx.objectStore("entries").delete(id);
+        tx.objectStore("games").delete(id);
+      }
     });
   }
 }
@@ -184,6 +190,14 @@ export class SaveLibrary {
   }
   remove(id: string) {
     return this.enqueue(() => this.backend.remove(id));
+  }
+  removeMany(ids: string[], protectedId?: string) {
+    const unique = [...new Set(ids)];
+    if (protectedId && unique.includes(protectedId))
+      return Promise.reject(
+        new Error("La sauvegarde de la partie en cours est protégée."),
+      );
+    return this.enqueue(() => this.backend.removeMany(unique));
   }
   async migrateLegacy(raw: string | null) {
     if (!raw) return false;

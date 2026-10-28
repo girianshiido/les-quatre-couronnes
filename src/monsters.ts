@@ -9,7 +9,6 @@ import {
   random,
   distance,
   resolveEncounter,
-  log,
   destroyStructure,
   destroyTurf,
   assaultHouse,
@@ -134,11 +133,6 @@ export function seedCaves(s: State) {
     }
     spawnMonster(s, c);
   }
-  log(
-    s,
-    "Des grottes abritent des monstres. Ouvrir leur enclos peut bouleverser la vallée.",
-    4,
-  );
 }
 export function monsterCanMove(s: State, p: Point) {
   const t = tile(s, p.x, p.y);
@@ -176,7 +170,6 @@ export function attackCave(s: State, u: Unit, c: Cave) {
     s.caves = s.caves.filter((v) => v.id !== c.id);
     delete tile(s, c.x, c.y)!.cave;
     invalidateWorld(s);
-    log(s, "Une grotte est détruite. Plus aucun monstre n’en sortira.", u.team);
   }
   return u.hp > 0 && c.hp <= 0;
 }
@@ -264,7 +257,6 @@ export function tickMonsters(s: State, dt: number) {
         const attacker = proxy(m);
         const destroyed = assaultHouse(s, house, attacker);
         m.hp = attacker.hp;
-        if (destroyed) log(s, "Un monstre détruit une maison.", 4);
         if (!destroyed) continue;
       }
     }

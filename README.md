@@ -64,9 +64,9 @@ Ils commencent dans des zones fermées par l’eau ou une barricade. **Ouvrir un
 
 Molette ou +/− : zoom ; clic droit ou Alt + glisser : déplacer la carte. Le bouton ↔ permet le déplacement tactile. A sélectionne les habitants sans le roi. Curseur de vitesse **de 0 à ×5**, par pas de 0,25 (0 met le jeu en pause) ; une nouvelle partie démarre à ×1.
 
-Un clic sur le titre en haut à gauche demande confirmation, sauvegarde et revient à **New game / Load game**. Le texte ne se sélectionne pas pendant les gestes. Une sauvegarde automatique distincte est conservée pour chaque partie. Le bouton Sauver crée des copies nommées indépendantes ; Load game ouvre une bibliothèque avec recherche, chargement, renommage et suppression. Le jeu n’impose aucune limite de nombre (dans la capacité de stockage du navigateur). Export/import JSON au menu. La reprise se fait en pause. Les anciennes sauvegardes conservent leur carte complète et migrent vers la nouvelle campagne.
+Un clic sur le titre en haut à gauche demande confirmation, sauvegarde et revient à **New game / Load game**. Le texte ne se sélectionne pas pendant les gestes. Une sauvegarde automatique distincte est conservée pour chaque partie. Le bouton Sauver crée des copies nommées indépendantes ; Load game ouvre une bibliothèque avec recherche, chargement, renommage et suppression. Le jeu n’impose aucune limite de nombre (dans la capacité de stockage du navigateur). La bibliothèque permet de cocher plusieurs sauvegardes et de les supprimer ensemble après confirmation ; la sauvegarde de la partie en cours est protégée. L’import et l’export ne sont plus proposés. Toutes les cartes commencent en pause. Les anciennes sauvegardes conservent leur carte complète et migrent vers la nouvelle campagne.
 
-Le jeu ne progresse pas lorsque son onglet est masqué. Le stockage dépend du navigateur et de l’adresse utilisée ; l’export permet de transférer une sauvegarde. Limites : 150 unités simultanées par camp, roi compris, et 100 monstres.
+Le jeu ne progresse pas lorsque son onglet est masqué. Le stockage dépend du navigateur et de l’adresse utilisée. Limites : 150 unités simultanées par camp, roi compris, et 100 monstres.
 
 ## Développer
 
@@ -146,7 +146,7 @@ Les chiffres au-dessus des habitants, rois et monstres sont masqués par défaut
 
 Un pont ou une barricade peut être commandé sans disposer de 1 000 ou 750 or. L’ouvrier rejoint une berge ou une case voisine et verse l’or disponible, puis les rentrées suivantes. Le chantier conserve sa progression et les dépenses si l’ouvrier meurt ou change d’ordre ; un autre habitant du même royaume peut le terminer en payant seulement le reste. À 0 % d’impôts et sans réserve, le chantier attend. L’usure et l’entretien habituels continuent ; une maison protège de l’usure normale.
 
-Les échafaudages montrent les chantiers et leur progression. Le pont reste une case d’eau infranchissable jusqu’à son achèvement ; la barricade ne bloque le passage qu’une fois achevée. Les chantiers peuvent être détruits et les dégâts reçus ne sont pas effacés par l’achèvement. Un chantier de pont abandonné avant son premier achèvement ne crée pas de réduction : la reconstruction à 500 or reste réservée aux ponts déjà achevés puis détruits. Sauvegarde, reprise et export conservent les paiements.
+Les échafaudages montrent les chantiers et leur progression. Le pont reste une case d’eau infranchissable jusqu’à son achèvement ; la barricade ne bloque le passage qu’une fois achevée. Les chantiers peuvent être détruits et les dégâts reçus ne sont pas effacés par l’achèvement. Un chantier de pont abandonné avant son premier achèvement ne crée pas de réduction : la reconstruction à 500 or reste réservée aux ponts déjà achevés puis détruits. Sauvegarde et reprise conservent les paiements.
 
 ## Une première vallée favorable au vert
 
@@ -179,3 +179,13 @@ Les personnages, rois, monstres et bâtiments utilisent de nouvelles planches Im
 Les index par case, les chemins partagés, les buffers de recherche réutilisés et les caches de ravitaillement réduisent les calculs répétés. Le terrain et le gazon sont repeints localement ; la simulation a un budget par image et le dessin immobile s’arrête. Sur la sauvegarde de l’audit, le test de bureau à ×5 passe d’environ 17 à 60 images/s ; ce résultat ne vaut pas validation sur téléphone.
 
 Rééquilibrage du 28 octobre : les petites unités en marche ne contournent plus l’entretien, une pénurie complète ajoute jusqu’à 8 % de pertes de PV/s et une unité de 100 PV ne rase plus seule une maison intacte. Les naissances restent à 100 PV, toutes les six secondes à 0 %, sans aucun revenu à ce taux. Les maisons conservent leurs dégâts dans les sauvegardes. Les massifs utilisent désormais des pièces rocheuses entières avec raccords selon les voisins et de grands sommets sur les empreintes de deux cases sur deux.
+
+## Pactes, options et préparation
+
+Chaque nouvelle carte, redémarrage et chargement attend en pause. Le bouton ▶ est mis en évidence avant le premier lancement ; Espace ou ▶ démarre la simulation. Le bouton 🤝 de l’en-tête permet alors de choisir l’un des trois partenaires ou de garder le mode chacun pour soi. Le choix peut être modifié jusqu’au premier lancement, puis reste verrouillé.
+
+Un pacte crée deux alliances de deux couronnes. Chaque couronne conserve ses couleurs, son trésor, ses naissances et ses unités. Les alliés ne combattent pas entre eux, n’endommagent pas leurs maisons, territoires ou constructions et ne fusionnent jamais entre couronnes ; ils peuvent occuper et traverser la même case. Les unités d’une même couronne fusionnent toujours. Le cheminement et la défense connaissent les alliances. Les maisons alliées offrent abri et routes de ravitaillement, sans mettre les trésors en commun. Une fois une alliance éliminée, les pactes se rompent : une notification annonce le duel entre les deux survivants. Leur présence seule ne vaut donc pas victoire. Le pacte et son verrouillage sont conservés dans les sauvegardes ; les anciennes parties restent chacun pour soi.
+
+Les options ⚙, accessibles aussi depuis le titre et le menu, proposent Forêt, Nuit bleue, Parchemin et Prune. Le choix est mémorisé dans ce navigateur et concerne l’interface, sans modifier les couleurs des quatre armées. Le volume musical reste réglable.
+
+Un pont ou une barricade achevé libère immédiatement tous les bâtisseurs du même camp qui avaient cette destination, même s’ils sont encore loin ou en attente. Ils reprennent leur activité normale ; les autres missions restent intactes. Les « Échos de la vallée » et la production de leur journal ont été supprimés. Les notifications utiles, dont la rupture du pacte et les confirmations de sauvegarde, restent visibles.

@@ -71,7 +71,7 @@ for (const kind of ["bridge", "barricade"] as const) {
     assert.equal(distance(workers[0], target), 1);
     assert.equal(workers[0].order, kind);
   });
-  test(`${kind}: late workers finish their approach after another unit completes the site`, () => {
+  test(`${kind}: completion releases distant builders immediately, even while waiting`, () => {
     const { s, us, target } = scene(kind);
     us[0].x = 23;
     us[0].y = 20;
@@ -82,31 +82,16 @@ for (const kind of ["bridge", "barricade"] as const) {
       kind,
       target,
     );
+    for (const u of us.slice(1)) u.wait = 999;
+    const before = us.slice(1).map((u) => ({ x: u.x, y: u.y }));
     step(s);
     assert.ok(!structureAt(s, target)!.construction);
-    for (const u of us.slice(1)) {
-      assert.equal(u.order, kind);
-      assert.ok(distance(u, target) > 1);
-    }
-    let reached = false;
-    for (let i = 0; i < 100; i++) {
-      step(s);
-      if (
-        s.units.some(
-          (u) =>
-            u.hp > 0 &&
-            us.slice(1).some((v) => v.id === u.id) &&
-            distance(u, target) <= 1,
-        )
-      )
-        reached = true;
-    }
-    assert.ok(reached, "late builders still reach the site");
-    assert.ok(
-      s.units
-        .filter((u) => u.hp > 0 && us.some((v) => v.id === u.id))
-        .every((u) => u.order !== kind),
-    );
+    us.slice(1).forEach((u, i) => {
+      assert.equal(u.order, "auto");
+      assert.equal(u.target, undefined);
+      assert.equal(u.formation, false);
+      assert.deepEqual({ x: u.x, y: u.y }, before[i]);
+    });
   });
   test(`${kind}: the entire group keeps its destination through a save`, () => {
     const { s, us, target } = scene(kind);

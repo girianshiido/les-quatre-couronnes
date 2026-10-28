@@ -26,6 +26,10 @@ class MemoryBackend implements SaveBackend {
     const e = this.entries.get(id);
     if (e) e.name = name;
   }
+  async removeMany(ids: string[]) {
+    if (this.fail) throw Error("storage unavailable");
+    for (const id of ids) await this.remove(id);
+  }
   async remove(id: string) {
     this.entries.delete(id);
     this.data.delete(id);
@@ -178,4 +182,33 @@ test("malformed checkpoints cannot overwrite saved games", async () => {
     assert.equal(await lib.restoreCheckpoint(raw), false);
   }
   assert.equal((await lib.load("auto-run"))!.time, 0);
+});
+
+test("bulk deletion removes only selected saves, deduplicates and protects the current run", async () => {
+  const { lib } = library(),
+    s = createGame();
+  const a = await lib.create(s, "A"),
+    b = await lib.create(s, "B"),
+    c = await lib.create(s, "C");
+  await lib.automatic("auto-active", s);
+  await assert.rejects(lib.removeMany([a.id, "auto-active"], "auto-active"));
+  assert.ok(await lib.load(a.id));
+  await lib.removeMany([a.id, b.id, a.id], "auto-active");
+  assert.equal(await lib.load(a.id), undefined);
+  assert.equal(await lib.load(b.id), undefined);
+  assert.ok(await lib.load(c.id));
+  assert.ok(await lib.load("auto-active"));
+});
+test("a failed bulk deletion leaves saves intact and the library can retry", async () => {
+  const { lib, backend } = library(),
+    s = createGame();
+  const a = await lib.create(s, "A"),
+    b = await lib.create(s, "B");
+  backend.fail = true;
+  await assert.rejects(lib.removeMany([a.id, b.id]));
+  assert.ok(await lib.load(a.id));
+  assert.ok(await lib.load(b.id));
+  backend.fail = false;
+  await lib.removeMany([a.id, b.id]);
+  assert.equal((await lib.list()).length, 0);
 });
