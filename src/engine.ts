@@ -2021,6 +2021,104 @@ function savingForHouse(s: State, u: Unit) {
     !!plan.work.get(plan.regions[idx(s, u.x, u.y)])?.land
   );
 }
+/** Prime the movement cache, then read its shared civilian route distances.
+ * Keep the hot movement routine unchanged for all uncontested orders. */
+function assaultRoutes(s: State, u: Unit, house: House, clearTrees: boolean) {
+  const start =
+    u.x === house.x && u.y === house.y
+      ? { x: house.x === 0 ? 1 : house.x - 1, y: house.y }
+      : u;
+  formationStep(s, start, house, u.team, false, clearTrees, true);
+  return flowCaches
+    .get(s)
+    ?.normal.fields.get(
+      `${idx(s, house.x, house.y)}-${u.team}-${clearTrees}-true`,
+    );
+}
+/** Compare a contested assault using the same cached routes as movement.
+ * Settling/clearing reservations stay exclusive; explicit orders are untouched. */
+function houseTakeoverDistance(
+  s: State,
+  u: Unit,
+  house: House,
+  claims: Unit[],
+  clearTrees: boolean,
+) {
+  const resistance = Math.max(0, 200 - (house.damage ?? 0));
+  if (u.hp * 0.95 < resistance) return -1;
+  const open = assaultRoutes(s, u, house, false);
+  let throughTrees: Int32Array | undefined;
+  const steps = (unit: Unit) => {
+    const at = idx(s, unit.x, unit.y);
+    const distance = open?.[at] ?? -1;
+    if (distance >= 0 || !clearTrees) return distance;
+    throughTrees ??= assaultRoutes(s, u, house, true);
+    return throughTrees?.[at] ?? -1;
+  };
+  const ours = steps(u);
+  if (ours < 0) return -1;
+  const allowed = claims.every((v) => {
+    if (v.royal || v.order !== "auto") return false;
+    const theirs = steps(v);
+    if (theirs < 0) return true;
+    // Let the current attacker strike; a two-cell margin avoids target churn.
+    if (theirs <= 1) return false;
+    return (
+      ours + 2 < theirs || (v.hp * 0.95 < resistance && ours <= theirs + 2)
+    );
+  });
+  return allowed ? ours : -1;
+}
+/** An idle troop checks at most three nearby claimed houses. This fallback
+ * does no extra work for units that already found a normal doctrine task. */
+function takeReservedHouse(
+  s: State,
+  u: Unit,
+  reserved: Set<number>,
+  clearTrees: boolean,
+) {
+  const nearby: House[] = [];
+  for (const key of reserved) {
+    const id = s.tiles[key]?.house;
+    if (id === undefined) continue;
+    const house = houseById(s, id);
+    if (
+      !house ||
+      areAllied(s, house.team, u.team) ||
+      u.hp * 0.95 < 200 - (house.damage ?? 0)
+    )
+      continue;
+    const d = distance(u, house);
+    let at = 0;
+    while (at < nearby.length && distance(u, nearby[at]) <= d) at++;
+    if (at < 3) {
+      nearby.splice(at, 0, house);
+      if (nearby.length > 3) nearby.pop();
+    }
+  }
+  let best: House | undefined,
+    bestDistance = Infinity;
+  for (const house of nearby) {
+    const claims = s.units.filter(
+      (v) =>
+        v.hp > 0 &&
+        v.team === u.team &&
+        v.id !== u.id &&
+        v.target?.x === house.x &&
+        v.target?.y === house.y &&
+        ["auto", "house"].includes(v.order),
+    );
+    const steps = houseTakeoverDistance(s, u, house, claims, clearTrees);
+    if (steps >= 0 && steps < bestDistance) {
+      best = house;
+      bestDistance = steps;
+    }
+  }
+  if (!best) return false;
+  u.order = "auto";
+  u.target = { x: best.x, y: best.y };
+  return true;
+}
 function playerExpansionTarget(s: State, u: Unit) {
   if (u.team !== 0 || u.royal || !["auto", "rest"].includes(u.order)) return;
   const profile = s.doctrine === "custom" ? undefined : DOCTRINES[s.doctrine];
@@ -2164,7 +2262,8 @@ function playerExpansionTarget(s: State, u: Unit) {
     }
     depth++;
   }
-  if (!choose()) updateRest(s, u, true);
+  if (!choose() && (!canRaid || !takeReservedHouse(s, u, reserved, canClear)))
+    updateRest(s, u, true);
 }
 const landLinks = new WeakMap<
   State,

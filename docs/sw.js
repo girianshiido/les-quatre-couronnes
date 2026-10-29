@@ -1,6 +1,6 @@
 // Generated from the complete production build. Do not edit by hand.
-const CACHE = 'quatre-couronnes-cb6e3a1903fb1987';
-const FILES = ["art/actors.png","art/buildings.png","art/world.png","assets/index-B-zI8fB-.js","assets/index-mEcdacdZ.css","audio/carte-cristal-essor.ogg","audio/carte-cristal-normal.ogg","audio/carte-desert-essor.ogg","audio/carte-desert-normal.ogg","audio/carte-marais-essor.ogg","audio/carte-marais-normal.ogg","audio/carte-neige-essor.ogg","audio/carte-neige-normal.ogg","audio/ecran-defaite.ogg","audio/ecran-titre.ogg","audio/ecran-victoire-finale.ogg","audio/theme-normal.ogg","audio/theme-victoire.ogg","biomes.png","crown.svg","icons/crown-192.png","icons/crown-512.png","index.html","kings-atlas.png","manifest.webmanifest","sprites-atlas.png"];
+const CACHE = 'quatre-couronnes-dd0a8442d7c2f129';
+const FILES = ["art/actors.png","art/buildings.png","art/world.png","assets/index-Dv0ABONs.js","assets/index-mEcdacdZ.css","audio/carte-cristal-essor.ogg","audio/carte-cristal-normal.ogg","audio/carte-desert-essor.ogg","audio/carte-desert-normal.ogg","audio/carte-marais-essor.ogg","audio/carte-marais-normal.ogg","audio/carte-neige-essor.ogg","audio/carte-neige-normal.ogg","audio/ecran-defaite.ogg","audio/ecran-titre.ogg","audio/ecran-victoire-finale.ogg","audio/theme-normal.ogg","audio/theme-victoire.ogg","biomes.png","crown.svg","icons/crown-192.png","icons/crown-512.png","index.html","kings-atlas.png","manifest.webmanifest","sprites-atlas.png"];
 const INDEX = new URL('index.html', self.registration.scope).href;
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES.map(p => new Request(new URL(p, self.registration.scope).href, {cache: "reload"})))));
